@@ -7,118 +7,50 @@ from common import get_log
 
 log = get_log(__file__)
 
-full_list_of_categories = [
-    "Airfare",
-    "Automotive",
-    "Bills & Utilities",
-    "Dining",
-    "Education",
-    "Entertainment",
-    "Fee/Interest Charge",
-    "Fees & Adjustments",
-    "Fees & Adjustments-Fees & Adjustments",
-    "Food & Drink",
-    "Gas",
-    "Gas/Automotive",
-    "Groceries",
-    "Health & Wellness",
-    "Health Care",
-    "Home",
-    "Lodging",
-    "Merchandise & Supplies-Groceries",
-    "Merchandise",
-    "Other Services",
-    "Other Travel",
-    "Payment/Credit",
-    "Personal",
-    "Phone/Cable",
-    "Professional Services",
-    "Restaurant-Bar & Café",
-    "Restaurant-Restaurant",
-    "Shopping",
-    "Transportation-Fuel",
-    "Travel",
-    "Travel-Airline",
-]
-
-
-def map_category(category):
-
+category_map = {
     # Examples: annual fees, interest fee, cash from cc rewards
-    if category in {
-        "Fee/Interest Charge",
-        "Fees & Adjustments",
-        "Fees & Adjustments-Fees & Adjustments",
-    }:
-        return "Fees"
-
-    if category in {
-        "Food & Drink",
-        "Dining",
-        "Restaurant-Bar & Café",
-        "Restaurant-Restaurant",
-    }:
-        return "Dining"
-
-    if category in {
-        "Gas",
-        "Gas/Automotive",
-        "Automotive",
-        "Transportation-Fuel",
-    }:
-        return "Car"
-
+    "Fee/Interest Charge": "Fees",
+    "Fees & Adjustments": "Fees",
+    "Fees & Adjustments-Fees & Adjustments": "Fees",
+    "Food & Drink": "Dining",
+    "Dining": "Dining",
+    "Restaurant-Bar & Café": "Dining",
+    "Restaurant-Restaurant": "Dining",
+    "Gas": "Car",
+    "Gas/Automotive": "Car",
+    "Automotive": "Car",
+    "Transportation-Fuel": "Car",
     # Examples: mitoc, paintnite, alum events
-    if category in {
-        "Education",
-        "Entertainment",
-    }:
-        return "Entertainment"
-
+    "Education": "Entertainment",
+    "Entertainment": "Entertainment",
     # Examples: bkb membership, csv, hospital fees
-    if category in {
-        "Health & Wellness",
-        "Health Care",
-    }:
-        return "Health"
-
+    "Health & Wellness": "Health",
+    "Health Care": "Health",
     # Examples: tj, whole foods
-    if category in {
-        "Groceries",
-        "Merchandise & Supplies-Groceries",
-    }:
-        return "Groceries"
-
+    "Groceries": "Groceries",
+    "Merchandise & Supplies-Groceries": "Groceries",
     # Examples: flights, ubers, airbnb
-    if category in {
-        "Airfare",
-        "Travel",
-        "Travel-Airline",
-        "Other Travel",
-        "Lodging",
-    }:
-        return "Travel"
-
+    "Airfare": "Travel",
+    "Travel": "Travel",
+    "Travel-Airline": "Travel",
+    "Other Travel": "Travel",
+    "Lodging": "Travel",
     # Examples: phone, internet, utilites
-    if category in {
-        "Bills & Utilities",
-        "Phone/Cable",
-    }:
-        return "Bills"
-
+    "Bills & Utilities": "Bills",
+    "Phone/Cable": "Bills",
     # Examples: stores, Note: capital_one puts TJs here
-    if category in {
-        "Merchandise",
-        "Shopping",
-    }:
-        return "Shopping"
-
-    return "Other"
+    "Merchandise": "Shopping",
+    "Shopping": "Shopping",
+}
 
 
 def standardizer(record):
     record["date"] = parse(record["date"]).isoformat()
-    record["category"] = map_category(record.get("category"))
+    record["category"] = (
+        category_map[record.get("category")]
+        if record.get("category") in category_map
+        else "Other"
+    )
     return record
 
 
