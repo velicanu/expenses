@@ -1,1 +1,12 @@
+# python
 venv/
+__pycache__
+
+# data
+data/raw
+data/extracted
+data/parsed
+data/standardized
+
+# output
+*.db
