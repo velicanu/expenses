@@ -38,7 +38,7 @@ class CardRecord(object):
         records_df = pd.DataFrame(strip_payment(self.records))
         records_df.index = pd.to_datetime(records_df["date"])
         records_df.groupby(
-            [pd.Grouper(freq="M"), "category"]
+            [pd.Grouper(freq=freq), "category"]
         ).sum().reset_index().pivot(index="date", columns="category").plot(
             kind="bar", stacked=stacked
         )
