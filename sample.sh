@@ -1,6 +1,7 @@
 echo "Copying data from sample folder into raw folder:"
 echo cp data/sample/* data/raw/
 echo
+mkdir -p data/raw
 cp data/sample/* data/raw/
 
 echo "Running the pipeline:"
