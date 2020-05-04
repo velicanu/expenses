@@ -62,7 +62,7 @@ def default_parser(record):
     return record
 
 
-def get_card(filename):
+def get_card_from_filename(filename):
     path_info = pathlib.Path(filename)
     if path_info.stem.startswith("amex"):
         return "amex"
@@ -76,8 +76,13 @@ def get_card(filename):
         raise NotImplementedError("Card type not supported.")
 
 
-def get_parser(filename):
-    card_type = get_card(filename)
+def get_parser(filename=None, card_type=None):
+    if filename is not None and card_type is None:
+        card_type = get_card_from_filename(filename)
+    elif card_type is None:
+        raise ValueError("One of card_type or filename must be provided.")
+    else:
+        pass
     if card_type in PARSER_DICT:
         return PARSER_DICT[card_type]
     else:
