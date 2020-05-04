@@ -4,6 +4,8 @@ etl() {
     python src/standardize.py data/parsed/$2.json data/standardized/$2.json
 }
 
+
+mkdir -p data/extracted data/parsed data/standardized
 for i in data/raw/*
 do
     base=$(basename $i)  # ex. amex.xlsx
