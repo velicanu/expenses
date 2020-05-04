@@ -45,9 +45,11 @@ class Card(object):
     def records(self, records):
         """Set records."""
         if isinstance(records, list) or isinstance(records, dict):
-            self.records = pd.DataFrame(records)
+            self._records = pd.DataFrame(records)
         elif isinstance(records, pd.DataFrame):
-            self.records = records
+            self._records = records
+        else:
+            raise TypeError("Records cannot be converted to dataframe.")
 
     def plot_categories(self, include_payments=False):
         """Barplot of expense across categories for entire expense record selected."""
