@@ -67,9 +67,9 @@ def standardizer(record):
         if record.get("category") in category_map
         else "Other"
     )
-    record["category"] = (
-        description_map.get(record.get("description"))
-        if record.get("category") == "Other" else record["category"])
+
+    if record["description"] in description_map:
+        record["category"] = description_map[record["description"]]
     return record
 
 
