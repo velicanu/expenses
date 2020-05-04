@@ -6,8 +6,8 @@ etl() {
 
 for i in data/raw/*
 do
-    base=$(basename $i)
-    filename="${base%.*}"
+    base=$(basename $i)  # ex. amex.xlsx
+    filename="${base%.*}"  # ex. amex
     etl $base $filename &
 done
 wait

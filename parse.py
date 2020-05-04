@@ -50,12 +50,22 @@ def parse_usbank(record):
     }
 
 
-PARSERS = {
-    "amex": parse_amex,
-    "capital_one": parse_capital_one,
-    "chase": parse_chase,
-    "usbank": parse_usbank,
-}
+def default_parser(record):
+    return record
+
+
+def get_parser(filename):
+    path_info = pathlib.Path(filename)
+    if path_info.stem.startswith("amex"):
+        return parse_amex
+    if path_info.stem.startswith("chase"):
+        return parse_chase
+    if path_info.stem.startswith("capital"):
+        return parse_capital_one
+    if path_info.stem.startswith("usbank"):
+        return parse_usbank
+
+    return default_parser
 
 
 @click.command()
@@ -63,8 +73,7 @@ PARSERS = {
 @click.argument("outfile", type=click.File("w"))
 def parse(infile, outfile):
     """Converts excel and csv files into json"""
-    path_info = pathlib.Path(infile.name)
-    parser = PARSERS[path_info.stem]
+    parser = get_parser(infile.name)
 
     log.info(f"Parsing {infile.name} into {outfile.name}")
     for line in infile:
