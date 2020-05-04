@@ -14,8 +14,9 @@ READERS = {".xlsx": pd.read_excel, ".xls": pd.read_excel, ".csv": pd.read_csv}
 def read_to_dict(infile):
     path_info = pathlib.Path(infile)
     reader = READERS[path_info.suffix]
-    records = reader(infile).replace({np.nan: None}).to_dict(orient="records")	
+    records = reader(infile).replace({np.nan: None}).to_dict(orient="records")
     return records
+
 
 @click.command()
 @click.argument("infile", type=str)  # click isn't smart enough to open xlsx :(
