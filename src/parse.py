@@ -45,15 +45,17 @@ def parse_usbank(record):
         "date": record["Date"],
         "description": record["Name"],
         "amount": record["Amount"],
-        "category": None, # No category
+        "category": None,  # No category
         "source": "usbank",
     }
 
 
-PARSER_DICT = {"amex": parse_amex,
-               "chase": parse_chase,
-               "capital_one": parse_capital_one,
-               "usbank": parse_usbank}
+PARSER_DICT = {
+    "amex": parse_amex,
+    "chase": parse_chase,
+    "capital_one": parse_capital_one,
+    "usbank": parse_usbank,
+}
 
 
 def default_parser(record):
