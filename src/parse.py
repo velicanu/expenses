@@ -45,27 +45,41 @@ def parse_usbank(record):
         "date": record["Date"],
         "description": record["Name"],
         "amount": record["Amount"],
-        # no category :(
+        "category": None, # No category
         "source": "usbank",
     }
+
+
+PARSER_DICT = {"amex": parse_amex,
+               "chase": parse_chase,
+               "capital_one": parse_capital_one,
+               "usbank": parse_usbank}
 
 
 def default_parser(record):
     return record
 
 
-def get_parser(filename):
+def get_card(filename):
     path_info = pathlib.Path(filename)
     if path_info.stem.startswith("amex"):
-        return parse_amex
-    if path_info.stem.startswith("chase"):
-        return parse_chase
-    if path_info.stem.startswith("capital"):
-        return parse_capital_one
-    if path_info.stem.startswith("usbank"):
-        return parse_usbank
+        return "amex"
+    elif path_info.stem.startswith("chase"):
+        return "chase"
+    elif path_info.stem.startswith("capital"):
+        return "capital_one"
+    elif path_info.stem.startswith("usbank"):
+        return "usbank"
+    else:
+        raise NotImplementedError("Card type not supported.")
 
-    return default_parser
+
+def get_parser(filename):
+    card_type = get_card(filename)
+    if card_type in PARSER_DICT:
+        return PARSER_DICT[card_type]
+    else:
+        return default_parser
 
 
 @click.command()
