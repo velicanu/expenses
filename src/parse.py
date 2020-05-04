@@ -50,7 +50,7 @@ def parse_usbank(record):
     }
 
 
-PARSER_DICT = {
+PARSERS = {
     "amex": parse_amex,
     "chase": parse_chase,
     "capital_one": parse_capital_one,
@@ -64,29 +64,20 @@ def default_parser(record):
 
 def get_card_from_filename(filename):
     path_info = pathlib.Path(filename)
-    if path_info.stem.startswith("amex"):
-        return "amex"
-    elif path_info.stem.startswith("chase"):
-        return "chase"
-    elif path_info.stem.startswith("capital"):
-        return "capital_one"
-    elif path_info.stem.startswith("usbank"):
-        return "usbank"
+    for card_name in PARSERS.keys():
+        if path_info.stem.startswith(card_name):
+            return card_name
     else:
         raise NotImplementedError("Card type not supported.")
 
 
 def get_parser(filename=None, card_type=None):
-    if filename is not None and card_type is None:
-        card_type = get_card_from_filename(filename)
-    elif card_type is None:
-        raise ValueError("One of card_type or filename must be provided.")
-    else:
-        pass
-    if card_type in PARSER_DICT:
-        return PARSER_DICT[card_type]
-    else:
-        return default_parser
+    if card_type is None:
+        try:
+            card_type = get_card_from_filename(filename)
+        except TypeError:
+            raise TypeError("One of card_type or filename must be provided.")
+    return PARSERS.get(card_type, default_parser)
 
 
 @click.command()
