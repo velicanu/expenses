@@ -4,6 +4,7 @@ from extract import read_to_dict
 from standardize import standardizer
 from common import flip_spending_sign
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 
 
@@ -23,11 +24,13 @@ class Card(object):
         """Read expenses."""
         records = read_to_dict(self.filename)
         records = [standardizer(self.parser(record)) for record in records]
-        self._records = pd.DataFrame(flip_spending_sign(records))
+        records_df = pd.DataFrame(flip_spending_sign(records))
+        records_df.index = pd.to_datetime(records_df["date"])
+        self._records = records_df
 
     @property
     def category_colors(self):
-        """Generate colors for each unique category
+        """Generate colors for each unique category.
 
         So that plot colors stay consistent throughout.
         """
@@ -51,11 +54,22 @@ class Card(object):
         else:
             raise TypeError("Records cannot be converted to dataframe.")
 
+    @property
+    def record_is_payment(self):
+        return self.records['description'].str.lower().str.contains('autopay|thank you|payment')
+
+    @property
+    def monthly_spending(self):
+        records_df = self.records[~self.record_is_payment]
+        return records_df.groupby(
+            [pd.Grouper(freq='M'), "category"]
+        ).sum().reset_index()
+
     def plot_categories(self, include_payments=False):
         """Barplot of expense across categories for entire expense record selected."""
         records_df = self.records
         if not include_payments:
-            records_df = records_df[~records_df['description'].str.contains('THANK YOU')]
+            records_df = records_df[~self.record_is_payment]
         records_df[["category", "amount"]].groupby("category")["amount"].sum().plot(
             x="category", y="amount", kind="bar", color=self.category_colors
         )
@@ -72,12 +86,7 @@ class Card(object):
         include_payments: False
             include credit card payments in records whil plotting.
         """
-        records_df = self.records
-        if not include_payments:
-            records_df = records_df[~records_df['description'].str.contains('THANK YOU')]
-        records_df.index = pd.to_datetime(records_df["date"])
-        records_df.groupby(
-            [pd.Grouper(freq=freq), "category"]
-        ).sum().reset_index().pivot(index="date", columns="category").plot(
+        self.monthly_spending.pivot(index="date", columns="category").plot(
             kind="bar", stacked=stacked
         )
+
