@@ -44,6 +44,16 @@ category_map = {
 }
 
 
+
+def strip_payment(records):
+    """Remove payment of bill from records.
+
+    Currently only implemented for AMEX.
+    """
+    records = [record for record in records if "THANK YOU" not in record['description']]
+    return records
+
+
 def standardizer(record):
     record["date"] = parse(record["date"]).isoformat()
     record["category"] = (
