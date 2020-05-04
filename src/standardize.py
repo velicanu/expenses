@@ -44,6 +44,13 @@ category_map = {
 }
 
 
+description_map = {
+    "LYFT": "Rideshare",
+    "UBER": "Rideshare"
+}
+
+
+
 def strip_payment(records):
     """Remove payment of bill from records.
 
@@ -60,6 +67,9 @@ def standardizer(record):
         if record.get("category") in category_map
         else "Other"
     )
+    record["category"] = (
+        description_map.get(record.get("description"))
+        if record.get("category") == "Other" else record["category"])
     return record
 
 
