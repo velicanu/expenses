@@ -4,12 +4,12 @@ from extract import read_to_dict
 from standardize import standardizer
 from common import flip_spending_sign
 import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
 
 
 class Card(object):
     """Class for a single credit card, and associated records."""
+
     def __init__(self, filename, card=None):
         """Init."""
         self.filename = filename
@@ -56,10 +56,12 @@ class Card(object):
 
     @property
     def record_is_payment(self):
+        """Mask for payments (as opposed to expenses)."""
         return self.records['description'].str.lower().str.contains('autopay|thank you|payment')
 
     @property
     def monthly_spending(self):
+        """Monthly totals by category."""
         records_df = self.records[~self.record_is_payment]
         return records_df.groupby(
             [pd.Grouper(freq='M'), "category"]
@@ -89,4 +91,3 @@ class Card(object):
         self.monthly_spending.pivot(index="date", columns="category").plot(
             kind="bar", stacked=stacked
         )
-
