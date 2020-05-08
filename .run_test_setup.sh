@@ -1,3 +1,8 @@
+if [ -z $1 ]; then
+    echo "Usage: ./.run_test_setup.sh </path/to/tmpdir/>"
+    exit 1
+fi
+
 TESTDIR="$1"
 
 mkdir -p $TESTDIR/data
