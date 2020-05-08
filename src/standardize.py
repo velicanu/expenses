@@ -44,6 +44,22 @@ category_map = {
 }
 
 
+description_map = {
+    "LYFT": "Rideshare",
+    "UBER": "Rideshare"
+}
+
+
+
+def strip_payment(records):
+    """Remove payment of bill from records.
+
+    Currently only implemented for AMEX.
+    """
+    records = [record for record in records if "THANK YOU" not in record["description"]]
+    return records
+
+
 def standardizer(record):
     record["date"] = parse(record["date"]).isoformat()
     record["category"] = (
@@ -51,6 +67,9 @@ def standardizer(record):
         if record.get("category") in category_map
         else "Other"
     )
+
+    if record["description"] in description_map:
+        record["category"] = description_map[record["description"]]
     return record
 
 
