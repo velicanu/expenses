@@ -1,10 +1,11 @@
 """Record class."""
-from parse import get_parser, get_card_from_filename
-from extract import read_to_dict
-from standardize import standardizer
-from common import flip_spending_sign
-import pandas as pd
 import matplotlib.pyplot as plt
+import pandas as pd
+
+from common import flip_spending_sign
+from extract import read_to_dict
+from parse import get_card_from_filename, get_parser
+from standardize import standardizer
 
 
 class Card(object):
@@ -57,15 +58,19 @@ class Card(object):
     @property
     def record_is_payment(self):
         """Mask for payments (as opposed to expenses)."""
-        return self.records['description'].str.lower().str.contains('autopay|thank you|payment')
+        return (
+            self.records["description"]
+            .str.lower()
+            .str.contains("autopay|thank you|payment")
+        )
 
     @property
     def monthly_spending(self):
         """Monthly totals by category."""
         records_df = self.records[~self.record_is_payment]
-        return records_df.groupby(
-            [pd.Grouper(freq='M'), "category"]
-        ).sum().reset_index()
+        return (
+            records_df.groupby([pd.Grouper(freq="M"), "category"]).sum().reset_index()
+        )
 
     def plot_categories(self, include_payments=False):
         """Barplot of expense across categories for entire expense record selected."""
