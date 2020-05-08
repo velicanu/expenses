@@ -11,7 +11,7 @@ import pandas as pd
 class TestPipeline(unittest.TestCase):
     def test_full_pipeline(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            subprocess.run(["sh", ".run_test_setup.sh", f"{tmpdir}"])
+            subprocess.run(["sh", ".test_helper.sh", f"{tmpdir}"])
             conn = sqlite3.connect(os.path.join(tmpdir, "expenses.db"))
             actual = (
                 pd.read_sql("SELECT * FROM expenses", conn)
