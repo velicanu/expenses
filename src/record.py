@@ -11,7 +11,7 @@ from standardize import standardizer
 class Card(object):
     """Class for a single credit card, and associated records."""
 
-    def __init__(self, filename, card=None):
+    def __init__(self, filename, card=None, df=None):
         """Init."""
         self.filename = filename
         if card is None:
@@ -20,6 +20,9 @@ class Card(object):
         else:
             self.card = card
             self.parser = get_parser(card)
+        if df is not None:
+            self._records = df.copy(deep=True)
+            self._records.index = pd.to_datetime(self._records["date"])
 
     def read_expenses(self):
         """Read expenses."""
