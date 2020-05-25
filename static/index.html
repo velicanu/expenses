@@ -24,13 +24,27 @@
         <button type="button" class="btn btn-secondary">Run Pipeline</button>
       </div>
     </div>
-    <script>
-      function myFunction() {
-        alert("hello");
-      }
-    </script>
+    <script src="js/axios.min.js"></script>
     <script src="js/jquery-3.3.1.slim.min.js"></script>
     <script src="js/popper.min.js"></script>
     <script src="js/bootstrap.min.js"></script>
+
+    <script>
+      function myFunction() {
+        axios
+          .get("/upload")
+          .then(function (response) {
+            // handle success
+            console.log(response);
+          })
+          .catch(function (error) {
+            // handle error
+            console.log(error);
+          })
+          .then(function () {
+            // always executed
+          });
+      }
+    </script>
   </body>
 </html>
