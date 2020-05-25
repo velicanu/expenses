@@ -1,4 +1,4 @@
-from flask import Flask, Response, g
+from flask import Flask, Response
 
 app = Flask(__name__)
 
@@ -13,7 +13,14 @@ def root():
 @app.route("/upload/")
 def upload():
     print("upload")
-    return Response("hello world")
+    return Response("upload")
+
+
+@app.route("/run")
+@app.route("/run/")
+def run():
+    print("run")
+    return Response("run")
 
 
 @app.route("/<path:path>")
