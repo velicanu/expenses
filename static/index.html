@@ -16,12 +16,14 @@
     <div class="container">
       <h1 class="py-4">Expenses</h1>
       <div class="row py-3">
-        <button type="button" class="btn btn-primary" onclick="myFunction()">
+        <button type="button" class="btn btn-primary" onclick="upload()">
           Upload
         </button>
       </div>
       <div class="row py-3">
-        <button type="button" class="btn btn-secondary">Run Pipeline</button>
+        <button type="button" class="btn btn-secondary" onclick="run()">
+          Run Pipeline
+        </button>
       </div>
     </div>
     <script src="js/axios.min.js"></script>
@@ -30,7 +32,7 @@
     <script src="js/bootstrap.min.js"></script>
 
     <script>
-      function myFunction() {
+      function upload() {
         axios
           .get("/upload")
           .then(function (response) {
@@ -44,6 +46,12 @@
           .then(function () {
             // always executed
           });
+      }
+      function run() {
+        axios.get("/run").then(function (response) {
+          // handle success
+          console.log(response);
+        });
       }
     </script>
   </body>
