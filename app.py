@@ -1,4 +1,5 @@
-from flask import Flask, Response
+from flask import Flask, Response, request
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 
@@ -9,11 +10,16 @@ def root():
     return app.send_static_file("index.html")
 
 
-@app.route("/upload")
-@app.route("/upload/")
+@app.route("/upload", methods=["GET", "POST"])
 def upload():
-    print("upload")
-    return Response("upload")
+    if request.method == "POST":
+        print(request.files)
+        file = request.files["file"]
+
+        filename = secure_filename(file.filename)
+
+        print(filename)
+        return Response("upload")
 
 
 @app.route("/run")

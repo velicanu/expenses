@@ -4,3 +4,16 @@ body {
   margin: 0;
   background: #f2f6e9;
 }
+
+button label{
+    border: 0px;
+    width: 100%;
+    height: 1em;
+}
+
+.form-group{
+    display: none;
+}
+.alert{
+    display: none;
+}
