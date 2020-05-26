@@ -16,9 +16,35 @@
     <div class="container">
       <h1 class="py-4">Small data</h1>
       <div class="row py-3">
-        <button type="button" class="btn btn-primary" onclick="upload()">
-          Upload
-        </button>
+        <form
+          role="form"
+          class="form"
+          enctype="multipart/form-data"
+          onsubmit="return false;"
+        >
+          <button id="browse" type="button" class="btn btn-primary">
+            <label for="file">
+              Browse
+            </label>
+          </button>
+          <button id="submitBtn" type="button" class="btn btn-primary" disabled>
+            Submit
+          </button>
+          <p id="output"></p>
+          <div id="success" class="alert alert-success" role="alert">
+            This is a success alert—check it out!
+          </div>
+          <div class="form-group">
+            <input
+              id="file"
+              type="file"
+              class="form-control"
+              accept=".csv,
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,
+            application/vnd.ms-excel"
+            />
+          </div>
+        </form>
       </div>
       <div class="row py-3">
         <button type="button" class="btn btn-secondary" onclick="run()">
@@ -32,27 +58,45 @@
     <script src="js/bootstrap.min.js"></script>
 
     <script>
-      function upload() {
+      // file form, triggered by Browse button
+      const file = document.getElementById("file");
+      // file.style.display = "none";
+
+      // text showing currently selected file
+      const output = document.getElementById("output");
+
+      // alert showing file upload success
+      const success = document.getElementById("success");
+      // success.style.display = "none";
+
+      // submit button clickable only if file is set
+      const submitBtn = document.getElementById("submitBtn");
+      file.addEventListener("change", updateValue);
+      function updateValue(e) {
+        if (e.target.value === "") {
+          submitBtn.disabled = true;
+          output.innerHTML = "";
+        } else {
+          output.innerHTML = file.files[0].name;
+          submitBtn.disabled = false;
+        }
+      }
+
+      // when submit is clicked. post file to /upload
+      document.getElementById("submitBtn").onclick = function () {
+        var data = new FormData();
+        data.append("file", document.getElementById("file").files[0]);
+
         axios
-          .get("/upload")
-          .then(function (response) {
-            // handle success
-            console.log(response);
+          .post("/upload", data)
+          .then(function (res) {
+            success.style.display = "block";
+            console.log(res.data);
           })
-          .catch(function (error) {
-            // handle error
-            console.log(error);
-          })
-          .then(function () {
-            // always executed
+          .catch(function (err) {
+            console.log(res.data);
           });
-      }
-      function run() {
-        axios.get("/run").then(function (response) {
-          // handle success
-          console.log(response);
-        });
-      }
+      };
     </script>
   </body>
 </html>
