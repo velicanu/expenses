@@ -21,6 +21,7 @@
     </div>
     <div class="row py-3">
       <form
+        id="form"
         role="form"
         class="form"
         enctype="multipart/form-data"
@@ -42,6 +43,7 @@
           accept=".csv,
             application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,
             application/vnd.ms-excel"
+          multiple
         />
       </form>
     </div>
@@ -57,6 +59,7 @@
 
     <script>
       // file form, triggered by Browse button
+      const form = document.getElementById("form");
       const file = document.getElementById("file");
       const browse = document.getElementById("browse");
       browse.onclick = function () {
@@ -77,7 +80,11 @@
           submitBtn.disabled = true;
           output.innerHTML = "";
         } else {
-          output.innerHTML = file.files[0].name;
+          for (x in file.files) {
+            if (typeof file.files[x] == "object") {
+              output.innerHTML += file.files[x].name + "<br />";
+            }
+          }
           submitBtn.disabled = false;
         }
       }
@@ -86,6 +93,7 @@
       submitBtn.onclick = function () {
         var data = new FormData();
         data.append("file", file.files[0]);
+        data.append("file", file.files[1]);
 
         axios
           .post("/upload", data)
@@ -95,6 +103,7 @@
               success.style.display = "none";
               submitBtn.disabled = true;
               output.innerHTML = "";
+              form.reset();
             }, 3000);
           })
           .catch(function (err) {
