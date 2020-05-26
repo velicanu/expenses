@@ -19,11 +19,11 @@ def root():
 @app.route("/upload", methods=["GET", "POST"])
 def upload():
     if request.method == "POST":
-        file_ = request.files["file"]
-        filename = secure_filename(file_.filename)
-        file_.save(os.path.join(app.config["UPLOAD_FOLDER"], filename))
+        for file_ in request.files.getlist("file"):
+            filename = secure_filename(file_.filename)
+            file_.save(os.path.join(app.config["UPLOAD_FOLDER"], filename))
 
-        return Response(f"{filename}")
+        return Response("success")
     else:
         return Response()
 
