@@ -1,6 +1,7 @@
 from flask import Flask, Response
 
 app = Flask(__name__)
+app.url_map.strict_slashes = False
 
 
 # Routes
@@ -10,14 +11,12 @@ def root():
 
 
 @app.route("/upload")
-@app.route("/upload/")
 def upload():
     print("upload")
     return Response("upload")
 
 
 @app.route("/run")
-@app.route("/run/")
 def run():
     print("run")
     return Response("run")
