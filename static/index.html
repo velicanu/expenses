@@ -13,44 +13,42 @@
     <title>Small data</title>
   </head>
   <body>
-    <div class="container">
-      <h1 class="py-4">Small data</h1>
-      <div class="row py-3">
-        <form
-          role="form"
-          class="form"
-          enctype="multipart/form-data"
-          onsubmit="return false;"
-        >
-          <button id="browse" type="button" class="btn btn-primary">
-            <label for="file">
-              Browse
-            </label>
-          </button>
-          <button id="submitBtn" type="button" class="btn btn-primary" disabled>
-            Submit
-          </button>
-          <p id="output"></p>
-          <div id="success" class="alert alert-success" role="alert">
-            This is a success alert—check it out!
-          </div>
-          <div class="form-group">
-            <input
-              id="file"
-              type="file"
-              class="form-control"
-              accept=".csv,
+    <div class="row py-0">
+      <h1 class="pb-4">Expenses</h1>
+    </div>
+    <div class="row py-0">
+      <h3 class="py-0">Add files</h3>
+    </div>
+    <div class="row py-3">
+      <form
+        role="form"
+        class="form"
+        enctype="multipart/form-data"
+        onsubmit="return false;"
+      >
+        <button id="browse" type="button" class="btn btn-primary">
+          Browse
+        </button>
+        <button id="submitBtn" type="button" class="btn btn-primary" disabled>
+          Submit
+        </button>
+        <p id="output"></p>
+        <div id="success" class="alert alert-success" role="alert">
+          Success! File has been added.
+        </div>
+        <input
+          id="file"
+          type="file"
+          accept=".csv,
             application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,
             application/vnd.ms-excel"
-            />
-          </div>
-        </form>
-      </div>
-      <div class="row py-3">
-        <button type="button" class="btn btn-secondary" onclick="run()">
-          Run Pipeline
-        </button>
-      </div>
+        />
+      </form>
+    </div>
+    <div class="row py-3">
+      <button type="button" class="btn btn-secondary" onclick="run()">
+        Run Pipeline
+      </button>
     </div>
     <script src="js/axios.min.js"></script>
     <script src="js/jquery-3.3.1.slim.min.js"></script>
@@ -60,16 +58,18 @@
     <script>
       // file form, triggered by Browse button
       const file = document.getElementById("file");
-      // file.style.display = "none";
+      const browse = document.getElementById("browse");
+      browse.onclick = function () {
+        file.click();
+      };
 
       // text showing currently selected file
       const output = document.getElementById("output");
 
       // alert showing file upload success
       const success = document.getElementById("success");
-      // success.style.display = "none";
 
-      // submit button clickable only if file is set
+      // this part toggles the submit button, enabling only if file is selected
       const submitBtn = document.getElementById("submitBtn");
       file.addEventListener("change", updateValue);
       function updateValue(e) {
@@ -82,16 +82,20 @@
         }
       }
 
-      // when submit is clicked. post file to /upload
-      document.getElementById("submitBtn").onclick = function () {
+      // this part does the actual uploading
+      submitBtn.onclick = function () {
         var data = new FormData();
-        data.append("file", document.getElementById("file").files[0]);
+        data.append("file", file.files[0]);
 
         axios
           .post("/upload", data)
           .then(function (res) {
             success.style.display = "block";
-            console.log(res.data);
+            setTimeout(function () {
+              success.style.display = "none";
+              submitBtn.disabled = true;
+              output.innerHTML = "";
+            }, 3000);
           })
           .catch(function (err) {
             console.log(res.data);
