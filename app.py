@@ -2,6 +2,7 @@ from flask import Flask, Response, request
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
+app.url_map.strict_slashes = False
 
 
 # Routes
@@ -23,7 +24,6 @@ def upload():
 
 
 @app.route("/run")
-@app.route("/run/")
 def run():
     print("run")
     return Response("run")
