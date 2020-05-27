@@ -10,21 +10,47 @@
     <link rel="stylesheet" type="text/css" href="css/bootstrap.min.css" />
     <link rel="stylesheet" type="text/css" href="css/main.css" />
     <link rel="stylesheet" type="text/css" href="css/fontawesome.all.min.css" />
-    <title>Expenses</title>
+    <title>Small data</title>
   </head>
   <body>
-    <div class="container">
-      <h1 class="py-4">Expenses</h1>
-      <div class="row py-3">
-        <button type="button" class="btn btn-primary" onclick="upload()">
-          Upload
+    <div class="row py-0">
+      <h1 class="pb-4">Expenses</h1>
+    </div>
+    <div class="row py-0">
+      <h3 class="py-0">Add files</h3>
+    </div>
+    <div class="row py-3">
+      <form
+        id="form"
+        role="form"
+        class="form"
+        enctype="multipart/form-data"
+        onsubmit="return false;"
+      >
+        <button id="browse" type="button" class="btn btn-primary">
+          Browse
         </button>
-      </div>
-      <div class="row py-3">
-        <button type="button" class="btn btn-secondary" onclick="run()">
-          Run Pipeline
+        <button id="submitBtn" type="button" class="btn btn-primary" disabled>
+          Submit
         </button>
-      </div>
+        <p id="output"></p>
+        <div id="success" class="alert alert-success" role="alert">
+          Success! File has been added.
+        </div>
+        <input
+          id="file"
+          type="file"
+          accept=".csv,
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,
+            application/vnd.ms-excel"
+          multiple
+        />
+      </form>
+    </div>
+    <div class="row py-3">
+      <button type="button" class="btn btn-secondary" onclick="run()">
+        Run Pipeline
+      </button>
     </div>
     <script src="js/axios.min.js"></script>
     <script src="js/jquery-3.3.1.slim.min.js"></script>
@@ -32,27 +58,58 @@
     <script src="js/bootstrap.min.js"></script>
 
     <script>
-      function upload() {
+      // file form, triggered by Browse button
+      const form = document.getElementById("form");
+      const file = document.getElementById("file");
+      const browse = document.getElementById("browse");
+      browse.onclick = function () {
+        file.click();
+      };
+
+      // text showing currently selected file
+      const output = document.getElementById("output");
+
+      // alert showing file upload success
+      const success = document.getElementById("success");
+
+      // this part toggles the submit button, enabling only if file is selected
+      const submitBtn = document.getElementById("submitBtn");
+      file.addEventListener("change", updateValue);
+      function updateValue(e) {
+        if (e.target.value === "") {
+          submitBtn.disabled = true;
+          output.innerHTML = "";
+        } else {
+          for (x in file.files) {
+            if (typeof file.files[x] == "object") {
+              output.innerHTML += file.files[x].name + "<br />";
+            }
+          }
+          submitBtn.disabled = false;
+        }
+      }
+
+      // this part does the actual uploading
+      submitBtn.onclick = function () {
+        var data = new FormData();
+        data.append("file", file.files[0]);
+        data.append("file", file.files[1]);
+
         axios
-          .get("/upload")
-          .then(function (response) {
-            // handle success
-            console.log(response);
+          .post("/upload", data)
+          .then(function (res) {
+            success.style.display = "block";
+            setTimeout(function () {
+              success.style.display = "none";
+              submitBtn.disabled = true;
+              output.innerHTML = "";
+              form.reset();
+            }, 3000);
           })
-          .catch(function (error) {
-            // handle error
-            console.log(error);
-          })
-          .then(function () {
-            // always executed
+          .catch(function (err) {
+            console.log(res.data);
           });
-      }
-      function run() {
-        axios.get("/run").then(function (response) {
-          // handle success
-          console.log(response);
-        });
-      }
+      };
     </script>
   </body>
 </html>
