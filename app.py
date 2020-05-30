@@ -1,7 +1,12 @@
+import io
+import json
 import os
 
 from flask import Flask, Response, request
 from werkzeug.utils import secure_filename
+
+from detect import get_card
+from extract import read_to_dict
 
 script_dir = os.path.dirname(os.path.realpath(__file__))
 
@@ -19,11 +24,21 @@ def root():
 @app.route("/upload", methods=["GET", "POST"])
 def upload():
     if request.method == "POST":
+        uploads = {"success": [], "failed": []}
         for file_ in request.files.getlist("file"):
             filename = secure_filename(file_.filename)
-            file_.save(os.path.join(app.config["UPLOAD_FOLDER"], filename))
+            with io.BytesIO() as stream:
+                file_.save(stream)
+                stream.seek(0)
+                first_record = read_to_dict(stream)[0]
+                card, card_def = get_card(first_record)
+                if card:
+                    file_.save(os.path.join(app.config["UPLOAD_FOLDER"], filename))
+                    uploads["success"].append(f"{filename}: {card}")
+                else:
+                    uploads["failed"].append(f"{filename}")
 
-        return Response("success")
+        return Response(json.dumps(uploads))
     else:
         return Response()
 
