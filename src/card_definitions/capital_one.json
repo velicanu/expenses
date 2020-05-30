@@ -1,0 +1,7 @@
+{
+  "Transaction Date": "date",
+  "Description": "description",
+  "Debit": "-amount",
+  "Credit": "amount",
+  "Category": "category"
+}
