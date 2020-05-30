@@ -34,21 +34,15 @@
           Submit
         </button>
         <p id="output"></p>
-        <div
-          id="success"
-          class="alert alert-success alert-dismissible"
-          role="alert"
-        >
-          <button type="button" class="close" data-dismiss="alert">x</button>
+        <div id="success" class="alert alert-success" role="alert">
+          <button id="successBtn" type="button" class="close">x</button>
           <h3>Successfully uploaded:</h3>
+          <div id="successText"></div>
         </div>
-        <div
-          id="failed"
-          class="alert alert-danger alert-dismissible"
-          role="alert"
-        >
-          <button type="button" class="close" data-dismiss="alert">x</button>
+        <div id="failed" class="alert alert-danger" role="alert">
+          <button id="failedBtn" type="button" class="close">x</button>
           <h3>Failed, card data not supported:</h3>
+          <div id="failedText"></div>
         </div>
         <input id="file" type="file" accept=".csv" multiple />
       </form>
@@ -77,6 +71,22 @@
 
       // alert showing file upload success
       const success = document.getElementById("success");
+      const successText = document.getElementById("successText");
+      const successBtn = document.getElementById("successBtn");
+      const failed = document.getElementById("failed");
+      const failedText = document.getElementById("failedText");
+      const failedBtn = document.getElementById("failedBtn");
+
+      successBtn.onclick = function () {
+        console.log("success clicky");
+        successText.innerHTML = "";
+        success.style.display = "none";
+      };
+      failedBtn.onclick = function () {
+        console.log("failed clicky");
+        failedText.innerHTML = "";
+        failed.style.display = "none";
+      };
 
       // this part toggles the submit button, enabling only if file is selected
       const submitBtn = document.getElementById("submitBtn");
@@ -109,13 +119,13 @@
               if (x == 0) {
                 success.style.display = "block";
               }
-              success.innerHTML += res.data.success[x] + "<br />";
+              successText.innerHTML += res.data.success[x] + "<br />";
             }
             for (x in res.data.failed) {
               if (x == 0) {
                 failed.style.display = "block";
               }
-              failed.innerHTML += res.data.failed[x] + "<br />";
+              failedText.innerHTML += res.data.failed[x] + "<br />";
             }
             submitBtn.disabled = true;
             output.innerHTML = "";
