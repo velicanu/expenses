@@ -44,11 +44,7 @@ category_map = {
 }
 
 
-description_map = {
-    "LYFT": "Rideshare",
-    "UBER": "Rideshare"
-}
-
+description_map = {"LYFT": "Rideshare", "UBER": "Rideshare"}
 
 
 def strip_payment(records):

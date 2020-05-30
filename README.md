@@ -42,3 +42,13 @@ After putting your data into the raw directory, run the following script to inge
 
 After running the pipeline, the data will be in standardized form in a sqlite database
 `expenses.db` as well in json format in the `data/standardized` directory.
+
+## Development
+
+`black` for python code.
+
+### Tests
+
+```bash
+nosetests -v src/
+```
