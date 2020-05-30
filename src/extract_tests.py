@@ -36,6 +36,6 @@ Transaction Date,Post Date,Description,Category,Type,Amount
                     "Amount": -51.37,
                 },
             ]
-            actual = read_to_dict(input_)
+            actual = read_to_dict(open(input_, "r"))
 
             self.assertEqual(expected, actual)
