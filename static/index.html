@@ -110,14 +110,12 @@
                 success.style.display = "block";
               }
               success.innerHTML += res.data.success[x] + "<br />";
-              console.log(res.data.success[x]);
             }
             for (x in res.data.failed) {
               if (x == 0) {
                 failed.style.display = "block";
               }
               failed.innerHTML += res.data.failed[x] + "<br />";
-              console.log(res.data.failed[x]);
             }
             submitBtn.disabled = true;
             output.innerHTML = "";
