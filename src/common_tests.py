@@ -64,7 +64,6 @@ class TestCommon(unittest.TestCase):
             with open(input_, "w") as _f:
                 _f.write(input_string)
             file_object = FileStorage(open(input_, "rb"))
-            # file_object.save(os.path.join(upload_folder, filename))
 
             expected = "success", f"{filename}: chase"
             actual = save_file_if_valid(file_object, filename, upload_folder)
@@ -80,7 +79,6 @@ class TestCommon(unittest.TestCase):
             with open(input_, "w") as _f:
                 _f.write(unknown_string)
             file_object = FileStorage(open(input_, "rb"))
-            # file_object.save(os.path.join(upload_folder, filename))
 
             expected = "failed", f"{filename}"
             actual = save_file_if_valid(file_object, filename, upload_folder)
