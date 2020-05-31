@@ -6,7 +6,7 @@ from flask import Flask, Response, request
 from werkzeug.utils import secure_filename
 
 from common import records_from_file
-from detect import get_card
+from detect import identify_card
 
 script_dir = os.path.dirname(os.path.realpath(__file__))
 
@@ -31,7 +31,7 @@ def upload():
                 file_.save(stream)
                 stream.seek(0)
                 first_record = records_from_file(stream)[0]
-                card, card_def = get_card(first_record)
+                card, card_def = identify_card(first_record)
                 if card:
                     file_.save(os.path.join(app.config["UPLOAD_FOLDER"], filename))
                     uploads["success"].append(f"{filename}: {card}")
