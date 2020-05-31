@@ -1,6 +1,6 @@
 import unittest
 
-from detect import CARD_DEFINITIONS, get_card
+from detect import CARD_DEFINITIONS, identify_card
 
 
 class TestDetect(unittest.TestCase):
@@ -16,7 +16,7 @@ class TestDetect(unittest.TestCase):
             "Category": "Merchandise & Supplies-Groceries",
         }
         expected = "amex", CARD_DEFINITIONS["amex"]
-        self.assertEqual(expected, get_card(input_))
+        self.assertEqual(expected, identify_card(input_))
 
     def test_detect_chase(self):
         input_ = {
@@ -28,7 +28,7 @@ class TestDetect(unittest.TestCase):
             "Amount": -123,
         }
         expected = "chase", CARD_DEFINITIONS["chase"]
-        self.assertEqual(expected, get_card(input_))
+        self.assertEqual(expected, identify_card(input_))
 
     def test_detect_capital_one(self):
         input_ = {
@@ -41,7 +41,7 @@ class TestDetect(unittest.TestCase):
             "Credit": None,
         }
         expected = "capital_one", CARD_DEFINITIONS["capital_one"]
-        self.assertEqual(expected, get_card(input_))
+        self.assertEqual(expected, identify_card(input_))
 
     def test_detect_usbank(self):
         input_ = {
@@ -52,4 +52,4 @@ class TestDetect(unittest.TestCase):
             "Amount": 123.45,
         }
         expected = "usbank", CARD_DEFINITIONS["usbank"]
-        self.assertEqual(expected, get_card(input_))
+        self.assertEqual(expected, identify_card(input_))
