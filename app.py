@@ -1,7 +1,10 @@
+import json
 import os
 
 from flask import Flask, Response, request
 from werkzeug.utils import secure_filename
+
+from common import save_file_if_valid
 
 script_dir = os.path.dirname(os.path.realpath(__file__))
 
@@ -19,11 +22,15 @@ def root():
 @app.route("/upload", methods=["GET", "POST"])
 def upload():
     if request.method == "POST":
+        file_upload_status = {"success": [], "failed": []}
         for file_ in request.files.getlist("file"):
             filename = secure_filename(file_.filename)
-            file_.save(os.path.join(app.config["UPLOAD_FOLDER"], filename))
+            status, status_string = save_file_if_valid(
+                file_, filename, app.config["UPLOAD_FOLDER"]
+            )
+            file_upload_status[status].append(status_string)
 
-        return Response("success")
+        return Response(json.dumps(file_upload_status))
     else:
         return Response()
 
