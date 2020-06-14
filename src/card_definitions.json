@@ -1,0 +1,26 @@
+{
+  "amex": {
+    "Date": "date",
+    "Description": "description",
+    "Amount": "-amount",
+    "Category": "category"
+  },
+  "capital_one": {
+    "Transaction Date": "date",
+    "Description": "description",
+    "Debit": "-amount",
+    "Credit": "amount",
+    "Category": "category"
+  },
+  "chase": {
+    "Transaction Date": "date",
+    "Description": "description",
+    "Amount": "amount",
+    "Category": "category"
+  },
+  "usbank": {
+    "Date": "date",
+    "Name": "description",
+    "Amount": "amount"
+  }
+}
