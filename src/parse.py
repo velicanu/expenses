@@ -9,17 +9,17 @@ from detect import identify_card
 log = get_log(__file__)
 
 
-def safe_float(value):
-    return float(value) if value else None
-
-
 def parse_record(record):
     card, card_def = identify_card(record)
     parsed_record = {k: record[v] for v, k in card_def.items()}
     if "amount" in parsed_record:
-        parsed_record["amount"] = safe_float(parsed_record["amount"])
+        parsed_record["amount"] = (
+            float(parsed_record["amount"]) if parsed_record["amount"] else None
+        )
     if "-amount" in parsed_record:
-        parsed_record["amount"] = -1 * safe_float(parsed_record["-amount"])
+        parsed_record["amount"] = (
+            -1 * float(parsed_record["-amount"]) if parsed_record["-amount"] else None
+        )
         parsed_record.pop("-amount")
     parsed_record["source"] = card
     if "category" not in parsed_record:
