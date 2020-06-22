@@ -7,13 +7,12 @@ from werkzeug.datastructures import FileStorage
 
 from common import records_from_file, save_file_if_valid
 
-input_string = """
-Transaction Date,Post Date,Description,Category,Type,Amount
+input_string = """Transaction Date,Post Date,Description,Category,Type,Amount
 12/30/2019,12/31/2019,THE LANDING PIZZA AND KIT,Food & Drink,Sale,-44.00
 12/29/2019,12/30/2019,TST* SWEET RICE - JP,Food & Drink,Sale,-51.37
+,,,,,
 """
-unknown_string = """
-Foo,Bar,Baz,Spam,Ham,Jam
+unknown_string = """Foo,Bar,Baz,Spam,Ham,Jam
 12/30/2019,12/31/2019,THE LANDING PIZZA AND KIT,Food & Drink,Sale,-44.00
 12/29/2019,12/30/2019,TST* SWEET RICE - JP,Food & Drink,Sale,-51.37
 """
@@ -24,7 +23,7 @@ expected = [
         "Description": "THE LANDING PIZZA AND KIT",
         "Category": "Food & Drink",
         "Type": "Sale",
-        "Amount": -44.0,
+        "Amount": "-44.00",
     },
     {
         "Transaction Date": "12/29/2019",
@@ -32,7 +31,7 @@ expected = [
         "Description": "TST* SWEET RICE - JP",
         "Category": "Food & Drink",
         "Type": "Sale",
-        "Amount": -51.37,
+        "Amount": "-51.37",
     },
 ]
 
@@ -44,7 +43,7 @@ class TestCommon(unittest.TestCase):
             with open(input_, "w") as _f:
                 _f.write(input_string)
 
-            actual = records_from_file(open(input_, "r"))
+            actual = list(records_from_file(open(input_, "r")))
 
             self.assertEqual(expected, actual)
 
@@ -53,7 +52,7 @@ class TestCommon(unittest.TestCase):
             _f.write(input_string.encode("utf-8"))
             _f.seek(0)
 
-            actual = records_from_file(_f)
+            actual = list(records_from_file(_f))
 
             self.assertEqual(expected, actual)
 
