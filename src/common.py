@@ -29,7 +29,7 @@ def flip_spending_sign(records):
 
 def records_from_file(infile):
     """
-    This function returns a list of json records from an input csv.
+    This function returns a generator of json records from an input csv.
 
     :param infile: Input csv file or stream
     :return: generator of json records
@@ -42,12 +42,10 @@ def records_from_file(infile):
                 input_ = input_.decode("utf-8")
             # amex csv export breaks python csv parser due to double "" inside "
             input_ = input_.replace('""', "@")
+            dialect = csv.Sniffer().sniff(input_)
             tmpfile.write(input_)
 
         with open(os.path.join(tmpdir, "tmp.txt"), "r") as tmpfile:
-            payload = tmpfile.read(2048)
-            dialect = csv.Sniffer().sniff(payload)
-            tmpfile.seek(0)
             reader = csv.reader(tmpfile, dialect)
             header = next(reader)
             for row in reader:
