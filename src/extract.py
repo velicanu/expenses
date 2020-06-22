@@ -14,7 +14,7 @@ def _get_newline(infile):
 
 
 def extract(infile, outfile):
-    """Converts excel and csv files into json, returns the output filename"""
+    """Converts csv files into json, returns the output filename"""
     with open(infile, "r", newline=_get_newline(infile)) as inf, open(
         outfile, "w"
     ) as outf:
