@@ -1,16 +1,23 @@
 import json
 
 import click
-from smart_open import open
 
 from common import get_log, records_from_file
 
 log = get_log(__file__)
 
 
+def _get_newline(infile):
+    with open(infile, "rb") as inf:
+        rn_pos = inf.read().find(b"\r\n")
+    return "\n" if rn_pos == -1 else "\r\n"
+
+
 def extract(infile, outfile):
     """Converts excel and csv files into json, returns the output filename"""
-    with open(infile, "r") as inf, open(outfile, "w") as outf:
+    with open(infile, "r", newline=_get_newline(infile)) as inf, open(
+        outfile, "w"
+    ) as outf:
         records = records_from_file(inf)
         log.info(f"Extracting {infile} into {outfile}")
         for record in records:

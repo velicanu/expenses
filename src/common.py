@@ -2,11 +2,17 @@ import csv
 import io
 import logging
 import os
-
-import numpy as np
-import pandas as pd
+import tempfile
 
 from detect import identify_card
+
+
+def get_files(dir_):
+    """
+    yields the full filename for each file in the directory
+    """
+    for file_name in next(os.walk(dir_))[2]:
+        yield os.path.join(dir_, file_name)
 
 
 def get_log(name):
@@ -26,18 +32,29 @@ def records_from_file(infile):
     This function returns a list of json records from an input csv.
 
     :param infile: Input csv file or stream
-    :return: list of json records
+    :return: generator of json records
     """
-    payload = infile.read(2048)
-    if isinstance(infile, io.BytesIO):
-        payload = payload.decode("utf-8")
-    dialect = csv.Sniffer().sniff(payload)
-    infile.seek(0)
-    return (
-        pd.read_csv(infile, dialect=dialect)
-        .replace({np.nan: None})
-        .to_dict(orient="records")
-    )
+    with tempfile.TemporaryDirectory() as tmpdir:
+        # first clean the file
+        with open(os.path.join(tmpdir, "tmp.txt"), "w") as tmpfile:
+            input_ = infile.read()
+            if isinstance(infile, io.BytesIO):
+                input_ = input_.decode("utf-8")
+            # amex csv export breaks python csv parser due to double "" inside "
+            input_ = input_.replace('""', "@")
+            tmpfile.write(input_)
+
+        with open(os.path.join(tmpdir, "tmp.txt"), "r") as tmpfile:
+            payload = tmpfile.read(2048)
+            dialect = csv.Sniffer().sniff(payload)
+            tmpfile.seek(0)
+            reader = csv.reader(tmpfile, dialect)
+            header = next(reader)
+            for row in reader:
+                _row = {k: v for k, v in zip(header, row)}
+                # don't return null rows
+                if any([v for v in _row.values()]):
+                    yield _row
 
 
 def save_file_if_valid(file_, filename, data_dir):
@@ -53,7 +70,7 @@ def save_file_if_valid(file_, filename, data_dir):
     with io.BytesIO() as stream:
         file_.save(stream)
         stream.seek(0)
-        first_record = records_from_file(stream)[0]
+        first_record = next(records_from_file(stream))
         card, card_def = identify_card(first_record)
         if card:
             if not os.path.exists(upload_dir):
