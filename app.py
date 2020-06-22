@@ -4,13 +4,14 @@ import os
 from flask import Flask, Response, request
 from werkzeug.utils import secure_filename
 
+import pipeline
 from common import save_file_if_valid
 
 script_dir = os.path.dirname(os.path.realpath(__file__))
 
 app = Flask(__name__)
 app.url_map.strict_slashes = False
-app.config["UPLOAD_FOLDER"] = os.path.join(script_dir, "data", "raw")
+app.config["DATA_DIR"] = os.path.join(script_dir, "data")
 
 
 # Routes
@@ -26,7 +27,7 @@ def upload():
         for file_ in request.files.getlist("file"):
             filename = secure_filename(file_.filename)
             status, status_string = save_file_if_valid(
-                file_, filename, app.config["UPLOAD_FOLDER"]
+                file_, filename, app.config["DATA_DIR"]
             )
             file_upload_status[status].append(status_string)
 
@@ -37,8 +38,8 @@ def upload():
 
 @app.route("/run")
 def run():
-    print("run")
-    return Response("run")
+    pipeline.run(app.config["DATA_DIR"])
+    return Response()
 
 
 @app.route("/<path:path>")

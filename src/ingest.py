@@ -9,14 +9,10 @@ from common import get_log
 log = get_log(__file__)
 
 
-@click.command()
-@click.argument("infiles", type=click.File("r"), nargs=-1)
-@click.argument("table", type=str)
-@click.argument("outfile", type=str)
 def ingest(infiles, table, outfile):
     """Converts ingests records into SQLite"""
 
-    log.info(f"Ingesting {[f.name for f in infiles]} into {outfile}:{table}")
+    log.info(f"Ingesting {infiles} into {outfile}:{table}")
 
     if os.path.exists(outfile):
         os.remove(outfile)
@@ -33,5 +29,13 @@ def ingest(infiles, table, outfile):
     df.to_sql(table, con)
 
 
+@click.command()
+@click.argument("infiles", type=str, nargs=-1)
+@click.argument("table", type=str)
+@click.argument("outfile", type=str)
+def _ingest(infiles, table, outfile):
+    ingest(infiles, table, outfile)
+
+
 if __name__ == "__main__":
-    ingest()
+    _ingest()

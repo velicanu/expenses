@@ -1,22 +1,28 @@
 import json
 
 import click
+from smart_open import open
 
 from common import get_log, records_from_file
 
 log = get_log(__file__)
 
 
-@click.command()
-@click.argument("infile", type=click.File("r"))
-@click.argument("outfile", type=click.File("w"))
 def extract(infile, outfile):
-    """Converts excel and csv files into json"""
-    records = records_from_file(infile)
-    log.info(f"Extracting {infile} into {outfile.name}")
-    for record in records:
-        outfile.write(f"{json.dumps(record)}\n")
+    """Converts excel and csv files into json, returns the output filename"""
+    with open(infile, "r") as inf, open(outfile, "w") as outf:
+        records = records_from_file(inf)
+        log.info(f"Extracting {infile} into {outfile}")
+        for record in records:
+            outf.write(f"{json.dumps(record)}\n")
+
+
+@click.command()
+@click.argument("infile", type=str)
+@click.argument("outfile", type=str)
+def _extract(infile, outfile):
+    extract(infile, outfile)
 
 
 if __name__ == "__main__":
-    extract()
+    _extract()
