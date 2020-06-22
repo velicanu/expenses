@@ -24,6 +24,7 @@ def parse_record(record):
     parsed_record["source"] = card
     if "category" not in parsed_record:
         parsed_record["category"] = None
+    parsed_record["source_file"] = record["source_file"]
     return parsed_record
 
 
