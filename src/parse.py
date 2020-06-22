@@ -2,8 +2,10 @@ import json
 import pathlib
 
 import click
+from smart_open import open
 
 from common import get_log
+from detect import identify_card
 
 log = get_log(__file__)
 
@@ -71,28 +73,31 @@ def get_card_from_filename(filename):
         raise NotImplementedError("Card type not supported.")
 
 
-def get_parser(filename=None, card_type=None):
-    if card_type is None:
-        try:
-            card_type = get_card_from_filename(filename)
-        except TypeError:
-            raise TypeError("One of card_type or filename must be provided.")
-    return PARSERS.get(card_type, default_parser)
+def get_parser(record):
+    card, card_def = identify_card(record)
+    return PARSERS.get(card, default_parser)
+
+
+def parse(infile, outfile):
+    """Converts excel and csv files into json"""
+    parser = None
+
+    log.info(f"Parsing {infile} into {outfile}")
+    with open(infile, "r") as inf, open(outfile, "w") as outf:
+        for line in inf:
+            record = json.loads(line)
+            if parser is None:
+                parser = get_parser(record)
+            parsed_record = parser(record)
+            outf.write(f"{json.dumps(parsed_record)}\n")
 
 
 @click.command()
-@click.argument("infile", type=click.File("r"))
-@click.argument("outfile", type=click.File("w"))
-def parse(infile, outfile):
-    """Converts excel and csv files into json"""
-    parser = get_parser(infile.name)
-
-    log.info(f"Parsing {infile.name} into {outfile.name}")
-    for line in infile:
-        record = json.loads(line)
-        parsed_record = parser(record)
-        outfile.write(f"{json.dumps(parsed_record)}\n")
+@click.argument("infile", type=str)
+@click.argument("outfile", type=str)
+def _parse(infile, outfile):
+    parse(infile, outfile)
 
 
 if __name__ == "__main__":
-    parse()
+    _parse()
