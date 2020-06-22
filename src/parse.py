@@ -28,7 +28,7 @@ def parse_record(record):
 
 
 def parse(infile, outfile):
-    """Converts excel and csv files into json"""
+    """Converts extracted json files files into uniform schema"""
 
     log.info(f"Parsing {infile} into {outfile}")
     with open(infile, "r") as inf, open(outfile, "w") as outf:
