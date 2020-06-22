@@ -6,6 +6,7 @@ from parse import parse_record
 class TestParse(unittest.TestCase):
     def test_parse(self):
         input_ = {
+            "source_file": "amex.csv",
             "Date": "12/30/19",
             "Reference": 1234567890,
             "Description": "Trader Joe's",
@@ -26,10 +27,12 @@ class TestParse(unittest.TestCase):
             "amount": -16.23,
             "category": "Merchandise & Supplies-Groceries",
             "source": "amex",
+            "source_file": "amex.csv",
         }
         self.assertEqual(parse_record(input_), expected)
 
         input_ = {
+            "source_file": "capital_one.csv",
             "Transaction Date": "2019-12-28",
             "Posted Date": "2019-12-30",
             "Card No.": 1234,
@@ -44,10 +47,12 @@ class TestParse(unittest.TestCase):
             "amount": -4,
             "category": "Dining",
             "source": "capital_one",
+            "source_file": "capital_one.csv",
         }
         self.assertEqual(parse_record(input_), expected)
 
         input_ = {
+            "source_file": "chase.csv",
             "Transaction Date": "12/30/2019",
             "Post Date": "12/31/2019",
             "Description": "THE LANDING PIZZA AND KIT",
@@ -61,10 +66,12 @@ class TestParse(unittest.TestCase):
             "amount": -44,
             "category": "Food & Drink",
             "source": "chase",
+            "source_file": "chase.csv",
         }
         self.assertEqual(parse_record(input_), expected)
 
         input_ = {
+            "source_file": "usbank.csv",
             "Date": "12/18/2018",
             "Transaction": "CREDIT",
             "Name": "REI #80 BOSTON BOSTON MA",
@@ -77,5 +84,6 @@ class TestParse(unittest.TestCase):
             "amount": 59.89,
             "category": None,
             "source": "usbank",
+            "source_file": "usbank.csv",
         }
         self.assertEqual(parse_record(input_), expected)

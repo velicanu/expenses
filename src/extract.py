@@ -1,4 +1,5 @@
 import json
+import os
 
 import click
 
@@ -21,6 +22,7 @@ def extract(infile, outfile):
         records = records_from_file(inf)
         log.info(f"Extracting {infile} into {outfile}")
         for record in records:
+            record["source_file"] = os.path.basename(infile)
             outf.write(f"{json.dumps(record)}\n")
 
 

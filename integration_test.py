@@ -36,6 +36,7 @@ class TestPipeline(unittest.TestCase):
                     "description": "REI #80 BOSTON BOSTON MA",
                     "amount": 59.89,
                     "source": "usbank",
+                    "source_file": "usbank.csv",
                     "category": "Other",
                 },
                 {
@@ -43,6 +44,7 @@ class TestPipeline(unittest.TestCase):
                     "description": "LATE FEE - PAYMENT DUE ON 01/01",
                     "amount": -27.0,
                     "source": "usbank",
+                    "source_file": "usbank.csv",
                     "category": "Other",
                 },
                 {
@@ -50,6 +52,7 @@ class TestPipeline(unittest.TestCase):
                     "description": "NIGHT SHIFT BREWING @",
                     "amount": -4.0,
                     "source": "capital_one",
+                    "source_file": "capital_one.csv",
                     "category": "Dining",
                 },
                 {
@@ -57,6 +60,7 @@ class TestPipeline(unittest.TestCase):
                     "description": "KOHL'S #0531",
                     "amount": -39.98,
                     "source": "capital_one",
+                    "source_file": "capital_one.csv",
                     "category": "Shopping",
                 },
                 {
@@ -64,6 +68,7 @@ class TestPipeline(unittest.TestCase):
                     "description": "Trader Joe's",
                     "amount": -10.76,
                     "source": "amex",
+                    "source_file": "amex.csv",
                     "category": "Groceries",
                 },
                 {
@@ -71,6 +76,7 @@ class TestPipeline(unittest.TestCase):
                     "description": "Trader Joe's",
                     "amount": -24.17,
                     "source": "amex",
+                    "source_file": "amex.csv",
                     "category": "Groceries",
                 },
                 {
@@ -78,6 +84,7 @@ class TestPipeline(unittest.TestCase):
                     "description": "THE LANDING PIZZA AND KIT",
                     "amount": -44.0,
                     "source": "chase",
+                    "source_file": "chase.csv",
                     "category": "Dining",
                 },
                 {
@@ -85,6 +92,7 @@ class TestPipeline(unittest.TestCase):
                     "description": "TST* SWEET RICE - JP",
                     "amount": -51.37,
                     "source": "chase",
+                    "source_file": "chase.csv",
                     "category": "Dining",
                 },
             ]
