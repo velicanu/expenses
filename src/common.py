@@ -40,22 +40,25 @@ def records_from_file(infile):
     )
 
 
-def save_file_if_valid(file_, filename, upload_folder):
+def save_file_if_valid(file_, filename, data_dir):
     """
-    Saves the given file to the upload_folder if it matches a card
+    Saves the given file to the upload_dir if it matches a card
 
     :param file_: a werkzeug.FileStorage object from flask
     :param filename: the filename to save the file to
-    :param upload_folder: folder to save the file
+    :param data_dir: the data directory of this app
 
     """
+    upload_dir = os.path.join(data_dir, "raw")
     with io.BytesIO() as stream:
         file_.save(stream)
         stream.seek(0)
         first_record = records_from_file(stream)[0]
         card, card_def = identify_card(first_record)
         if card:
-            with open(os.path.join(upload_folder, filename), "wb") as output_file:
+            if not os.path.exists(upload_dir):
+                os.makedirs(upload_dir)
+            with open(os.path.join(upload_dir, filename), "wb") as output_file:
                 output_file.write(stream.getbuffer())
             return "success", f"{filename}: {card}"
         else:

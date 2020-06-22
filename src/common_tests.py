@@ -58,7 +58,7 @@ class TestCommon(unittest.TestCase):
             self.assertEqual(expected, actual)
 
     def test_save_file_if_valid_valid(self):
-        with tempfile.TemporaryDirectory() as tmpdir, tempfile.TemporaryDirectory() as upload_folder:
+        with tempfile.TemporaryDirectory() as tmpdir, tempfile.TemporaryDirectory() as data_dir:
             filename = "input.csv"
             input_ = os.path.join(tmpdir, filename)
             with open(input_, "w") as _f:
@@ -66,14 +66,14 @@ class TestCommon(unittest.TestCase):
             file_object = FileStorage(open(input_, "rb"))
 
             expected = "success", f"{filename}: chase"
-            actual = save_file_if_valid(file_object, filename, upload_folder)
+            actual = save_file_if_valid(file_object, filename, data_dir)
             self.assertEqual(expected, actual)
 
-            with open(os.path.join(upload_folder, filename), "r") as uploaded_file:
+            with open(os.path.join(data_dir, "raw", filename), "r") as uploaded_file:
                 self.assertTrue(input_string, uploaded_file.read())
 
     def test_save_file_if_valid_invalid(self):
-        with tempfile.TemporaryDirectory() as tmpdir, tempfile.TemporaryDirectory() as upload_folder:
+        with tempfile.TemporaryDirectory() as tmpdir, tempfile.TemporaryDirectory() as data_dir:
             filename = "input.csv"
             input_ = os.path.join(tmpdir, filename)
             with open(input_, "w") as _f:
@@ -81,8 +81,8 @@ class TestCommon(unittest.TestCase):
             file_object = FileStorage(open(input_, "rb"))
 
             expected = "failed", f"{filename}"
-            actual = save_file_if_valid(file_object, filename, upload_folder)
+            actual = save_file_if_valid(file_object, filename, data_dir)
             self.assertEqual(expected, actual)
 
             with self.assertRaises(FileNotFoundError):
-                open(os.path.join(upload_folder, filename), "r")
+                open(os.path.join(data_dir, "raw", filename), "r")

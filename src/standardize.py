@@ -69,18 +69,24 @@ def standardizer(record):
     return record
 
 
-@click.command()
-@click.argument("infile", type=click.File("r"))
-@click.argument("outfile", type=click.File("w"))
 def standardize(infile, outfile):
-    """Converts excel and csv files into json"""
+    """Standardizes parsed files"""
 
-    log.info(f"Standardizing {infile.name} into {outfile.name}")
-    for line in infile:
-        record = json.loads(line)
-        standardized_record = standardizer(record)
-        outfile.write(f"{json.dumps(standardized_record)}\n")
+    log.info(f"Standardizing {infile} into {outfile}")
+
+    with open(infile, "r") as inf, open(outfile, "w") as outf:
+        for line in inf:
+            record = json.loads(line)
+            standardized_record = standardizer(record)
+            outf.write(f"{json.dumps(standardized_record)}\n")
+
+
+@click.command()
+@click.argument("infile", type=str)
+@click.argument("outfile", type=str)
+def _standardize(infile, outfile):
+    standardize(infile, outfile)
 
 
 if __name__ == "__main__":
-    standardize()
+    _standardize()
