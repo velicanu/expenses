@@ -1,10 +1,10 @@
 import unittest
 
-from parse import parse_amex, parse_capital_one, parse_chase, parse_usbank
+from parse import parse_record
 
 
 class TestParse(unittest.TestCase):
-    def test_parse_amex(self):
+    def test_parse(self):
         input_ = {
             "Date": "12/30/19",
             "Reference": 1234567890,
@@ -27,9 +27,8 @@ class TestParse(unittest.TestCase):
             "category": "Merchandise & Supplies-Groceries",
             "source": "amex",
         }
-        self.assertEqual(parse_amex(input_), expected)
+        self.assertEqual(parse_record(input_), expected)
 
-    def test_capital_one(self):
         input_ = {
             "Transaction Date": "2019-12-28",
             "Posted Date": "2019-12-30",
@@ -46,9 +45,8 @@ class TestParse(unittest.TestCase):
             "category": "Dining",
             "source": "capital_one",
         }
-        self.assertEqual(parse_capital_one(input_), expected)
+        self.assertEqual(parse_record(input_), expected)
 
-    def test_chase(self):
         input_ = {
             "Transaction Date": "12/30/2019",
             "Post Date": "12/31/2019",
@@ -64,9 +62,8 @@ class TestParse(unittest.TestCase):
             "category": "Food & Drink",
             "source": "chase",
         }
-        self.assertEqual(parse_chase(input_), expected)
+        self.assertEqual(parse_record(input_), expected)
 
-    def test_usbank(self):
         input_ = {
             "Date": "12/18/2018",
             "Transaction": "CREDIT",
@@ -81,4 +78,4 @@ class TestParse(unittest.TestCase):
             "category": None,
             "source": "usbank",
         }
-        self.assertEqual(parse_usbank(input_), expected)
+        self.assertEqual(parse_record(input_), expected)

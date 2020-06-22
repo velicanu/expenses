@@ -21,12 +21,12 @@ def ingest(infiles, table, outfile):
     df = None
     for infile in infiles:
         df = (
-            df.append(pd.read_json(infile, lines=True))
+            df.append(pd.read_json(infile, lines=True), sort=False)
             if df is not None
             else pd.read_json(infile, lines=True)
         )
 
-    df.to_sql(table, con)
+    df.to_sql(table, con, index=False)
 
 
 @click.command()
