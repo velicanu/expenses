@@ -9,10 +9,9 @@ from detect import identify_card
 
 def get_files(dir_):
     """
-    yields the full filename for each file in the directory
+    returns a list of full path filenames in dir
     """
-    for file_name in next(os.walk(dir_))[2]:
-        yield os.path.join(dir_, file_name)
+    return [os.path.join(dir_, filename) for filename in os.listdir(dir_)]
 
 
 def get_log(name):

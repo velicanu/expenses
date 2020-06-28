@@ -67,9 +67,7 @@ def run(data_dir):
     [job.get() for job in jobs]
     # TODO: hardcoded expenses tablename and expenses.db
     ingest(
-        list(get_files(standardized_dir)),
-        "expenses",
-        os.path.join(data_dir, "expenses.db"),
+        get_files(standardized_dir), "expenses", os.path.join(data_dir, "expenses.db"),
     )
 
 
