@@ -48,9 +48,19 @@
       </form>
     </div>
     <div class="row py-3">
-      <button type="button" class="btn btn-secondary" onclick="run()">
+      <button id="runBtn" type="button" class="btn btn-secondary">
         Run Pipeline
       </button>
+    </div>
+    <div id="successrun" class="alert alert-success" role="alert">
+      <button id="successrunBtn" type="button" class="close">x</button>
+      <h3>Pipeline run success!</h3>
+      <div id="successrunText"></div>
+    </div>
+    <div id="failedrun" class="alert alert-danger" role="alert">
+      <button id="failedrunBtn" type="button" class="close">x</button>
+      <h3>Pipeline run failed, check logs.</h3>
+      <div id="failedrunText"></div>
     </div>
     <script src="js/axios.min.js"></script>
     <script src="js/jquery-3.3.1.slim.min.js"></script>
@@ -78,14 +88,18 @@
       const failedBtn = document.getElementById("failedBtn");
 
       successBtn.onclick = function () {
-        console.log("success clicky");
         successText.innerHTML = "";
         success.style.display = "none";
       };
       failedBtn.onclick = function () {
-        console.log("failed clicky");
         failedText.innerHTML = "";
         failed.style.display = "none";
+      };
+      successrunBtn.onclick = function () {
+        successrun.style.display = "none";
+      };
+      failedrunBtn.onclick = function () {
+        failedrun.style.display = "none";
       };
 
       // this part toggles the submit button, enabling only if file is selected
@@ -133,6 +147,18 @@
           })
           .catch(function (res) {
             console.log(res.data);
+          });
+      };
+
+      // pings the /run api
+      runBtn.onclick = function () {
+        axios
+          .get("/run")
+          .then(function (res) {
+            successrun.style.display = "block";
+          })
+          .catch(function (res) {
+            failedrun.style.display = "block";
           });
       };
     </script>
