@@ -1,98 +1,50 @@
 import json
-import pathlib
 
 import click
+from smart_open import open
 
 from common import get_log
+from detect import identify_card
 
 log = get_log(__file__)
 
-# money spent is negative, money paid is positive
+
+def parse_record(record):
+    card, card_def = identify_card(record)
+    parsed_record = {k: record[v] for v, k in card_def.items()}
+    if "amount" in parsed_record:
+        parsed_record["amount"] = (
+            float(parsed_record["amount"]) if parsed_record["amount"] else None
+        )
+    if "-amount" in parsed_record:
+        parsed_record["amount"] = (
+            -1 * float(parsed_record["-amount"]) if parsed_record["-amount"] else None
+        )
+        parsed_record.pop("-amount")
+    parsed_record["source"] = card
+    if "category" not in parsed_record:
+        parsed_record["category"] = None
+    parsed_record["source_file"] = record["source_file"]
+    return parsed_record
 
 
-def parse_amex(record):
-    return {
-        "date": record["Date"],
-        "description": record["Description"],
-        "amount": -1 * record["Amount"],
-        "category": record["Category"],
-        "source": "amex",
-    }
+def parse(infile, outfile):
+    """Converts extracted json files files into uniform schema"""
 
-
-def parse_capital_one(record):
-    return {
-        "date": record["Transaction Date"],
-        "description": record["Description"],
-        "amount": -1 * record.get("Debit") if record.get("Debit") else record["Credit"],
-        "category": record["Category"],
-        "source": "capital_one",
-    }
-
-
-def parse_chase(record):
-    return {
-        "date": record["Transaction Date"],
-        "description": record["Description"],
-        "amount": record["Amount"],
-        "category": record["Category"],
-        "source": "chase",
-    }
-
-
-def parse_usbank(record):
-    return {
-        "date": record["Date"],
-        "description": record["Name"],
-        "amount": record["Amount"],
-        "category": None,  # No category
-        "source": "usbank",
-    }
-
-
-PARSERS = {
-    "amex": parse_amex,
-    "chase": parse_chase,
-    "capital_one": parse_capital_one,
-    "usbank": parse_usbank,
-}
-
-
-def default_parser(record):
-    return record
-
-
-def get_card_from_filename(filename):
-    path_info = pathlib.Path(filename)
-    for card_name in PARSERS.keys():
-        if path_info.stem.startswith(card_name):
-            return card_name
-    else:
-        raise NotImplementedError("Card type not supported.")
-
-
-def get_parser(filename=None, card_type=None):
-    if card_type is None:
-        try:
-            card_type = get_card_from_filename(filename)
-        except TypeError:
-            raise TypeError("One of card_type or filename must be provided.")
-    return PARSERS.get(card_type, default_parser)
+    log.info(f"Parsing {infile} into {outfile}")
+    with open(infile, "r") as inf, open(outfile, "w") as outf:
+        for line in inf:
+            record = json.loads(line)
+            parsed_record = parse_record(record)
+            outf.write(f"{json.dumps(parsed_record)}\n")
 
 
 @click.command()
-@click.argument("infile", type=click.File("r"))
-@click.argument("outfile", type=click.File("w"))
-def parse(infile, outfile):
-    """Converts excel and csv files into json"""
-    parser = get_parser(infile.name)
-
-    log.info(f"Parsing {infile.name} into {outfile.name}")
-    for line in infile:
-        record = json.loads(line)
-        parsed_record = parser(record)
-        outfile.write(f"{json.dumps(parsed_record)}\n")
+@click.argument("infile", type=str)
+@click.argument("outfile", type=str)
+def _parse(infile, outfile):
+    parse(infile, outfile)
 
 
 if __name__ == "__main__":
-    parse()
+    _parse()
