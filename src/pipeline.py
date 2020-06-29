@@ -1,6 +1,7 @@
 import multiprocessing as mp
 import os
 import shutil
+import tempfile
 
 from common import get_files, get_log
 from extract import extract
@@ -11,16 +12,15 @@ from standardize import standardize
 log = get_log(__file__)
 
 
-def clean_dirs(list_of_dirs):
+def make_dirs(list_of_dirs):
     """
-    Deletes and recreates empty directories
+    Makes internal directories if they don't exist
     """
     for dir_ in list_of_dirs:
         try:
-            shutil.rmtree(dir_)
-        except FileNotFoundError:
+            os.makedirs(dir_)
+        except FileExistsError:
             pass
-        os.makedirs(dir_)
 
 
 def get_filename_without_extension(filename):
@@ -48,6 +48,11 @@ def _etl(raw, extracted, parsed, standardized):
 
 
 def run(data_dir):
+    """
+    Run the pipeline, intermediate files go into
+    data/extracted, data/parsed, and data/standardized
+    which is ingested into ./expenses.db
+    """
     cores = mp.cpu_count()
     pool = mp.Pool(cores)
     jobs = []
@@ -57,18 +62,26 @@ def run(data_dir):
     parsed_dir = os.path.join(data_dir, "parsed")
     standardized_dir = os.path.join(data_dir, "standardized")
 
-    clean_dirs([extracted_dir, parsed_dir, standardized_dir])
+    make_dirs([extracted_dir, parsed_dir, standardized_dir])
 
-    for raw, extracted, parsed, standardized in get_pipeline_files(
-        raw_dir, extracted_dir, parsed_dir, standardized_dir
-    ):
-        jobs.append(pool.apply_async(_etl, (raw, extracted, parsed, standardized)))
+    with tempfile.TemporaryDirectory() as tmp_standardized_dir:
+        for raw, extracted, parsed, standardized in get_pipeline_files(
+            raw_dir, extracted_dir, parsed_dir, tmp_standardized_dir
+        ):
+            jobs.append(pool.apply_async(_etl, (raw, extracted, parsed, standardized)))
 
-    [job.get() for job in jobs]
-    # TODO: hardcoded expenses tablename and expenses.db
-    ingest(
-        get_files(standardized_dir), "expenses", os.path.join(data_dir, "expenses.db"),
-    )
+        [job.get() for job in jobs]
+        # TODO: hardcoded expenses tablename and expenses.db
+        ingest(
+            get_files(tmp_standardized_dir),
+            "expenses",
+            os.path.join(data_dir, "expenses.db"),
+        )
+        for file_ in os.listdir(tmp_standardized_dir):
+            os.replace(
+                os.path.join(tmp_standardized_dir, file_),
+                os.path.join(standardized_dir, file_),
+            )
 
 
 if __name__ == "__main__":
