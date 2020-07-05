@@ -62,6 +62,16 @@
       <h3>Pipeline run failed, check logs.</h3>
       <div id="failedrunText"></div>
     </div>
+
+    <div class="embed-responsive embed-responsive-16by9">
+      <iframe
+        id="streamlit"
+        class="embed-responsive-item"
+        src="http://localhost:8501"
+        allowfullscreen
+      ></iframe>
+    </div>
+
     <script src="js/axios.min.js"></script>
     <script src="js/jquery-3.3.1.slim.min.js"></script>
     <script src="js/popper.min.js"></script>
@@ -86,6 +96,7 @@
       const failed = document.getElementById("failed");
       const failedText = document.getElementById("failedText");
       const failedBtn = document.getElementById("failedBtn");
+      const streamlitFrame = document.getElementById("streamlit");
 
       successBtn.onclick = function () {
         successText.innerHTML = "";
@@ -143,6 +154,10 @@
             }
             submitBtn.disabled = true;
             output.innerHTML = "";
+            setTimeout(function () {
+              success.style.display = "none";
+              successText.innerHTML = "";
+            }, 3000);
             form.reset();
           })
           .catch(function (res) {
@@ -156,6 +171,9 @@
           .get("/run")
           .then(function (res) {
             successrun.style.display = "block";
+            setTimeout(function () {
+              successrun.style.display = "none";
+            }, 3000);
           })
           .catch(function (res) {
             failedrun.style.display = "block";
