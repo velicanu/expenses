@@ -25,7 +25,7 @@ class TestParse(unittest.TestCase):
         expected = {
             "date": "12/30/19",
             "description": "Trader Joe's",
-            "amount": -16.23,
+            "amount": 16.23,
             "category": "Merchandise & Supplies-Groceries",
             "source": "amex",
             "source_file": "amex.csv",
@@ -46,7 +46,7 @@ class TestParse(unittest.TestCase):
         expected = {
             "date": "2019-12-28",
             "description": "NIGHT SHIFT BREWING @",
-            "amount": -4,
+            "amount": 4,
             "category": "Dining",
             "source": "capital_one",
             "source_file": "capital_one.csv",
@@ -66,7 +66,7 @@ class TestParse(unittest.TestCase):
         expected = {
             "date": "12/30/2019",
             "description": "THE LANDING PIZZA AND KIT",
-            "amount": -44,
+            "amount": 44,
             "category": "Food & Drink",
             "source": "chase",
             "source_file": "chase.csv",
@@ -85,7 +85,7 @@ class TestParse(unittest.TestCase):
         expected = {
             "date": "12/18/2018",
             "description": "REI #80 BOSTON BOSTON MA",
-            "amount": 59.89,
+            "amount": -59.89,
             "category": None,
             "source": "usbank",
             "source_file": "usbank.csv",
