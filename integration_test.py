@@ -80,6 +80,14 @@ class TestPipeline(unittest.TestCase):
                     "category": "Groceries",
                 },
                 {
+                    "date": "2019-06-15 00:00:00",
+                    "description": "Hannaford",
+                    "amount": -2.55,
+                    "source": "amex",
+                    "category": "Groceries",
+                    "source_file": "amex.csv",
+                },
+                {
                     "date": "2019-12-30 00:00:00",
                     "description": "THE LANDING PIZZA AND KIT",
                     "amount": -44.0,
