@@ -1,6 +1,7 @@
 import unittest
 
 from parse import parse_record
+from detect import identify_card
 
 
 class TestParse(unittest.TestCase):
@@ -29,7 +30,8 @@ class TestParse(unittest.TestCase):
             "source": "amex",
             "source_file": "amex.csv",
         }
-        self.assertEqual(parse_record(input_), expected)
+        card, card_def = identify_card(input_)
+        self.assertEqual(parse_record(input_, card, card_def), expected)
 
         input_ = {
             "source_file": "capital_one.csv",
@@ -49,7 +51,8 @@ class TestParse(unittest.TestCase):
             "source": "capital_one",
             "source_file": "capital_one.csv",
         }
-        self.assertEqual(parse_record(input_), expected)
+        card, card_def = identify_card(input_)
+        self.assertEqual(parse_record(input_, card, card_def), expected)
 
         input_ = {
             "source_file": "chase.csv",
@@ -68,7 +71,8 @@ class TestParse(unittest.TestCase):
             "source": "chase",
             "source_file": "chase.csv",
         }
-        self.assertEqual(parse_record(input_), expected)
+        card, card_def = identify_card(input_)
+        self.assertEqual(parse_record(input_, card, card_def), expected)
 
         input_ = {
             "source_file": "usbank.csv",
@@ -86,4 +90,5 @@ class TestParse(unittest.TestCase):
             "source": "usbank",
             "source_file": "usbank.csv",
         }
-        self.assertEqual(parse_record(input_), expected)
+        card, card_def = identify_card(input_)
+        self.assertEqual(parse_record(input_, card, card_def), expected)
