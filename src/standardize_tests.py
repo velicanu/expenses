@@ -20,3 +20,22 @@ class TestStandardize(unittest.TestCase):
             "source": "chase",
         }
         self.assertEqual(standardizer(input_), expected)
+
+    def test_standardize_payment(self):
+        input_ = {
+            "date": "12/4/19",
+            "description": "ONLINE PAYMENT - THANK YOU",
+            "amount": -81.89,
+            "category": "",
+            "source": "amex",
+            "source_file": "amex-viral-2019.csv",
+        }
+        expected = {
+            "date": "2019-12-04T00:00:00",
+            "description": "ONLINE PAYMENT - THANK YOU",
+            "amount": -81.89,
+            "category": "Payment",
+            "source": "amex",
+            "source_file": "amex-viral-2019.csv",
+        }
+        self.assertEqual(standardizer(input_), expected)
