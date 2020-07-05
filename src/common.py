@@ -40,6 +40,7 @@ def records_from_file(infile):
             if isinstance(infile, io.BytesIO):
                 input_ = input_.decode("utf-8")
             # amex csv export breaks python csv parser due to double "" inside "
+            input_ = input_.replace('"""', '"@')
             input_ = input_.replace('""', "@")
             dialect = csv.Sniffer().sniff(input_)
             tmpfile.write(input_)
