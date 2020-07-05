@@ -1,5 +1,6 @@
 import json
 import os
+import subprocess
 
 from flask import Flask, Response, request
 from werkzeug.utils import secure_filename
@@ -12,6 +13,17 @@ script_dir = os.path.dirname(os.path.realpath(__file__))
 app = Flask(__name__)
 app.url_map.strict_slashes = False
 app.config["DATA_DIR"] = os.path.join(script_dir, "data")
+streamlit_options = [
+    "streamlit",
+    "run",
+    "streamlit_app.py",
+    "--server.headless",
+    "true",
+    "--browser.gatherUsageStats",
+    "false",
+]
+
+app.streamlit = subprocess.Popen(streamlit_options)
 
 
 # Routes
@@ -39,6 +51,8 @@ def upload():
 @app.route("/run")
 def run():
     pipeline.run(app.config["DATA_DIR"])
+    app.streamlit.terminate()
+    app.streamlit = subprocess.Popen(streamlit_options)
     return Response()
 
 
