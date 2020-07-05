@@ -55,8 +55,9 @@ def standardizer(record):
         else "Other"
     )
 
-    if record["description"] in description_map:
-        record["category"] = description_map[record["description"]]
+    for key in description_map:
+        if key in record["description"] and "EATS" not in record["description"]:
+            record["category"] = description_map[key]
 
     if "pay" in record["description"].lower() and record["amount"] < 0:
         record["category"] = "Payment"
