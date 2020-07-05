@@ -25,17 +25,54 @@ class TestStandardize(unittest.TestCase):
         input_ = {
             "date": "12/4/19",
             "description": "ONLINE PAYMENT - THANK YOU",
-            "amount": -81.89,
+            "amount": -8,
             "category": "",
             "source": "amex",
-            "source_file": "amex-viral-2019.csv",
+            "source_file": "amex.csv",
         }
         expected = {
             "date": "2019-12-04T00:00:00",
             "description": "ONLINE PAYMENT - THANK YOU",
-            "amount": -81.89,
+            "amount": -8,
             "category": "Payment",
             "source": "amex",
-            "source_file": "amex-viral-2019.csv",
+            "source_file": "amex.csv",
+        }
+        self.assertEqual(standardizer(input_), expected)
+
+    def test_standardize_rideshare(self):
+        input_ = {
+            "date": "2020-03-26",
+            "description": "UBER   EATS",
+            "amount": 2,
+            "category": "Dining",
+            "source": "capital_one",
+            "source_file": "capital_one.csv",
+        }
+        expected = {
+            "date": "2020-03-26T00:00:00",
+            "description": "UBER   EATS",
+            "amount": 2,
+            "category": "Dining",
+            "source": "capital_one",
+            "source_file": "capital_one.csv",
+        }
+        self.assertEqual(standardizer(input_), expected)
+
+        input_ = {
+            "date": "2020-01-01",
+            "description": "UBER TRIP HELP.UBER.COM",
+            "amount": 5,
+            "category": "Other Travel",
+            "source": "capital_one",
+            "source_file": "capital_one.csv",
+        }
+        expected = {
+            "date": "2020-01-01T00:00:00",
+            "description": "UBER TRIP HELP.UBER.COM",
+            "amount": 5,
+            "category": "Rideshare",
+            "source": "capital_one",
+            "source_file": "capital_one.csv",
         }
         self.assertEqual(standardizer(input_), expected)
