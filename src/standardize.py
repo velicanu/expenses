@@ -1,4 +1,5 @@
 import json
+import os
 
 import click
 from dateutil.parser import parse
@@ -7,48 +8,16 @@ from common import get_log
 
 log = get_log(__file__)
 
-category_map = {
-    # Examples: annual fees, interest fee, cash from cc rewards
-    "Fee/Interest Charge": "Fees",
-    "Fees & Adjustments": "Fees",
-    "Fees & Adjustments-Fees & Adjustments": "Fees",
-    "Food & Drink": "Dining",
-    "Dining": "Dining",
-    "Restaurant-Bar & Café": "Dining",
-    "Restaurant-Restaurant": "Dining",
-    "Gas": "Car",
-    "Gas/Automotive": "Car",
-    "Automotive": "Car",
-    "Transportation-Fuel": "Car",
-    # Examples: mitoc, paintnite, alum events
-    "Education": "Entertainment",
-    "Entertainment": "Entertainment",
-    # Examples: bkb membership, csv, hospital fees
-    "Health & Wellness": "Health",
-    "Health Care": "Health",
-    # Examples: tj, whole foods
-    "Groceries": "Groceries",
-    "Merchandise & Supplies-Groceries": "Groceries",
-    # Examples: flights, ubers, airbnb
-    "Airfare": "Travel",
-    "Travel": "Travel",
-    "Travel-Airline": "Travel",
-    "Other Travel": "Travel",
-    "Lodging": "Travel",
-    # Examples: phone, internet, utilites
-    "Bills & Utilities": "Bills",
-    "Phone/Cable": "Bills",
-    # Examples: stores, Note: capital_one puts TJs here
-    "Merchandise": "Shopping",
-    "Shopping": "Shopping",
-}
+script_dir = os.path.dirname(os.path.realpath(__file__))
 
+category_map = json.load(open(os.path.join(script_dir, "category_definitions.json")))
 
 description_map = {"LYFT": "Rideshare", "UBER": "Rideshare"}
 
 
 def standardizer(record):
     record["date"] = parse(record["date"]).isoformat()
+    record["source_category"] = record["category"]
     record["category"] = (
         category_map[record.get("category")]
         if record.get("category") in category_map

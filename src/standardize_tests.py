@@ -18,6 +18,7 @@ class TestStandardize(unittest.TestCase):
             "amount": -44.0,
             "category": "Dining",
             "source": "chase",
+            "source_category": "Food & Drink",
         }
         self.assertEqual(standardizer(input_), expected)
 
@@ -37,6 +38,7 @@ class TestStandardize(unittest.TestCase):
             "category": "Payment",
             "source": "amex",
             "source_file": "amex.csv",
+            "source_category": "",
         }
         self.assertEqual(standardizer(input_), expected)
 
@@ -56,6 +58,7 @@ class TestStandardize(unittest.TestCase):
             "category": "Dining",
             "source": "capital_one",
             "source_file": "capital_one.csv",
+            "source_category": "Dining",
         }
         self.assertEqual(standardizer(input_), expected)
 
@@ -74,5 +77,6 @@ class TestStandardize(unittest.TestCase):
             "category": "Rideshare",
             "source": "capital_one",
             "source_file": "capital_one.csv",
+            "source_category": "Other Travel",
         }
         self.assertEqual(standardizer(input_), expected)

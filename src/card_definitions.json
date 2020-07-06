@@ -18,6 +18,12 @@
     "Amount": "-amount",
     "Category": "category"
   },
+  "wallet": {
+    "date": "date",
+    "note": "description",
+    "amount": "amount",
+    "category": "category"
+  },
   "usbank": {
     "Date": "date",
     "Name": "description",
