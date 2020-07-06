@@ -1,7 +1,7 @@
 import unittest
 
-from parse import parse_record
 from detect import identify_card
+from parse import parse_record
 
 
 class TestParse(unittest.TestCase):

@@ -1,17 +1,15 @@
-import sqlite3
-import dateutil.parser
-
-import pandas as pd
-import streamlit as st
-import plotly.express as px
 import base64
-import plotly.graph_objects as go
-
 import os
+import sqlite3
+
+import dateutil.parser
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+import streamlit as st
 
 # Needed for st.State() , TODO: remove when streamlit supports it natively
 import st_state_patch
-
 
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 RAW_DATA_DIR = os.path.join(SCRIPT_DIR, "data", "raw")
