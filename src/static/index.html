@@ -55,12 +55,14 @@
     <div id="successrun" class="alert alert-success" role="alert">
       <button id="successrunBtn" type="button" class="close">x</button>
       <h3>Pipeline run success!</h3>
-      <div id="successrunText"></div>
     </div>
     <div id="failedrun" class="alert alert-danger" role="alert">
       <button id="failedrunBtn" type="button" class="close">x</button>
       <h3>Pipeline run failed, check logs.</h3>
-      <div id="failedrunText"></div>
+    </div>
+    <div id="nodata" class="alert alert-warning" role="alert">
+      <button id="nodataBtn" type="button" class="close">x</button>
+      <h3>No data! Add some files first.</h3>
     </div>
 
     <div class="embed-responsive embed-responsive-16by9">
@@ -111,6 +113,9 @@
       };
       failedrunBtn.onclick = function () {
         failedrun.style.display = "none";
+      };
+      nodataBtn.onclick = function () {
+        nodata.style.display = "none";
       };
 
       // this part toggles the submit button, enabling only if file is selected
@@ -175,8 +180,12 @@
               successrun.style.display = "none";
             }, 3000);
           })
-          .catch(function (res) {
-            failedrun.style.display = "block";
+          .catch(function (error) {
+            if (error.response.status == 400) {
+              nodata.style.display = "block";
+            } else {
+              failedrun.style.display = "block";
+            }
           });
       };
     </script>

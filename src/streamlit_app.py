@@ -108,7 +108,11 @@ def add_delete_files_widget():
 
 
 def init():
-    df_initial = pd.read_sql("SELECT * FROM expenses", conn)
+    try:
+        df_initial = pd.read_sql("SELECT * FROM expenses", conn)
+    except pd.io.sql.DatabaseError:
+        return
+
     default_user_input = add_date_range_widget(df_initial)
     default_user_input = add_category_widget(df_initial, default_user_input)
     default_user_input = add_description_widget(default_user_input)
@@ -174,6 +178,9 @@ def add_spending_over_time(df):
 
 def main():
     df = init()
+    if df is None:
+        st.write("Add some data and run the pipeline.")
+        return
     add_spending_by_category(df)
     add_spending_over_time(df)
 

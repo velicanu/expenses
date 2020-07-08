@@ -53,6 +53,7 @@ def run(data_dir):
     data/extracted, data/parsed, and data/standardized
     which is ingested into ./expenses.db
     """
+
     cores = mp.cpu_count()
     pool = mp.Pool(cores)
     jobs = []
@@ -61,6 +62,9 @@ def run(data_dir):
     extracted_dir = os.path.join(data_dir, "extracted")
     parsed_dir = os.path.join(data_dir, "parsed")
     standardized_dir = os.path.join(data_dir, "standardized")
+
+    if len(os.listdir(raw_dir)) == 0:
+        return False
 
     make_dirs([extracted_dir, parsed_dir, standardized_dir])
 
@@ -82,6 +86,7 @@ def run(data_dir):
                 os.path.join(tmp_standardized_dir, file_),
                 os.path.join(standardized_dir, file_),
             )
+    return True
 
 
 if __name__ == "__main__":

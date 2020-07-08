@@ -52,7 +52,7 @@ All intermediate data is available should you want it in the `data/` directory.
 
 ## Development
 
-`black` + `isort` for python code.
+`black` + `isort` for python code. `prettier` for html/js
 
 ### Tests
 

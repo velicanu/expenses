@@ -50,10 +50,12 @@ def upload():
 
 @app.route("/run")
 def run():
-    pipeline.run(app.config["DATA_DIR"])
-    app.streamlit.terminate()
-    app.streamlit = subprocess.Popen(streamlit_options)
-    return Response()
+    if pipeline.run(app.config["DATA_DIR"]):
+        app.streamlit.terminate()
+        app.streamlit = subprocess.Popen(streamlit_options)
+        return Response()
+    else:
+        return Response(status=400)
 
 
 @app.route("/<path:path>")
