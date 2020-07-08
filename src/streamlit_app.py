@@ -12,7 +12,7 @@ import streamlit as st
 import st_state_patch
 
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
-RAW_DATA_DIR = os.path.join(SCRIPT_DIR, "data", "raw")
+RAW_DATA_DIR = os.path.join(SCRIPT_DIR, "..", "data", "raw")
 state = st.State()
 if not state:
     state.delete_files = set()
