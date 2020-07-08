@@ -15,7 +15,7 @@ class TestPipeline(unittest.TestCase):
     def test_full_pipeline(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             script_dir = os.path.dirname(os.path.realpath(__file__))
-            sample_files_dir = os.path.join(script_dir, "data", "sample")
+            sample_files_dir = os.path.join(script_dir, "..", "data", "sample")
             raw_dir = os.path.join(tmpdir, "raw")
             os.makedirs(raw_dir)
             for file_ in get_files(sample_files_dir):
