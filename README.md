@@ -15,40 +15,47 @@ pip install -r requirements.txt
 
 ## Getting started
 
-You can see the pipeline run on some sample data by running the following script:
+Spin up the main UI via:
 
 ```bash
-./sample.sh
+python src/app.py
 ```
+
+Then open http://localhost:5000 on your browser. There is sample data to play with
+in the `data/sample/` directory that can be used to test the code / UI.
 
 ## Usage
 
-Put your own exported credit card transactions in the `data/raw/` directory,
-the filenames need to respect the following conventions:
-- American Express files must start with `amex`
-- Capital One files must start with `capital`
-- Chase files must start with `chase`
-- USBank (REI) files must start with `usbank`
+The first step to using this tool is obtaining the credit card transaction data.
+You can usually download a full year's worth of data at a time from each account.
 
-Currently `csv` and `xlsx/xls` files are supported.
+Once you obtain your data you can start using the UI.
 
-After putting your data into the raw directory, run the following script to ingest it:
+1. `Browse` and `Submit` buttons let you add the raw the data into the app's internal folder. Currently only `csv` files are supported.
+2. `Run Pipeline` button runs the data processing workflow that puts the data into a database.
+3. The visualization section of the UI should automatically pick up the updated data after the pipeline runs.
 
-```bash
-./run.sh
-```
 
-### Analysis
+### Internal files
 
-After running the pipeline, the data will be in standardized form in a sqlite database
-`expenses.db` as well in json format in the `data/standardized` directory.
+All intermediate data is available should you want it in the `data/` directory.
+- `data/raw`
+  - where the CSV's added through the UI are stored
+- `data/extracted`
+  - the folder contains `json` versions of the csv files, this is the first step of the pipeline
+- `data/parsed`
+  - this folder contains json files with keys converted into a uniform schema, second step of the pipeline
+- `data/standardized`
+  - this folder contains json files with standardized values for fields (eg. categories and dates), third step of the pipeline
+- `data/expenses.db`
+  - This is the sqlite database where the final data is stored in. The UI reads all its data from this database.
 
 ## Development
 
-`black` for python code.
+`black` + `isort` for python code.
 
 ### Tests
 
 ```bash
-nosetests -v src/
+nosetests -v .
 ```
