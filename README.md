@@ -1,3 +1,4 @@
+![](https://github.com/actions/velicanu/expenses/workflows/.github/workflows/nosetests/badge.svg?branch=feature/github-ci)  ![](https://github.com/actions/velicanu/expenses/workflows/.github/workflows/black/badge.svg?branch=feature/github-ci)
 # Expenses
 
 This repository gathers data from different credit card transactions exports and
