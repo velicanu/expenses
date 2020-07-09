@@ -16,53 +16,123 @@
     <div class="row py-0">
       <h1 class="pb-4">Expenses</h1>
     </div>
-    <div class="row py-0">
-      <h3 class="py-0">Add files</h3>
-    </div>
-    <div class="row py-3">
-      <form
-        id="form"
-        role="form"
-        class="form"
-        enctype="multipart/form-data"
-        onsubmit="return false;"
-      >
-        <button id="browse" type="button" class="btn btn-primary">
-          Browse
-        </button>
-        <button id="submitBtn" type="button" class="btn btn-primary" disabled>
-          Submit
-        </button>
-        <p id="output"></p>
-        <div id="success" class="alert alert-success" role="alert">
-          <button id="successBtn" type="button" class="close">x</button>
-          <h3>Successfully uploaded:</h3>
-          <div id="successText"></div>
+
+    <div class="row" id="information">
+      <div class="col-auto px-5">
+        <div class="row py-0">
+          <h3 class="py-0">Add files</h3>
         </div>
-        <div id="failed" class="alert alert-danger" role="alert">
-          <button id="failedBtn" type="button" class="close">x</button>
-          <h3>Failed, card data not supported:</h3>
-          <div id="failedText"></div>
+        <div class="row py-3">
+          <form
+            id="form"
+            role="form"
+            class="form"
+            enctype="multipart/form-data"
+            onsubmit="return false;"
+          >
+            <button id="browse" type="button" class="btn btn-primary">
+              Browse
+            </button>
+            <button
+              id="submitBtn"
+              type="button"
+              class="btn btn-primary"
+              disabled
+            >
+              Submit
+            </button>
+            <p id="output"></p>
+            <div id="success" class="alert alert-success" role="alert">
+              <button id="successBtn" type="button" class="close">x</button>
+              <h3>Successfully uploaded:</h3>
+              <div id="successText"></div>
+            </div>
+            <div id="failed" class="alert alert-danger" role="alert">
+              <button id="failedBtn" type="button" class="close">x</button>
+              <h3>Failed, card data not supported:</h3>
+              <div id="failedText"></div>
+            </div>
+            <input id="file" type="file" accept=".csv" multiple />
+          </form>
         </div>
-        <input id="file" type="file" accept=".csv" multiple />
-      </form>
-    </div>
-    <div class="row py-3">
-      <button id="runBtn" type="button" class="btn btn-secondary">
-        Run Pipeline
-      </button>
-    </div>
-    <div id="successrun" class="alert alert-success" role="alert">
-      <button id="successrunBtn" type="button" class="close">x</button>
-      <h3>Pipeline run success!</h3>
-    </div>
-    <div id="failedrun" class="alert alert-danger" role="alert">
-      <button id="failedrunBtn" type="button" class="close">x</button>
-      <h3>Pipeline run failed, check logs.</h3>
-    </div>
-    <div id="nodata" class="alert alert-warning" role="alert">
-      <button id="nodataBtn" type="button" class="close">x</button>
-      <h3>No data! Add some files first.</h3>
+      </div>
+      <div class="col-auto px-5">
+        <div class="row py-0">
+          <h3 class="py-0">Run pipeline</h3>
+        </div>
+        <div class="row py-3">
+          <button id="runBtn" type="button" class="btn btn-secondary">
+            Run Pipeline
+          </button>
+        </div>
+        <div id="successrun" class="alert alert-success" role="alert">
+          <button id="successrunBtn" type="button" class="close">x</button>
+          <h3>Pipeline run success!</h3>
+        </div>
+        <div id="failedrun" class="alert alert-danger" role="alert">
+          <button id="failedrunBtn" type="button" class="close">x</button>
+          <h3>Pipeline run failed, check logs.</h3>
+        </div>
+        <div id="nodata" class="alert alert-warning" role="alert">
+          <button id="nodataBtn" type="button" class="close">x</button>
+          <h3>No data! Add some files first.</h3>
+        </div>
+      </div>
+      <div class="col-auto px-5">
+        <div class="row py-0">
+          <h3 class="py-0">Supported cards</h3>
+        </div>
+        <div class="row py-3">
+          <a
+            tabindex="0"
+            class="btn btn-info mx-1"
+            role="button"
+            data-toggle="popover"
+            data-trigger="focus"
+            title="Download Amex CSV"
+            data-html="true"
+            data-content='<img class="card-img-bot embed-responsive-item"  src="img/download-amex.png?text=Image cap" alt="Card image cap">'
+            data-placement="left"
+            >American Expenses</a
+          >
+          <a
+            tabindex="0"
+            class="btn btn-info mx-1"
+            role="button"
+            data-toggle="popover"
+            data-trigger="focus"
+            title="Download Chase CSV"
+            data-html="true"
+            data-content='<img class="card-img-bot embed-responsive-item"  src="img/download-chase.png?text=Image cap" alt="Card image cap">'
+            data-placement="left"
+            >Chase</a
+          >
+          <a
+            tabindex="0"
+            class="btn btn-info mx-1"
+            role="button"
+            data-toggle="popover"
+            data-trigger="focus"
+            title="Download Capital One CSV"
+            data-html="true"
+            data-content='<img class="card-img-bot embed-responsive-item"  src="img/download-capital_one.png?text=Image cap" alt="Card image cap">'
+            data-placement="left"
+            >Capital One</a
+          >
+          <a
+            tabindex="0"
+            class="btn btn-info mx-1"
+            role="button"
+            data-toggle="popover"
+            data-trigger="focus"
+            title="Download US Bank CSV"
+            data-html="true"
+            data-content='<img class="card-img-bot embed-responsive-item"  src="img/download-usbank.png?text=Image cap" alt="Card image cap">'
+            data-placement="left"
+            >US Bank</a
+          >
+        </div>
+      </div>
     </div>
 
     <div class="embed-responsive embed-responsive-16by9">
@@ -87,6 +157,10 @@
       browse.onclick = function () {
         file.click();
       };
+
+      $(function () {
+        $('[data-toggle="popover"]').popover();
+      });
 
       // text showing currently selected file
       const output = document.getElementById("output");
