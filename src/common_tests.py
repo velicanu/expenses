@@ -5,7 +5,8 @@ import unittest
 
 from werkzeug.datastructures import FileStorage
 
-from common import records_from_file, save_file_if_valid
+from common import records_from_file
+from detect import save_file_if_valid
 
 input_string = """Transaction Date,Post Date,Description,Category,Type,Amount
 12/30/2019,12/31/2019,THE LANDING PIZZA AND KIT,Food & Drink,Sale,-44.00

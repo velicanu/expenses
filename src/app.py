@@ -6,7 +6,7 @@ from flask import Flask, Response, request
 from werkzeug.utils import secure_filename
 
 import pipeline
-from common import save_file_if_valid
+from detect import save_file_if_valid
 
 script_dir = os.path.dirname(os.path.realpath(__file__))
 

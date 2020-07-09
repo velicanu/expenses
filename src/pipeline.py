@@ -1,9 +1,9 @@
 import multiprocessing as mp
 import os
-import shutil
 import tempfile
 
 from common import get_files, get_log
+from detect import identify_file
 from extract import extract
 from ingest import ingest
 from parse import parse
@@ -33,7 +33,7 @@ def get_pipeline_files(raw_dir, extracted_dir, parsed_dir, standardized_dir):
     intermediate steps pf the pipeline
     """
     suffix = ".json"
-    for raw_file in get_files(raw_dir):
+    for raw_file in [f for f in get_files(raw_dir) if identify_file(f)]:
         filestem = get_filename_without_extension(raw_file)
         extracted_file = os.path.join(extracted_dir, filestem + suffix)
         parsed_file = os.path.join(parsed_dir, filestem + suffix)
