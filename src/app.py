@@ -1,6 +1,8 @@
+import webbrowser
 import json
 import os
 import subprocess
+import threading
 
 from flask import Flask, Response, request
 from werkzeug.utils import secure_filename
@@ -63,5 +65,10 @@ def static_proxy(path):
     return app.send_static_file(path)
 
 
+def open_browser():
+    webbrowser.open("http://127.0.0.1:5000/")
+
+
 if __name__ == "__main__":
-    app.run()
+    threading.Timer(1, open_browser).start()
+    app.run(port=5000)
