@@ -22,4 +22,4 @@ jobs:
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
     - name: Test with nose
       run: |
-        nosetests -v src/
+        nosetests -v .

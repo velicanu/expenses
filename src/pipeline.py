@@ -1,9 +1,9 @@
 import multiprocessing as mp
 import os
-import shutil
 import tempfile
 
 from common import get_files, get_log
+from detect import identify_file
 from extract import extract
 from ingest import ingest
 from parse import parse
@@ -33,7 +33,7 @@ def get_pipeline_files(raw_dir, extracted_dir, parsed_dir, standardized_dir):
     intermediate steps pf the pipeline
     """
     suffix = ".json"
-    for raw_file in get_files(raw_dir):
+    for raw_file in [f for f in get_files(raw_dir) if identify_file(f)]:
         filestem = get_filename_without_extension(raw_file)
         extracted_file = os.path.join(extracted_dir, filestem + suffix)
         parsed_file = os.path.join(parsed_dir, filestem + suffix)
@@ -53,6 +53,7 @@ def run(data_dir):
     data/extracted, data/parsed, and data/standardized
     which is ingested into ./expenses.db
     """
+
     cores = mp.cpu_count()
     pool = mp.Pool(cores)
     jobs = []
@@ -61,6 +62,9 @@ def run(data_dir):
     extracted_dir = os.path.join(data_dir, "extracted")
     parsed_dir = os.path.join(data_dir, "parsed")
     standardized_dir = os.path.join(data_dir, "standardized")
+
+    if len(os.listdir(raw_dir)) == 0:
+        return False
 
     make_dirs([extracted_dir, parsed_dir, standardized_dir])
 
@@ -82,6 +86,7 @@ def run(data_dir):
                 os.path.join(tmp_standardized_dir, file_),
                 os.path.join(standardized_dir, file_),
             )
+    return True
 
 
 if __name__ == "__main__":

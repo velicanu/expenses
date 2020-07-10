@@ -4,8 +4,6 @@ import logging
 import os
 import tempfile
 
-from detect import identify_card
-
 
 def get_files(dir_):
     """
@@ -53,28 +51,3 @@ def records_from_file(infile):
                 # don't return null rows
                 if any([v for v in _row.values()]):
                     yield _row
-
-
-def save_file_if_valid(file_, filename, data_dir):
-    """
-    Saves the given file to the upload_dir if it matches a card
-
-    :param file_: a werkzeug.FileStorage object from flask
-    :param filename: the filename to save the file to
-    :param data_dir: the data directory of this app
-
-    """
-    upload_dir = os.path.join(data_dir, "raw")
-    with io.BytesIO() as stream:
-        file_.save(stream)
-        stream.seek(0)
-        first_record = next(records_from_file(stream))
-        card, card_def = identify_card(first_record)
-        if card:
-            if not os.path.exists(upload_dir):
-                os.makedirs(upload_dir)
-            with open(os.path.join(upload_dir, filename), "wb") as output_file:
-                output_file.write(stream.getbuffer())
-            return "success", f"{filename}: {card}"
-        else:
-            return "failed", f"{filename}"
