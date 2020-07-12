@@ -14,12 +14,15 @@ def _get_newline(infile):
     return "\n" if rn_pos == -1 else "\r\n"
 
 
-def extract(infile, outfile):
+def extract(infile, outfile=None):
     """Converts csv files into json, returns the output filename"""
-    with open(infile, "r", newline=_get_newline(infile)) as inf, open(
-        outfile, "w"
-    ) as outf:
+    with open(infile, "r", newline=_get_newline(infile)) as inf:
         records = records_from_file(inf)
+
+        if outfile is None:
+            return records
+
+    with open(outfile, "w") as outf:
         log.info(f"Extracting {infile} into {outfile}")
         for record in records:
             record["source_file"] = os.path.basename(infile)
@@ -28,7 +31,7 @@ def extract(infile, outfile):
 
 @click.command()
 @click.argument("infile", type=str)
-@click.argument("outfile", type=str)
+@click.argument("outfile", type=str, required=False)
 def _extract(infile, outfile):
     extract(infile, outfile)
 

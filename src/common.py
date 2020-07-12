@@ -43,6 +43,7 @@ def records_from_file(infile):
             dialect = csv.Sniffer().sniff(input_)
             tmpfile.write(input_)
 
+        records = []
         with open(os.path.join(tmpdir, "tmp.txt"), "r") as tmpfile:
             reader = csv.reader(tmpfile, dialect)
             header = next(reader)
@@ -50,4 +51,5 @@ def records_from_file(infile):
                 _row = {k: v for k, v in zip(header, row)}
                 # don't return null rows
                 if any([v for v in _row.values()]):
-                    yield _row
+                    records.append(_row)
+        return records
