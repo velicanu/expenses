@@ -107,3 +107,4 @@ class TestPipeline(unittest.TestCase):
                 },
             ]
             self.assertEqual(actual, expected)
+            conn.close()
