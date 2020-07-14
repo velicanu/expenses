@@ -9,6 +9,7 @@ Clone/fork this repository from it do the following:
 
 ```bash
 git clone https://github.com/velicanu/expenses.git
+cd expenses/
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
