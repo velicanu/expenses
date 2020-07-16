@@ -1,9 +1,10 @@
-import click
 import json
 import os
 import tempfile
 
-from extract import extract
+import click
+
+from common import records_from_file
 
 script_dir = os.path.dirname(os.path.realpath(__file__))
 
@@ -24,7 +25,7 @@ def identify_card(record):
 
 
 def identify_file(filename):
-    records = extract(filename)
+    records = records_from_file(filename)
     card, card_def = identify_card(records[0])
     return card
 

@@ -8,20 +8,9 @@ from common import get_log, records_from_file
 log = get_log(__file__)
 
 
-def _get_newline(infile):
-    with open(infile, "rb") as inf:
-        rn_pos = inf.read().find(b"\r\n")
-    return "\n" if rn_pos == -1 else "\r\n"
-
-
-def extract(infile, outfile=None):
+def extract(infile, outfile):
     """Converts csv files into json, returns the output filename"""
-    with open(infile, "r", newline=_get_newline(infile)) as inf:
-        records = records_from_file(inf)
-
-        if outfile is None:
-            return records
-
+    records = records_from_file(infile)
     with open(outfile, "w") as outf:
         log.info(f"Extracting {infile} into {outfile}")
         for record in records:

@@ -24,6 +24,12 @@ def flip_spending_sign(records):
     return records
 
 
+def _get_newline(infile):
+    with open(infile, "rb") as inf:
+        rn_pos = inf.read().find(b"\r\n")
+    return "\n" if rn_pos == -1 else "\r\n"
+
+
 def records_from_file(infile):
     """
     This function returns a generator of json records from an input csv.
@@ -31,6 +37,9 @@ def records_from_file(infile):
     :param infile: Input csv file or stream
     :return: generator of json records
     """
+    if type(infile) == str:
+        infile = open(infile, "r", newline=_get_newline(infile))
+
     with tempfile.TemporaryDirectory() as tmpdir:
         # first clean the file
         with open(os.path.join(tmpdir, "tmp.txt"), "w") as tmpfile:
