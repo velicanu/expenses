@@ -20,7 +20,7 @@ def extract(infile, outfile):
 
 @click.command()
 @click.argument("infile", type=str)
-@click.argument("outfile", type=str, required=False)
+@click.argument("outfile", type=str)
 def _extract(infile, outfile):
     extract(infile, outfile)
 
