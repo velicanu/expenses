@@ -4,8 +4,7 @@ on: [push]
 
 jobs:
   build:
-
-    runs-on: ubuntu-latest
+    runs-on: ${{matrix.os}}
     strategy:
       matrix:
         python-version: [3.7, 3.8]
@@ -21,6 +20,12 @@ jobs:
         python -m pip install --upgrade pip
         pip install nose
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-    - name: Test with nose
+    - name: Test with nose on windows
+      if: matrix.os == "windows-latest"
+      run: |
+        nosetests -v -A '!fails_on_windows' .
+
+    - name: Test with nose on ubuntu and macOS
+      if: matrix.os != "windows-latest"
       run: |
         nosetests -v .
