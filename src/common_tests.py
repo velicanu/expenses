@@ -2,9 +2,8 @@ import io
 import os
 import tempfile
 import unittest
-from nose.tools import nottest
 
-
+from nose.plugins.attrib import attr
 from werkzeug.datastructures import FileStorage
 
 from common import records_from_file
@@ -43,10 +42,10 @@ class TestCommon(unittest.TestCase):
     def test_records_from_file_file(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             input_ = os.path.join(tmpdir, "input.csv")
-            with open(input_, "w+") as _f:
+            with open(input_, "w") as _f:
                 _f.write(input_string)
-                _f.seek(0)
-                actual = records_from_file(_f)
+
+            actual = list(records_from_file(open(input_, "r")))
 
             self.assertEqual(expected, actual)
 
@@ -59,26 +58,23 @@ class TestCommon(unittest.TestCase):
 
             self.assertEqual(expected, actual)
 
-    @nottest
+    @attr("fails_on_windows")
     def test_save_file_if_valid_valid(self):
         with tempfile.TemporaryDirectory() as tmpdir, tempfile.TemporaryDirectory() as data_dir:
             filename = "input.csv"
             input_ = os.path.join(tmpdir, filename)
-            with open(input_, "w+") as _f:
+            with open(input_, "w") as _f:
                 _f.write(input_string)
-                _f.seek(0)
-                file_object = FileStorage(_f)
+            file_object = FileStorage(open(input_, "rb"))
 
-                expected = "success", f"{filename}: chase"
-                actual = save_file_if_valid(file_object, filename, data_dir)
-                self.assertEqual(expected, actual)
+            expected = "success", f"{filename}: chase"
+            actual = save_file_if_valid(file_object, filename, data_dir)
+            self.assertEqual(expected, actual)
 
-                with open(
-                    os.path.join(data_dir, "raw", filename), "r"
-                ) as uploaded_file:
-                    self.assertTrue(input_string, uploaded_file.read())
+            with open(os.path.join(data_dir, "raw", filename), "r") as uploaded_file:
+                self.assertTrue(input_string, uploaded_file.read())
 
-    @nottest
+    @attr("fails_on_windows")
     def test_save_file_if_valid_invalid(self):
         with tempfile.TemporaryDirectory() as tmpdir, tempfile.TemporaryDirectory() as data_dir:
             filename = "input.csv"
