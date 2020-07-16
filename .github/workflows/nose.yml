@@ -21,7 +21,7 @@ jobs:
         pip install nose
         pip install -r requirements.txt
     - name: Test with nose on windows
-      run: nosetests -v -A '!fails_on_windows' .
+      run: nosetests -v -A 'fails_on_windows==0' .
       if: matrix.os == 'windows-latest'
     - name: Test with nose on ubuntu and macOS
       run: nosetests -v .
