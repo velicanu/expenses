@@ -21,11 +21,11 @@ jobs:
         pip install nose
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
     - name: Test with nose on windows
-      if: matrix.os == "windows-latest"
-      run: |
-        nosetests -v -A '!fails_on_windows' .
+        if: matrix.os == "windows-latest"
+        run: |
+          nosetests -v -A '!fails_on_windows' .
 
     - name: Test with nose on ubuntu and macOS
-      if: matrix.os != "windows-latest"
-      run: |
-        nosetests -v .
+        if: matrix.os != "windows-latest"
+        run: |
+          nosetests -v .
