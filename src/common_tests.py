@@ -3,6 +3,7 @@ import os
 import tempfile
 import unittest
 
+from nose.plugins.attrib import attr
 from werkzeug.datastructures import FileStorage
 
 from common import records_from_file
@@ -57,6 +58,7 @@ class TestCommon(unittest.TestCase):
 
             self.assertEqual(expected, actual)
 
+    @attr("fails_on_windows")
     def test_save_file_if_valid_valid(self):
         with tempfile.TemporaryDirectory() as tmpdir, tempfile.TemporaryDirectory() as data_dir:
             filename = "input.csv"
@@ -72,6 +74,7 @@ class TestCommon(unittest.TestCase):
             with open(os.path.join(data_dir, "raw", filename), "r") as uploaded_file:
                 self.assertTrue(input_string, uploaded_file.read())
 
+    @attr("fails_on_windows")
     def test_save_file_if_valid_invalid(self):
         with tempfile.TemporaryDirectory() as tmpdir, tempfile.TemporaryDirectory() as data_dir:
             filename = "input.csv"

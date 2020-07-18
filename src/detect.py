@@ -1,9 +1,10 @@
-import io
 import json
 import os
 import tempfile
 
-from extract import extract
+import click
+
+from common import records_from_file
 
 script_dir = os.path.dirname(os.path.realpath(__file__))
 
@@ -24,13 +25,8 @@ def identify_card(record):
 
 
 def identify_file(filename):
-    with tempfile.TemporaryDirectory() as tempdir:
-        outfile = os.path.join(tempdir, "out.json")
-        extract(filename, outfile)
-
-        records = (json.loads(line) for line in open(outfile))
-        card, card_def = identify_card(next(records))
-
+    records = records_from_file(filename)
+    card, card_def = identify_card(records[0])
     return card
 
 
@@ -56,3 +52,13 @@ def save_file_if_valid(file_, filename, data_dir):
             return "success", f"{filename}: {card}"
         else:
             return "failed", f"{filename}"
+
+
+@click.command()
+@click.argument("infile", type=str)
+def _detect(infile):
+    identify_file(infile)
+
+
+if __name__ == "__main__":
+    _detect()
