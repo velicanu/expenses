@@ -14,18 +14,22 @@ category_map = {
     "Fees & Adjustments-Fees & Adjustments": "Fees",
     "Food & Drink": "Dining",
     "Dining": "Dining",
+    "Bar, cafe": "Dining",
+    "Restaurant, fast-food": "Dining",
     "Restaurant-Bar & Café": "Dining",
     "Restaurant-Restaurant": "Dining",
     "Gas": "Car",
     "Gas/Automotive": "Car",
     "Automotive": "Car",
     "Transportation-Fuel": "Car",
+    "Transportation": "Car",
     # Examples: mitoc, paintnite, alum events
     "Education": "Entertainment",
     "Entertainment": "Entertainment",
     # Examples: bkb membership, csv, hospital fees
     "Health & Wellness": "Health",
     "Health Care": "Health",
+    "Active sport, fitness": "Health",
     # Examples: tj, whole foods
     "Groceries": "Groceries",
     "Merchandise & Supplies-Groceries": "Groceries",
@@ -35,16 +39,30 @@ category_map = {
     "Travel-Airline": "Travel",
     "Other Travel": "Travel",
     "Lodging": "Travel",
+    "Holiday, trips, hotels": "Travel",
     # Examples: phone, internet, utilites
+    "Energy, utilities": "Bills",
     "Bills & Utilities": "Bills",
     "Phone/Cable": "Bills",
+    "Phone, cell phone": "Bills",
     # Examples: stores, Note: capital_one puts TJs here
+    "Electronics, accessories": "Shopping",
     "Merchandise": "Shopping",
     "Shopping": "Shopping",
+    # Home
+    "Home, garden": "Home",
+    "Rent": "Rent",
+    "Services": "Services",
+    "Life events": "Family",
 }
 
 
-description_map = {"LYFT": "Rideshare", "UBER": "Rideshare"}
+description_map = {
+    "LYFT": "Rideshare",
+    "UBER": "Rideshare",
+    "REI": "Shopping",
+    "Google Fi": "Bills",
+}
 
 
 def standardizer(record):
@@ -56,7 +74,10 @@ def standardizer(record):
     )
 
     for key in description_map:
-        if key in record["description"] and "EATS" not in record["description"]:
+        if (
+            key.lower() in record["description"].lower()
+            and "EATS" not in record["description"]
+        ):
             record["category"] = description_map[key]
 
     if "pay" in record["description"].lower() and record["amount"] < 0:

@@ -22,5 +22,11 @@
     "Date": "date",
     "Name": "description",
     "Amount": "-amount"
+  },
+  "wallet": {
+    "date": "date",
+    "note": "description",
+    "amount": "amount",
+    "category": "category"
   }
 }

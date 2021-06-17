@@ -143,17 +143,55 @@ def init():
 
 
 def add_spending_by_category(df):
+    if "category" not in df or "amount" not in df:
+        st.markdown("**Spending by category**")
+        st.markdown("Missing category or amount columns.")
+        return
+
+    df2 = df.groupby(["category"], as_index=False)["amount"].agg("sum")
+
+    total = df["amount"].sum()
+
+    color_discrete_map = {
+        "Rent": px.colors.qualitative.Plotly[0],
+        "Shopping": px.colors.qualitative.Plotly[1],
+        "Family": px.colors.qualitative.Plotly[2],
+        "Dining": px.colors.qualitative.Plotly[3],
+        "Travel": px.colors.qualitative.Plotly[4],
+        "Groceries": px.colors.qualitative.Plotly[5],
+        "Bills": px.colors.qualitative.Plotly[6],
+        "Entertainment": px.colors.qualitative.Plotly[7],
+        "Other": px.colors.qualitative.Plotly[8],
+        "Car": px.colors.qualitative.Plotly[9],
+        "Rideshare": px.colors.qualitative.D3[0],
+        "Fees": px.colors.qualitative.D3[1],
+        "Health": px.colors.qualitative.D3[2],
+        "Services": px.colors.qualitative.D3[3],
+    }
     fig = px.pie(
-        df, values="amount", names="category", title="Spending by category", height=600,
+        df2,
+        values="amount",
+        names="category",
+        title=f"Spending by category, total: {total}",
+        height=600,
+        color="category",
+        color_discrete_map=color_discrete_map,
     )
+
     fig.update_layout(
-        font=dict(size=18, color="#7f7f7f"), title={"xanchor": "center", "x": 0.5},
+        font=dict(size=18, color="#7f7f7f"),
+        title={"xanchor": "center", "x": 0.5},
     )
 
     st.plotly_chart(fig, use_container_width=True)
 
 
 def add_spending_over_time(df):
+    if "date" not in df or "amount" not in df:
+        st.markdown("**Spending over time**")
+        st.markdown("Missing date or amount columns.")
+        return
+
     df = df.set_index(pd.DatetimeIndex(df["date"]))
     df_month = df.resample("M").sum()
     df_month["date"] = df_month.index
@@ -168,10 +206,13 @@ def add_spending_over_time(df):
         )
     )
     fig2.update_layout(
-        title="Spending over time", xaxis_title="Date", yaxis_title="Amount",
+        title="Spending over time",
+        xaxis_title="Date",
+        yaxis_title="Amount",
     )
     fig2.update_layout(
-        font=dict(size=16, color="#7f7f7f"), title={"xanchor": "center", "x": 0.5},
+        font=dict(size=16, color="#7f7f7f"),
+        title={"xanchor": "center", "x": 0.5},
     )
     st.plotly_chart(fig2, use_container_width=True)
 
