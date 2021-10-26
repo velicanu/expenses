@@ -37,7 +37,7 @@ class TestPipeline(unittest.TestCase):
                     "date": "2018-12-18 00:00:00",
                     "description": "REI #80 BOSTON BOSTON MA",
                     "amount": -59.89,
-                    "category": "Other",
+                    "category": "Shopping",
                     "source": "usbank",
                     "source_file": "usbank.csv",
                 },

@@ -1,8 +1,8 @@
-import webbrowser
 import json
 import os
 import subprocess
 import threading
+import webbrowser
 
 from flask import Flask, Response, request
 from werkzeug.utils import secure_filename
@@ -23,6 +23,8 @@ streamlit_options = [
     "true",
     "--browser.gatherUsageStats",
     "false",
+    "--server.port",
+    "8501",
 ]
 
 app.streamlit = subprocess.Popen(streamlit_options)
