@@ -6,11 +6,13 @@ import tempfile
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from common import get_files
 from pipeline import run
 
 
+@pytest.mark.fails_on_windows
 def test_full_pipeline():
     with tempfile.TemporaryDirectory() as tmpdir:
         script_dir = os.path.dirname(os.path.realpath(__file__))
