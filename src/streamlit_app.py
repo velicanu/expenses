@@ -124,11 +124,11 @@ def save_files_to_disk(files):
 
     if success:
         st.sidebar.success("Saved: " + " ".join(success))
-        print(DATA_DIR)
         run(DATA_DIR)
     if failed:
         st.sidebar.error("Failed: " + " ".join(failed))
 
+    # this key increment clears the upload dialog box after clicking upload
     st.session_state.file_uploader_key += 1
 
 
