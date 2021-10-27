@@ -59,5 +59,5 @@ All intermediate data is available should you want it in the `data/` directory.
 ### Tests
 
 ```bash
-nosetests -v .
+pytest .
 ```

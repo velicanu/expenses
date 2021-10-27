@@ -1,7 +1,6 @@
 import io
 import os
 import tempfile
-import unittest
 
 import pytest
 
@@ -37,54 +36,56 @@ expected = [
 ]
 
 
-class TestCommon(unittest.TestCase):
-    def test_records_from_file_file(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            input_ = os.path.join(tmpdir, "input.csv")
-            with open(input_, "w") as _f:
-                _f.write(input_string)
+def test_records_from_file_file():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        input_ = os.path.join(tmpdir, "input.csv")
+        with open(input_, "w") as _f:
+            _f.write(input_string)
 
-            actual = list(records_from_file(open(input_, "r")))
+        actual = list(records_from_file(open(input_, "r")))
 
-            self.assertEqual(expected, actual)
+        assert actual == expected
 
-    def test_records_from_file_stream(self):
-        with io.BytesIO() as _f:
-            _f.write(input_string.encode("utf-8"))
-            _f.seek(0)
 
-            actual = list(records_from_file(_f))
+def test_records_from_file_stream():
+    with io.BytesIO() as _f:
+        _f.write(input_string.encode("utf-8"))
+        _f.seek(0)
 
-            self.assertEqual(expected, actual)
+        actual = list(records_from_file(_f))
 
-    @pytest.mark.fails_on_windows
-    def test_save_file_if_valid_valid(self):
-        with tempfile.TemporaryDirectory() as tmpdir, tempfile.TemporaryDirectory() as data_dir:
-            filename = "input.csv"
-            input_ = os.path.join(tmpdir, filename)
-            with open(input_, "w") as _f:
-                _f.write(input_string)
-            file_object = open(input_, "rb")
+        assert actual == expected
 
-            expected = "success", f"{filename}: chase"
-            actual = save_file_if_valid(file_object, data_dir)
-            self.assertEqual(expected, actual)
 
-            with open(os.path.join(data_dir, "raw", filename), "r") as uploaded_file:
-                self.assertTrue(input_string, uploaded_file.read())
+@pytest.mark.fails_on_windows
+def test_save_file_if_valid_valid():
+    with tempfile.TemporaryDirectory() as tmpdir, tempfile.TemporaryDirectory() as data_dir:
+        filename = "input.csv"
+        input_ = os.path.join(tmpdir, filename)
+        with open(input_, "w") as _f:
+            _f.write(input_string)
+        file_object = open(input_, "rb")
 
-    @pytest.mark.fails_on_windows
-    def test_save_file_if_valid_invalid(self):
-        with tempfile.TemporaryDirectory() as tmpdir, tempfile.TemporaryDirectory() as data_dir:
-            filename = "input.csv"
-            input_ = os.path.join(tmpdir, filename)
-            with open(input_, "w") as _f:
-                _f.write(unknown_string)
-            file_object = open(input_, "rb")
+        expected = "success", f"{filename}: chase"
+        actual = save_file_if_valid(file_object, data_dir)
+        assert actual == expected
 
-            expected = "failed", f"{filename}"
-            actual = save_file_if_valid(file_object, data_dir)
-            self.assertEqual(expected, actual)
+        with open(os.path.join(data_dir, "raw", filename), "r") as uploaded_file:
+            assert input_string == uploaded_file.read()
 
-            with self.assertRaises(FileNotFoundError):
-                open(os.path.join(data_dir, "raw", filename), "r")
+
+@pytest.mark.fails_on_windows
+def test_save_file_if_valid_invalid():
+    with tempfile.TemporaryDirectory() as tmpdir, tempfile.TemporaryDirectory() as data_dir:
+        filename = "input.csv"
+        input_ = os.path.join(tmpdir, filename)
+        with open(input_, "w") as _f:
+            _f.write(unknown_string)
+        file_object = open(input_, "rb")
+
+        expected = "failed", f"{filename}"
+        actual = save_file_if_valid(file_object, data_dir)
+        assert actual == expected
+
+        with pytest.raises(FileNotFoundError):
+            open(os.path.join(data_dir, "raw", filename), "r")

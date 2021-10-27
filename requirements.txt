@@ -6,7 +6,6 @@ click
 flake8
 isort
 jupyter
-nose
 pandas
 plaid-python
 streamlit
