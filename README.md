@@ -20,10 +20,10 @@ pip install -r requirements.txt
 Spin up the main UI via:
 
 ```bash
-python src/app.py
+streamlit run src/streamlit_app.py
 ```
 
-Then open http://localhost:5000 on your browser. There is sample data to play with
+Then open http://localhost:8501 on your browser. There is sample data to play with
 in the `data/sample/` directory that can be used to test the code / UI.
 
 ## Usage

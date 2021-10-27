@@ -34,24 +34,26 @@ def save_file_if_valid(file_, data_dir):
     """
     Saves the given file to the upload_dir if it matches a card
 
-    :param file_: a streamlit UploadedFile object
+    :param file_: a filelike object
     :param data_dir: the data directory of this app
 
     """
+    raw = file_.read()
     upload_dir = os.path.join(data_dir, "raw")
+    file_name = os.path.basename(file_.name)
     with tempfile.TemporaryDirectory() as tempdir:
-        tempfilename = os.path.join(tempdir, file_.name)
+        tempfilename = os.path.join(tempdir, file_name)
         with open(tempfilename, "wb") as tmpfile:
-            tmpfile.write(file_.read())
+            tmpfile.write(raw)
         card = identify_file(tempfilename)
 
         if card:
             if not os.path.exists(upload_dir):
                 os.makedirs(upload_dir)
-            os.replace(tempfilename, os.path.join(upload_dir, file_.name))
-            return "success", f"{file_.name}: {card}"
+            os.replace(tempfilename, os.path.join(upload_dir, file_name))
+            return "success", f"{file_name}: {card}"
         else:
-            return "failed", f"{file_.name}"
+            return "failed", f"{file_name}"
 
 
 @click.command()

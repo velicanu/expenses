@@ -4,7 +4,6 @@ import tempfile
 import unittest
 
 from nose.plugins.attrib import attr
-from werkzeug.datastructures import FileStorage
 
 from common import records_from_file
 from detect import save_file_if_valid
@@ -65,10 +64,10 @@ class TestCommon(unittest.TestCase):
             input_ = os.path.join(tmpdir, filename)
             with open(input_, "w") as _f:
                 _f.write(input_string)
-            file_object = FileStorage(open(input_, "rb"))
+            file_object = open(input_, "rb")
 
             expected = "success", f"{filename}: chase"
-            actual = save_file_if_valid(file_object, filename, data_dir)
+            actual = save_file_if_valid(file_object, data_dir)
             self.assertEqual(expected, actual)
 
             with open(os.path.join(data_dir, "raw", filename), "r") as uploaded_file:
@@ -81,10 +80,10 @@ class TestCommon(unittest.TestCase):
             input_ = os.path.join(tmpdir, filename)
             with open(input_, "w") as _f:
                 _f.write(unknown_string)
-            file_object = FileStorage(open(input_, "rb"))
+            file_object = open(input_, "rb")
 
             expected = "failed", f"{filename}"
-            actual = save_file_if_valid(file_object, filename, data_dir)
+            actual = save_file_if_valid(file_object, data_dir)
             self.assertEqual(expected, actual)
 
             with self.assertRaises(FileNotFoundError):
