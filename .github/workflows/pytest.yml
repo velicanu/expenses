@@ -1,4 +1,4 @@
-name: nosetests
+name: tests
 
 on: [push]
 
@@ -7,7 +7,9 @@ jobs:
     runs-on: ${{matrix.os}}
     strategy:
       matrix:
-        python-version: [3.7, 3.8, 3.9]
+        # TODO: uncomment other python versions later
+        # python-version: [3.7, 3.8, 3.9]
+        python-version: [3.9]
         os: ['ubuntu-latest', 'windows-latest', 'macos-latest']
     steps:
     - uses: actions/checkout@v2
@@ -19,9 +21,9 @@ jobs:
       run: |
         pip install --upgrade pip
         pip install -r requirements.txt
-    # - name: Test with nose on windows
-    #   run: nosetests -v -A 'fails_on_windows==0' .
-    #   if: matrix.os == 'windows-latest'
     - name: Test with nose on ubuntu and macOS
       run: pytest .
-      # if: matrix.os != 'windows-latest'
+      if: matrix.os != 'windows-latest'
+    - name: Test with nose on ubuntu and macOS
+      run: pytest . -m "not fails_on_windows"
+      if: matrix.os == 'windows-latest'

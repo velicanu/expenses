@@ -3,11 +3,10 @@ import os
 import tempfile
 import unittest
 
+import pytest
+
 from common import records_from_file
 from detect import save_file_if_valid
-
-# import pytest
-
 
 input_string = """Transaction Date,Post Date,Description,Category,Type,Amount
 12/30/2019,12/31/2019,THE LANDING PIZZA AND KIT,Food & Drink,Sale,-44.00
@@ -58,7 +57,7 @@ class TestCommon(unittest.TestCase):
 
             self.assertEqual(expected, actual)
 
-    # @pytest.mark.fails_on_windows
+    @pytest.mark.fails_on_windows
     def test_save_file_if_valid_valid(self):
         with tempfile.TemporaryDirectory() as tmpdir, tempfile.TemporaryDirectory() as data_dir:
             filename = "input.csv"
@@ -74,7 +73,7 @@ class TestCommon(unittest.TestCase):
             with open(os.path.join(data_dir, "raw", filename), "r") as uploaded_file:
                 self.assertTrue(input_string, uploaded_file.read())
 
-    # @pytest.mark.fails_on_windows
+    @pytest.mark.fails_on_windows
     def test_save_file_if_valid_invalid(self):
         with tempfile.TemporaryDirectory() as tmpdir, tempfile.TemporaryDirectory() as data_dir:
             filename = "input.csv"
