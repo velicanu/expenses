@@ -30,28 +30,28 @@ def identify_file(filename):
     return card
 
 
-def save_file_if_valid(file_, filename, data_dir):
+def save_file_if_valid(file_, data_dir):
     """
     Saves the given file to the upload_dir if it matches a card
 
-    :param file_: a werkzeug.FileStorage object from flask
-    :param filename: the filename to save the file to
+    :param file_: a streamlit UploadedFile object
     :param data_dir: the data directory of this app
 
     """
     upload_dir = os.path.join(data_dir, "raw")
     with tempfile.TemporaryDirectory() as tempdir:
-        tempfilename = os.path.join(tempdir, filename)
-        file_.save(open(tempfilename, "wb"))
+        tempfilename = os.path.join(tempdir, file_.name)
+        with open(tempfilename, "wb") as tmpfile:
+            tmpfile.write(file_.read())
         card = identify_file(tempfilename)
 
         if card:
             if not os.path.exists(upload_dir):
                 os.makedirs(upload_dir)
-            os.replace(tempfilename, os.path.join(upload_dir, filename))
-            return "success", f"{filename}: {card}"
+            os.replace(tempfilename, os.path.join(upload_dir, file_.name))
+            return "success", f"{file_.name}: {card}"
         else:
-            return "failed", f"{filename}"
+            return "failed", f"{file_.name}"
 
 
 @click.command()
