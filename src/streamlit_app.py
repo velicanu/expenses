@@ -8,16 +8,15 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 
-# Needed for st.State() , TODO: remove when streamlit supports it natively
-import st_state_patch
+from detect import save_file_if_valid
+from pipeline import run
 
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
-RAW_DATA_DIR = os.path.join(SCRIPT_DIR, "..", "data", "raw")
-state = st.State()
-if not state:
-    state.delete_files = set()
+DATA_DIR = os.path.join(SCRIPT_DIR, "..", "data")
+RAW_DATA_DIR = os.path.join(DATA_DIR, "raw")
+DB_PATH = os.path.join(DATA_DIR, "expenses.db")
 
-conn = sqlite3.connect("data/expenses.db")
+conn = sqlite3.connect(DB_PATH)
 
 
 def extend_sql_statement(statement):
@@ -89,22 +88,64 @@ def add_download_csv_widget(df):
         )
 
 
-def add_delete_files_widget():
-    if st.sidebar.checkbox("Delete files"):
-        if st.sidebar.checkbox("Confirm delete files"):
-            # This is where saving state is needed, to know which files are checked below
-            for filename in state.delete_files:
-                os.remove(filename)
+def delete_files():
+    for filename in st.session_state.delete_files:
+        os.remove(filename)
+    st.session_state.delete_files = set()
 
+
+def add_delete_files_widget():
+    if "delete_files" not in st.session_state:
+        st.session_state.delete_files = set()
+
+    if st.sidebar.checkbox("Delete files"):
         for file_ in os.listdir(RAW_DATA_DIR):
             filename = os.path.join(RAW_DATA_DIR, file_)
             if st.sidebar.checkbox(f"Delete {file_}"):
-                state.delete_files.add(filename)
+                st.session_state.delete_files.add(filename)
             else:
                 try:
-                    state.delete_files.remove(filename)
+                    st.session_state.delete_files.remove(filename)
                 except KeyError:
                     pass
+        if st.session_state.delete_files:
+            st.sidebar.button("Confirm Delete", on_click=delete_files)
+
+
+def save_files_to_disk(files):
+    success = []
+    failed = []
+    for file_ in files:
+        status, msg = save_file_if_valid(file_, DATA_DIR)
+        if status == "success":
+            success.append(msg)
+        else:
+            failed.append(msg)
+
+    if success:
+        st.sidebar.success("Saved: " + " ".join(success))
+        run(DATA_DIR)
+    if failed:
+        st.sidebar.error("Failed: " + " ".join(failed))
+
+    # this key increment clears the upload dialog box after clicking upload
+    st.session_state.file_uploader_key += 1
+
+
+def add_upload_files_widget():
+    if "file_uploader_key" not in st.session_state:
+        st.session_state.file_uploader_key = 1
+    files = st.sidebar.file_uploader(
+        "upload data",
+        type="csv",
+        accept_multiple_files=True,
+        key=f"file_uploader_{st.session_state.file_uploader_key}",
+    )
+    st.sidebar.button(
+        "Upload files",
+        on_click=save_files_to_disk,
+        kwargs={"files": files},
+    )
 
 
 def init():
@@ -125,10 +166,16 @@ def init():
     else:
         df = pd.read_sql(default_user_input, conn)
 
+    st.sidebar.button(
+        "Run pipeline",
+        on_click=run,
+        kwargs={"data_dir": DATA_DIR},
+    )
+    add_upload_files_widget()
     add_download_csv_widget(df)
     add_delete_files_widget()
 
-    max_width_str = f"max-width: 1080px;"
+    max_width_str = "max-width: 1080px;"
     st.markdown(
         f"""
     <style>
