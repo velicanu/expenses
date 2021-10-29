@@ -18,6 +18,13 @@ DB_PATH = os.path.join(DATA_DIR, "expenses.db")
 
 conn = sqlite3.connect(DB_PATH)
 
+st.set_page_config(
+    page_title="Expense app",
+    page_icon="src/static/favicon.ico",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+
 
 def extend_sql_statement(statement):
     return (
@@ -149,6 +156,14 @@ def add_upload_files_widget():
 
 
 def init():
+    from streamlit.report_thread import get_report_ctx
+    from streamlit.server.server import Server
+
+    session_id = get_report_ctx().session_id
+    session_info = Server.get_current()._get_session_info(session_id)
+    st.write(session_id)
+    st.write(session_info.ws.request.headers.get("X-Forwarded-User"))
+
     try:
         df_initial = pd.read_sql("SELECT * FROM expenses", conn)
     except pd.io.sql.DatabaseError:
@@ -171,6 +186,7 @@ def init():
         on_click=run,
         kwargs={"data_dir": DATA_DIR},
     )
+    # st.sidebar.button()
     add_upload_files_widget()
     add_download_csv_widget(df)
     add_delete_files_widget()
