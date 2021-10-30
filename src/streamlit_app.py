@@ -7,16 +7,11 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
+from streamlit.report_thread import get_report_ctx
+from streamlit.server.server import Server
 
 from detect import save_file_if_valid
 from pipeline import run
-
-SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
-DATA_DIR = os.path.join(SCRIPT_DIR, "..", "data")
-RAW_DATA_DIR = os.path.join(DATA_DIR, "raw")
-DB_PATH = os.path.join(DATA_DIR, "expenses.db")
-
-conn = sqlite3.connect(DB_PATH)
 
 st.set_page_config(
     page_title="Expense app",
@@ -101,13 +96,13 @@ def delete_files():
     st.session_state.delete_files = set()
 
 
-def add_delete_files_widget():
+def add_delete_files_widget(raw_data_dir):
     if "delete_files" not in st.session_state:
         st.session_state.delete_files = set()
 
     if st.sidebar.checkbox("Delete files"):
-        for file_ in os.listdir(RAW_DATA_DIR):
-            filename = os.path.join(RAW_DATA_DIR, file_)
+        for file_ in os.listdir(raw_data_dir):
+            filename = os.path.join(raw_data_dir, file_)
             if st.sidebar.checkbox(f"Delete {file_}"):
                 st.session_state.delete_files.add(filename)
             else:
@@ -119,11 +114,11 @@ def add_delete_files_widget():
             st.sidebar.button("Confirm Delete", on_click=delete_files)
 
 
-def save_files_to_disk(files):
+def save_files_to_disk(files, data_dir):
     success = []
     failed = []
     for file_ in files:
-        status, msg = save_file_if_valid(file_, DATA_DIR)
+        status, msg = save_file_if_valid(file_, data_dir)
         if status == "success":
             success.append(msg)
         else:
@@ -131,7 +126,7 @@ def save_files_to_disk(files):
 
     if success:
         st.sidebar.success("Saved: " + " ".join(success))
-        run(DATA_DIR)
+        run(data_dir)
     if failed:
         st.sidebar.error("Failed: " + " ".join(failed))
 
@@ -139,7 +134,7 @@ def save_files_to_disk(files):
     st.session_state.file_uploader_key += 1
 
 
-def add_upload_files_widget():
+def add_upload_files_widget(data_dir):
     if "file_uploader_key" not in st.session_state:
         st.session_state.file_uploader_key = 1
     files = st.sidebar.file_uploader(
@@ -151,45 +146,36 @@ def add_upload_files_widget():
     st.sidebar.button(
         "Upload files",
         on_click=save_files_to_disk,
-        kwargs={"files": files},
+        kwargs={"files": files, "data_dir": data_dir},
     )
 
 
-def init():
-    from streamlit.report_thread import get_report_ctx
-    from streamlit.server.server import Server
-
-    session_id = get_report_ctx().session_id
-    session_info = Server.get_current()._get_session_info(session_id)
-    st.write(session_id)
-    st.write(session_info.ws.request.headers.get("X-Forwarded-User"))
-
+def init(conn, data_dir):
+    df = None
     try:
         df_initial = pd.read_sql("SELECT * FROM expenses", conn)
+        default_user_input = add_date_range_widget(df_initial)
+        default_user_input = add_category_widget(df_initial, default_user_input)
+        default_user_input = add_description_widget(default_user_input)
+        default_user_input = add_include_payment_widget(default_user_input)
+
+        if st.sidebar.checkbox("Show sql"):
+            user_input = st.text_input("label goes here", default_user_input)
+            df = pd.read_sql(user_input, conn)
+            st.dataframe(df)
+            add_download_csv_widget(df)
+        else:
+            df = pd.read_sql(default_user_input, conn)
     except pd.io.sql.DatabaseError:
-        return
-
-    default_user_input = add_date_range_widget(df_initial)
-    default_user_input = add_category_widget(df_initial, default_user_input)
-    default_user_input = add_description_widget(default_user_input)
-    default_user_input = add_include_payment_widget(default_user_input)
-
-    if st.sidebar.checkbox("Show sql"):
-        user_input = st.text_input("label goes here", default_user_input)
-        df = pd.read_sql(user_input, conn)
-        st.dataframe(df)
-    else:
-        df = pd.read_sql(default_user_input, conn)
+        pass
 
     st.sidebar.button(
         "Run pipeline",
         on_click=run,
-        kwargs={"data_dir": DATA_DIR},
+        kwargs={"data_dir": data_dir},
     )
-    # st.sidebar.button()
-    add_upload_files_widget()
-    add_download_csv_widget(df)
-    add_delete_files_widget()
+    add_upload_files_widget(data_dir)
+    add_delete_files_widget(os.path.join(data_dir, "raw"))
 
     max_width_str = "max-width: 1080px;"
     st.markdown(
@@ -281,12 +267,29 @@ def add_spending_over_time(df):
 
 
 def main():
-    df = init()
+    session_id = get_report_ctx().session_id
+    session_info = Server.get_current()._get_session_info(session_id)
+    try:
+        user = session_info.ws.request.headers.get("X-Forwarded-User")
+    except AttributeError:
+        warning = st.write("Warning: no user provided, defaulting to ")
+        user = ""
+
+    script_dir = os.path.dirname(os.path.realpath(__file__))
+    data_dir = os.path.join(script_dir, "..", user, "data")
+    os.makedirs(data_dir, exist_ok=True)
+    db_path = os.path.join(data_dir, "expenses.db")
+
+    conn = sqlite3.connect(db_path)
+
+    df = init(conn=conn, data_dir=data_dir)
     if df is None:
         st.write("Add some data and run the pipeline.")
         return
     add_spending_by_category(df)
     add_spending_over_time(df)
+
+    warning = st.empty
 
 
 if __name__ == "__main__":
