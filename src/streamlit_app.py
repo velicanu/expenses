@@ -153,10 +153,10 @@ def add_upload_files_widget(data_dir):
 
 def init(conn, data_dir, user):
     df = None
+    if user:
+        st.sidebar.write(f"{user} logged in")
     try:
         df_initial = pd.read_sql("SELECT * FROM expenses", conn)
-        if user:
-            st.sidebar.write(f"{user} logged in")
         default_user_input = add_date_range_widget(df_initial)
         default_user_input = add_category_widget(df_initial, default_user_input)
         default_user_input = add_description_widget(default_user_input)
