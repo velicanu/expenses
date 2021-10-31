@@ -290,7 +290,7 @@ def main():
 
     conn = sqlite3.connect(db_path)
 
-    df = init(conn=conn, data_dir=data_dir)
+    df = init(conn=conn, data_dir=data_dir, user=user)
     if df is None:
         st.write("Add some data and run the pipeline.")
         return
