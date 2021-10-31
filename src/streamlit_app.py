@@ -295,7 +295,7 @@ def main():
     add_spending_by_category(df)
     add_spending_over_time(df)
 
-    if no_user_warning:
+    if not user and no_user_warning:
         time.sleep(5)
         no_user_warning.empty()
 
