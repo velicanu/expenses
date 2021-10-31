@@ -1,6 +1,7 @@
 import base64
 import os
 import sqlite3
+import time
 
 import dateutil.parser
 import pandas as pd
@@ -269,11 +270,16 @@ def add_spending_over_time(df):
 def main():
     session_id = get_report_ctx().session_id
     session_info = Server.get_current()._get_session_info(session_id)
+    user = ""
     try:
-        user = session_info.ws.request.headers.get("X-Forwarded-User")
+        user = session_info.ws.request.headers.get("X-Forwarded-User", "")
     except AttributeError:
-        warning = st.write("Warning: no user provided, defaulting to ")
-        user = ""
+        pass
+    if not user and "no_user_warning" not in st.session_state:
+        no_user_warning = st.warning(
+            "Warning: no user provided, defaulting to common directory"
+        )
+        st.session_state.no_user_warning = True
 
     script_dir = os.path.dirname(os.path.realpath(__file__))
     data_dir = os.path.join(script_dir, "..", user, "data")
@@ -289,7 +295,9 @@ def main():
     add_spending_by_category(df)
     add_spending_over_time(df)
 
-    warning = st.empty
+    if no_user_warning:
+        time.sleep(5)
+        no_user_warning.empty()
 
 
 if __name__ == "__main__":
