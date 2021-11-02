@@ -3,10 +3,7 @@ venv/
 __pycache__
 
 # data
-data/raw
-data/extracted
-data/parsed
-data/standardized
+data
 
 # output
 *.db

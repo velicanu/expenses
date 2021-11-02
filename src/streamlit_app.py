@@ -1,7 +1,6 @@
 import base64
 import os
 import sqlite3
-import time
 
 import dateutil.parser
 import pandas as pd
@@ -13,6 +12,7 @@ from streamlit.server.server import Server
 
 from detect import save_file_if_valid
 from pipeline import run
+from utils import clear
 
 st.set_page_config(
     page_title="Expense app",
@@ -126,13 +126,14 @@ def save_files_to_disk(files, data_dir):
             failed.append(msg)
 
     if success:
-        st.sidebar.success("Saved: " + " ".join(success))
+        status_info = st.sidebar.success("Saved: " + " ".join(success))
         run(data_dir)
     if failed:
-        st.sidebar.error("Failed: " + " ".join(failed))
+        status_info = st.sidebar.error("Failed: " + " ".join(failed))
 
     # this key increment clears the upload dialog box after clicking upload
     st.session_state.file_uploader_key += 1
+    clear(streamlit_object=status_info, seconds=2)
 
 
 def add_upload_files_widget(data_dir):
@@ -151,34 +152,47 @@ def add_upload_files_widget(data_dir):
     )
 
 
+def expand():
+    st.session_state.expand = not st.session_state.expand
+
+
 def init(conn, data_dir, user):
     df = None
-    if user:
+    if "expand" not in st.session_state:
+        st.session_state.expand = False
+    st.sidebar.button(
+        "Expand",
+        on_click=expand,
+    )
+    if st.session_state.expand and user:
         st.sidebar.write(f"{user} logged in")
     try:
         df_initial = pd.read_sql("SELECT * FROM expenses", conn)
         default_user_input = add_date_range_widget(df_initial)
         default_user_input = add_category_widget(df_initial, default_user_input)
         default_user_input = add_description_widget(default_user_input)
-        default_user_input = add_include_payment_widget(default_user_input)
+        if st.session_state.expand:
+            default_user_input = add_include_payment_widget(default_user_input)
 
         if st.sidebar.checkbox("Show sql"):
             user_input = st.text_input("label goes here", default_user_input)
             df = pd.read_sql(user_input, conn)
             st.dataframe(df)
-            add_download_csv_widget(df)
+            if st.session_state.expand:
+                add_download_csv_widget(df)
         else:
             df = pd.read_sql(default_user_input, conn)
     except pd.io.sql.DatabaseError:
         pass
 
-    st.sidebar.button(
-        "Run pipeline",
-        on_click=run,
-        kwargs={"data_dir": data_dir},
-    )
-    add_upload_files_widget(data_dir)
-    add_delete_files_widget(os.path.join(data_dir, "raw"))
+    if df is None or st.session_state.expand:
+        st.sidebar.button(
+            "Run pipeline",
+            on_click=run,
+            kwargs={"data_dir": data_dir},
+        )
+        add_upload_files_widget(data_dir)
+        add_delete_files_widget(os.path.join(data_dir, "raw"))
 
     max_width_str = "max-width: 1080px;"
     st.markdown(
@@ -284,7 +298,7 @@ def main():
         st.session_state.no_user_warning = True
 
     script_dir = os.path.dirname(os.path.realpath(__file__))
-    data_dir = os.path.join(script_dir, "..", user, "data")
+    data_dir = os.path.join(script_dir, "..", "data", user)
     os.makedirs(data_dir, exist_ok=True)
     db_path = os.path.join(data_dir, "expenses.db")
 
@@ -298,8 +312,7 @@ def main():
     add_spending_over_time(df)
 
     if not user and no_user_warning:
-        time.sleep(5)
-        no_user_warning.empty()
+        clear(streamlit_object=no_user_warning, seconds=2)
 
 
 if __name__ == "__main__":
