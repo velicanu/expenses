@@ -12,7 +12,7 @@ from streamlit.server.server import Server
 
 from detect import save_file_if_valid
 from pipeline import run
-from utils import clear
+from utils import clear, get_config, put_config
 
 st.set_page_config(
     page_title="Expense app",
@@ -30,27 +30,42 @@ def extend_sql_statement(statement):
     )
 
 
-def add_date_range_widget(df):
-    min_ = dateutil.parser.parse(df["date"].min())
-    max_ = dateutil.parser.parse(df["date"].max())
-    date_range = st.sidebar.date_input(
-        "Date range", value=(min_, max_), min_value=min_, max_value=max_
+def add_date_range_widget(df, config):
+    min_value = dateutil.parser.parse(df["date"].min())
+    max_value = dateutil.parser.parse(df["date"].max())
+    min_default = (
+        dateutil.parser.parse(config.get("min_date"))
+        if config.get("min_date")
+        else min_value
     )
-    min_ = min_.isoformat().replace("T00:00:00", "")
-    max_ = max_.isoformat().replace("T00:00:00", "")
+    max_default = (
+        dateutil.parser.parse(config.get("max_date"))
+        if config.get("max_date")
+        else max_value
+    )
+    date_range = st.sidebar.date_input(
+        "Date range",
+        value=(min_default, max_default),
+        min_value=min_value,
+        max_value=max_value,
+    )
+    min_value_str = min_value.isoformat().replace("T00:00:00", "")
+    max_value_str = max_value.isoformat().replace("T00:00:00", "")
     min_selected = date_range[0].isoformat()
     max_selected = date_range[1].isoformat() if len(date_range) == 2 else None
 
     default_user_input = "SELECT * FROM expenses"
 
-    if min_selected != min_:
+    if min_selected != min_value_str:
         default_user_input = (
             extend_sql_statement(default_user_input) + f'date >= "{min_selected}"'
         )
-    if max_selected and max_selected != max_:
+    if max_selected and max_selected != max_value_str:
         default_user_input = (
             extend_sql_statement(default_user_input) + f'date <= "{max_selected}"'
         )
+    config["max_date"] = max_selected
+    config["min_date"] = min_selected
     return default_user_input
 
 
@@ -156,7 +171,7 @@ def expand():
     st.session_state.expand = not st.session_state.expand
 
 
-def init(conn, data_dir, user):
+def init(conn, data_dir, user, config):
     df = None
     if "expand" not in st.session_state:
         st.session_state.expand = False
@@ -168,13 +183,26 @@ def init(conn, data_dir, user):
         st.sidebar.write(f"{user} logged in")
     try:
         df_initial = pd.read_sql("SELECT * FROM expenses", conn)
-        default_user_input = add_date_range_widget(df_initial)
+        default_user_input = add_date_range_widget(df_initial, config)
         default_user_input = add_category_widget(df_initial, default_user_input)
         default_user_input = add_description_widget(default_user_input)
         if st.session_state.expand:
             default_user_input = add_include_payment_widget(default_user_input)
+        else:
+            default_user_input = (
+                extend_sql_statement(default_user_input) + "category != 'Payment'"
+            )
 
-        if st.sidebar.checkbox("Show sql"):
+        # only set the default state to config if on first run
+        # otherwise you have to click twice
+        if "init_done" not in st.session_state:
+            show_sql = st.sidebar.checkbox(
+                "Show sql", value=config.get("show_sql", False)
+            )
+            st.session_state.show_sql = show_sql
+        else:
+            show_sql = st.sidebar.checkbox("Show sql", value=st.session_state.show_sql)
+        if show_sql:
             user_input = st.text_input("label goes here", default_user_input)
             df = pd.read_sql(user_input, conn)
             st.dataframe(df)
@@ -182,6 +210,7 @@ def init(conn, data_dir, user):
                 add_download_csv_widget(df)
         else:
             df = pd.read_sql(default_user_input, conn)
+        config["show_sql"] = show_sql
     except pd.io.sql.DatabaseError:
         pass
 
@@ -205,6 +234,7 @@ def init(conn, data_dir, user):
     """,
         unsafe_allow_html=True,
     )
+    st.session_state.init_done = True
     return df
 
 
@@ -304,15 +334,25 @@ def main():
 
     conn = sqlite3.connect(db_path)
 
-    df = init(conn=conn, data_dir=data_dir, user=user)
+    config_file = os.path.join(data_dir, "config.json")
+    config = get_config(config_file)
+    df = init(conn=conn, data_dir=data_dir, user=user, config=config)
+    put_config(config_file=config_file, config=config)
     if df is None:
         st.write("Add some data and run the pipeline.")
         return
-    add_spending_by_category(df)
-    add_spending_over_time(df)
+    if len(df.index) == 0:
+        st.warning("Current selection is empty.")
+    else:
+        add_spending_by_category(df)
+        add_spending_over_time(df)
 
-    if not user and no_user_warning:
-        clear(streamlit_object=no_user_warning, seconds=2)
+    if not user:
+        try:
+            clear(streamlit_object=no_user_warning, seconds=2)
+        except UnboundLocalError:
+            pass
+        st.session_state.no_user_warning = False
 
 
 if __name__ == "__main__":
