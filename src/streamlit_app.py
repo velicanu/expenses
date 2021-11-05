@@ -81,13 +81,45 @@ def add_category_widget(df, default_user_input):
     return default_user_input
 
 
+def validate_description_input(value):
+    num_operators = 0
+    for operator in ["+", "^"]:
+        if operator in value:
+            num_operators += 1
+    return num_operators <= 1 and value
+
+
 def add_description_widget(default_user_input):
-    title = st.sidebar.text_input("Description", "")
-    return (
-        extend_sql_statement(default_user_input) + f"description LIKE '%{title}%'"
-        if title
-        else default_user_input
+    title = st.sidebar.text_input(
+        "Description", "", help="^ is and, + is or, ! is not, * is wildcard"
     )
+    title = title.replace("*", "%")
+    if not validate_description_input(title):
+        if title:
+            st.sidebar.warning(
+                "invalid description, only one of + or ^ supported at a time"
+            )
+        return default_user_input
+    if "+" in title:
+        return extend_sql_statement(default_user_input) + " OR ".join(
+            [
+                f"description LIKE '%{s}%'"
+                if not s.startswith("!")
+                else f"description NOT LIKE '%{s[1:]}%'"
+                for s in title.split("+")
+            ]
+        )
+    if "^" in title:
+        return extend_sql_statement(default_user_input) + " AND ".join(
+            [
+                f"description LIKE '%{s}%'"
+                if not s.startswith("!")
+                else f"description NOT LIKE '%{s[1:]}%'"
+                for s in title.split("^")
+            ]
+        )
+
+    return extend_sql_statement(default_user_input) + f"description LIKE '%{title}%'"
 
 
 def add_include_payment_widget(default_user_input):
@@ -322,9 +354,7 @@ def main():
     except AttributeError:
         pass
     if not user and "no_user_warning" not in st.session_state:
-        no_user_warning = st.warning(
-            "Warning: no user provided, defaulting to common directory"
-        )
+        no_user_warning = st.warning("No user provided, defaulting to common directory")
         st.session_state.no_user_warning = True
 
     script_dir = os.path.dirname(os.path.realpath(__file__))
