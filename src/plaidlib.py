@@ -12,8 +12,8 @@ from plaid.model.transactions_get_request_options import TransactionsGetRequestO
 configuration = plaid.Configuration(
     host=plaid.Environment.Development,
     api_key={
-        "clientId": os.environ["PLAID_CLIENT_ID"],
-        "secret": os.environ["PLAID_SECRET"],
+        "clientId": os.getenv("PLAID_CLIENT_ID"),
+        "secret": os.getenv("PLAID_SECRET"),
     },
 )
 api_client = plaid.ApiClient(configuration)
