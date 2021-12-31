@@ -23,6 +23,12 @@
     "Name": "description",
     "Amount": "-amount"
   },
+  "plaid": {
+    "authorized_date": "date",
+    "name": "description",
+    "amount": "-amount",
+    "categories": "category"
+  },
   "wallet": {
     "date": "date",
     "note": "description",

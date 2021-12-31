@@ -8,19 +8,9 @@ from extract import extract
 from ingest import ingest
 from parse import parse
 from standardize import standardize
+from utils import make_dirs
 
 log = get_log(__file__)
-
-
-def make_dirs(list_of_dirs):
-    """
-    Makes internal directories if they don't exist
-    """
-    for dir_ in list_of_dirs:
-        try:
-            os.makedirs(dir_)
-        except FileExistsError:
-            pass
 
 
 def get_filename_without_extension(filename):
@@ -62,11 +52,10 @@ def run(data_dir):
     extracted_dir = os.path.join(data_dir, "extracted")
     parsed_dir = os.path.join(data_dir, "parsed")
     standardized_dir = os.path.join(data_dir, "standardized")
+    make_dirs([raw_dir, extracted_dir, parsed_dir, standardized_dir])
 
     if len(os.listdir(raw_dir)) == 0:
         return False
-
-    make_dirs([extracted_dir, parsed_dir, standardized_dir])
 
     with tempfile.TemporaryDirectory() as tmp_standardized_dir:
         for raw, extracted, parsed, standardized in get_pipeline_files(

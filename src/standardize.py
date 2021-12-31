@@ -11,6 +11,7 @@ category_map = {
     # Examples: annual fees, interest fee, cash from cc rewards
     "Fee/Interest Charge": "Fees",
     "Fees & Adjustments": "Fees",
+    "Bank Fees": "Fees",
     "Fees & Adjustments-Fees & Adjustments": "Fees",
     "Food & Drink": "Dining",
     "Dining": "Dining",
@@ -64,10 +65,19 @@ description_map = {
     "Google Fi": "Bills",
 }
 
+grep_category_map = {
+    "food": "Dining",
+    "payment": "Payment",
+    "entertainment": "Entertainment",
+    "payment": "Payment",
+    "fitness": "Health",
+    "travel": "Travel",
+}
+
 
 def standardizer(record):
     record["date"] = parse(record["date"]).isoformat()
-    record["category"] = (
+    record["new_category"] = (
         category_map[record.get("category")]
         if record.get("category") in category_map
         else "Other"
@@ -78,10 +88,18 @@ def standardizer(record):
             key.lower() in record["description"].lower()
             and "EATS" not in record["description"]
         ):
-            record["category"] = description_map[key]
+            record["new_category"] = description_map[key]
+
+    if record["new_category"] == "Other":
+        for key in grep_category_map:
+            if key.lower() in record["category"].lower():
+                record["new_category"] = grep_category_map[key]
+                break
 
     if "pay" in record["description"].lower() and record["amount"] < 0:
-        record["category"] = "Payment"
+        record["new_category"] = "Payment"
+    record["category"] = record["new_category"]
+    record.pop("new_category")
     return record
 
 
