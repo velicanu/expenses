@@ -67,7 +67,6 @@ description_map = {
 
 grep_category_map = {
     "food": "Dining",
-    "payment": "Payment",
     "entertainment": "Entertainment",
     "payment": "Payment",
     "fitness": "Health",
