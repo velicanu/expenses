@@ -83,7 +83,7 @@ def test_parse():
         "date": "12/18/2018",
         "description": "REI #80 BOSTON BOSTON MA",
         "amount": -59.89,
-        "category": None,
+        "category": "",
         "source": "usbank",
         "source_file": "usbank.csv",
     }

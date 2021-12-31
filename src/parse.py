@@ -19,7 +19,7 @@ def parse_record(record, card, card_def):
         parsed_record.pop("-amount")
     parsed_record["source"] = card
     if "category" not in parsed_record:
-        parsed_record["category"] = None
+        parsed_record["category"] = ""
     parsed_record["source_file"] = record["source_file"]
     return parsed_record
 

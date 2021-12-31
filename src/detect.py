@@ -20,7 +20,11 @@ def identify_card(record):
     """
     for card, card_def in CARD_DEFINITIONS.items():
         if all(key in record for key in card_def):
-            return card, card_def
+            return (
+                (record["institution"], card_def)
+                if card == "plaid"
+                else (card, card_def)
+            )
     return None, None
 
 
