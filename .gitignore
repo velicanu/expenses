@@ -9,3 +9,6 @@ data
 *.db
 
 .ipynb*
+
+# plaid
+quickstart

@@ -37,6 +37,10 @@ Once you obtain your data you can start using the UI.
 2. `Run Pipeline` button runs the data processing workflow that puts the data into a database.
 3. The visualization section of the UI should automatically pick up the updated data after the pipeline runs.
 
+### Plaid integration
+
+See the documentation in `./plaid/README.md` for instructions on how to setup Plaid to
+automatically pull transactions.
 
 ### Internal files
 
