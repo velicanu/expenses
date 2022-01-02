@@ -4,13 +4,13 @@ import tempfile
 
 import pytest
 
-from common import records_from_file
+from common import _clean_barclays, records_from_file
 from detect import save_file_if_valid
 
-input_string = """Transaction Date,Post Date,Description,Category,Type,Amount
-12/30/2019,12/31/2019,THE LANDING PIZZA AND KIT,Food & Drink,Sale,-44.00
-12/29/2019,12/30/2019,TST* SWEET RICE - JP,Food & Drink,Sale,-51.37
-,,,,,
+input_string = """Transaction Date,Post Date,Description,Category,Type,Amount,Memo
+12/30/2019,12/31/2019,THE LANDING PIZZA AND KIT,Food & Drink,Sale,-44.00,
+12/29/2019,12/30/2019,TST* SWEET RICE - JP,Food & Drink,Sale,-51.37,
+,,,,,,
 """
 unknown_string = """Foo,Bar,Baz,Spam,Ham,Jam
 12/30/2019,12/31/2019,THE LANDING PIZZA AND KIT,Food & Drink,Sale,-44.00
@@ -24,6 +24,7 @@ expected = [
         "Category": "Food & Drink",
         "Type": "Sale",
         "Amount": "-44.00",
+        "Memo": "",
     },
     {
         "Transaction Date": "12/29/2019",
@@ -32,8 +33,24 @@ expected = [
         "Category": "Food & Drink",
         "Type": "Sale",
         "Amount": "-51.37",
+        "Memo": "",
     },
 ]
+
+
+def test_clean_barclays():
+    input_ = """Barclays Bank Delaware
+Account Number: XXXXXXXXXXXX1330
+Account Balance as of January 1 2022:    $0.00
+ 
+Transaction Date,Description,Category,Amount
+11/13/2021,"Payment Received","CREDIT",193.64
+10/22/2021,"THDCAPEAIR AIR TKT","DEBIT",-193.64"""
+    expected = """Transaction Date,Description,Category,Amount
+11/13/2021,"Payment Received","CREDIT",193.64
+10/22/2021,"THDCAPEAIR AIR TKT","DEBIT",-193.64"""
+    actual = _clean_barclays(input_)
+    assert actual == expected
 
 
 def test_records_from_file_file():

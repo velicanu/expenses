@@ -1,4 +1,5 @@
-from detect import CARD_DEFINITIONS, identify_card
+from detect import SCHEMALESS_CARD_DEFS as CARD_DEFINITIONS
+from detect import identify_card
 
 
 def test_detect_amex():
@@ -9,6 +10,9 @@ def test_detect_amex():
         "Extended Details": '0098616     626-599-3700\n"Description : GROCERY STORES,SUPE Price : 0.00"\n626-599-3700',
         "Appears On Your Statement As": "TRADER JOE'S #502  QCAMBRIDGE           MA",
         "Address": "748 MEMORIAL DR\nCAMBRIDGE\nMA\n02139\nUNITED STATES",
+        "City/State": "",
+        "Zip Code": "",
+        "Country": "",
         "Reference": "'123'",
         "Category": "Merchandise & Supplies-Groceries",
     }
@@ -24,6 +28,7 @@ def test_detect_chase():
         "Category": "Food & Drink",
         "Type": "Sale",
         "Amount": -123,
+        "Memo": "",
     }
     expected = "chase", CARD_DEFINITIONS["chase"]
     assert identify_card(input_) == expected
