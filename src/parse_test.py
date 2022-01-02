@@ -35,7 +35,7 @@ def test_parse():
         "Card No.": 1234,
         "Description": "NIGHT SHIFT BREWING @",
         "Category": "Dining",
-        "Debit": 4,
+        "Debit": "4",
         "Credit": None,
     }
     expected = {
@@ -76,7 +76,7 @@ def test_parse():
         "Transaction": "CREDIT",
         "Name": "REI #80 BOSTON BOSTON MA",
         "Memo": "12345; ; ; ; ",
-        "Amount": 59.89,
+        "Amount": "59.89",
     }
     expected = {
         "date": "12/18/2018",
