@@ -79,14 +79,15 @@ def merge_tx(card_dir, card_id):
     ]
 
     db_file = os.path.join(card_dir, f"{card_id}.db")
-    conn = sqlite3.connect(db_file)
     if os.path.exists(db_file):
+        conn = sqlite3.connect(db_file)
         cur = conn.cursor()
         df_out.set_index("transaction_id").to_sql(
             name="temp", con=conn, if_exists="replace"
         )
         cur.execute("INSERT OR IGNORE INTO transactions SELECT * FROM temp")
     else:
+        conn = sqlite3.connect(db_file)
         df_out.to_sql(
             name="transactions",
             con=conn,
