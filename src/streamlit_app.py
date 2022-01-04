@@ -213,6 +213,10 @@ def expand():
     st.session_state.expand = not st.session_state.expand
 
 
+def toggle_sql():
+    st.session_state.config["show_sql"] = not st.session_state.config["show_sql"]
+
+
 def add_card_to_config(token, card, alias, start_date):
     st.session_state.config["linked_accounts"][alias] = {
         "alias": alias,
@@ -346,17 +350,9 @@ def init(conn, data_dir, user):
                 extend_sql_statement(default_user_input) + "category != 'Payment'"
             )
 
-        # only set the default state to config if on first run
-        # otherwise you have to click twice
-        if "init_done" not in st.session_state:
-            show_sql = st.sidebar.checkbox(
-                "Show sql", value=st.session_state.config.get("show_sql", False)
-            )
-            st.session_state.show_sql = show_sql
-        else:
-            show_sql = st.sidebar.checkbox("Show sql", value=st.session_state.show_sql)
+        st.sidebar.button("Show sql", on_click=toggle_sql)
 
-        if show_sql:
+        if st.session_state.config["show_sql"]:
             user_input = st.text_input("label goes here", default_user_input)
             df = pd.read_sql(user_input, conn)
             st.dataframe(df)
@@ -364,7 +360,7 @@ def init(conn, data_dir, user):
                 add_download_csv_widget(df)
         else:
             df = pd.read_sql(default_user_input, conn)
-        st.session_state.config["show_sql"] = show_sql
+
     except pd.io.sql.DatabaseError:
         pass
 
@@ -503,6 +499,8 @@ def main():
         st.session_state.file_uploader_key = 1
     if "linked_accounts" not in st.session_state.config:
         st.session_state.config["linked_accounts"] = {}
+    if "show_sql" not in st.session_state.config:
+        st.session_state.config["show_sql"] = False
     if "link_account_button" not in st.session_state:
         st.session_state.link_account_button = False
     if "custom_start_date" not in st.session_state:
