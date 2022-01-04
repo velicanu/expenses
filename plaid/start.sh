@@ -14,11 +14,22 @@ EOL
 docker ps > /dev/null 2>&1
 [[ $? -ne 0 ]] && echo Docker not running, exiting. && exit 1
 
+# patch server
+cd quickstart ; git checkout . ; cd -
 cat quickstart/python/server.py | sed '/api\/info/,+10 d' > tmp.py
 cat server.py >> tmp.py
-cp tmp.py quickstart/python/server.py
+mv tmp.py quickstart/python/server.py
 
-cp index.tsx quickstart/frontend/src/Components/Headers/
+# patch frontend
+head -n31 quickstart/frontend/src/Components/Headers/index.tsx | sed 's/Plaid Quickstart/Link Account/' > tmp.tsx
+cat >> tmp.tsx <<EOL
+            Click the Launch Link button and log into your account.
+            After logging in you can close this tab and click the
+            Get Token button in the expense app.
+EOL
+tail -n82 quickstart/frontend/src/Components/Headers/index.tsx >> tmp.tsx
+mv tmp.tsx quickstart/frontend/src/Components/Headers/index.tsx
+
 cd quickstart
 make up language=python
 cd -
