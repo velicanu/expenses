@@ -14,7 +14,7 @@ EOL
 docker ps > /dev/null 2>&1
 [[ $? -ne 0 ]] && echo Docker not running, exiting. && exit 1
 
-cp server.py quickstart/python/
+cat server.py >> quickstart/python/server.py
 cp index.tsx quickstart/frontend/src/Components/Headers/
 cd quickstart
 make up language=python
