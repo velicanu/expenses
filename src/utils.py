@@ -47,7 +47,7 @@ def get_institution_st(access_token):
 
 def get_access_token(url="http://localhost:8000/api/info"):
     try:
-        r = requests.post("http://localhost:8000/api/info")
+        r = requests.post(url)
         data = r.json()
         return data["access_token"]
     except Exception as e:
