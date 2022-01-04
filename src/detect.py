@@ -1,3 +1,4 @@
+import copy
 import json
 import os
 import tempfile
@@ -9,6 +10,9 @@ from common import records_from_file
 script_dir = os.path.dirname(os.path.realpath(__file__))
 
 CARD_DEFINITIONS = json.load(open(os.path.join(script_dir, "card_definitions.json")))
+SCHEMALESS_CARD_DEFS = copy.deepcopy(CARD_DEFINITIONS)
+for key, value in SCHEMALESS_CARD_DEFS.items():
+    value.pop("schema")
 
 
 def identify_card(record):
@@ -18,13 +22,12 @@ def identify_card(record):
     :param record: a json record
     :return: the matching card name, the card definition (field name mapping)
     """
+    columns = list(record)
+    if "source_file" in record:
+        columns.remove("source_file")
     for card, card_def in CARD_DEFINITIONS.items():
-        if all(key in record for key in card_def):
-            return (
-                (record["institution"], card_def)
-                if card == "plaid"
-                else (card, card_def)
-            )
+        if columns == card_def["schema"]:
+            return card, SCHEMALESS_CARD_DEFS[card]
     return None, None
 
 

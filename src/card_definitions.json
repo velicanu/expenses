@@ -1,11 +1,40 @@
 {
   "amex": {
+    "schema": [
+      "Date",
+      "Description",
+      "Amount",
+      "Extended Details",
+      "Appears On Your Statement As",
+      "Address",
+      "City/State",
+      "Zip Code",
+      "Country",
+      "Reference",
+      "Category"
+    ],
     "Date": "date",
     "Description": "description",
     "Amount": "amount",
     "Category": "category"
   },
+  "barclays": {
+    "schema": ["Transaction Date", "Description", "Category", "Amount"],
+    "Transaction Date": "date",
+    "Description": "description",
+    "Amount": "-amount",
+    "Category": "category"
+  },
   "capital_one": {
+    "schema": [
+      "Transaction Date",
+      "Posted Date",
+      "Card No.",
+      "Description",
+      "Category",
+      "Debit",
+      "Credit"
+    ],
     "Transaction Date": "date",
     "Description": "description",
     "Debit": "amount",
@@ -13,23 +42,70 @@
     "Category": "category"
   },
   "chase": {
+    "schema": [
+      "Transaction Date",
+      "Post Date",
+      "Description",
+      "Category",
+      "Type",
+      "Amount",
+      "Memo"
+    ],
     "Transaction Date": "date",
     "Description": "description",
     "Amount": "-amount",
     "Category": "category"
   },
+  "plaid": {
+    "schema": [
+      "transaction_id",
+      "institution",
+      "categories",
+      "name",
+      "amount",
+      "date",
+      "authorized_date"
+    ],
+    "authorized_date": "date",
+    "name": "description",
+    "amount": "amount",
+    "categories": "category"
+  },
   "usbank": {
+    "schema": ["Date", "Transaction", "Name", "Memo", "Amount"],
     "Date": "date",
     "Name": "description",
     "Amount": "-amount"
   },
-  "plaid": {
-    "authorized_date": "date",
-    "name": "description",
-    "amount": "-amount",
-    "categories": "category"
+  "usalliance": {
+    "schema": ["Transaction Date", "Description", "Amount", "Category"],
+    "Transaction Date": "date",
+    "Description": "description",
+    "Amount": "amount",
+    "Category": "category"
   },
   "wallet": {
+    "schema": [
+      "account",
+      "category",
+      "currency",
+      "amount",
+      "ref_currency_amount",
+      "type",
+      "payment_type",
+      "payment_type_local",
+      "note",
+      "date",
+      "gps_latitude",
+      "gps_longitude",
+      "gps_accuracy_in_meters",
+      "warranty_in_month",
+      "transfer",
+      "payee",
+      "labels",
+      "envelope_id",
+      "custom_category"
+    ],
     "date": "date",
     "note": "description",
     "amount": "amount",

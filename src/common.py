@@ -30,6 +30,13 @@ def _get_newline(infile):
     return "\n" if rn_pos == -1 else "\r\n"
 
 
+def _clean_barclays(instr):
+    if instr.startswith("Barclays Bank Delaware"):
+        idx = instr.find("\n \n") + 3
+        return instr[idx:]
+    return instr
+
+
 def records_from_file(infile):
     """
     This function returns a generator of json records from an input csv.
@@ -49,6 +56,10 @@ def records_from_file(infile):
             # amex csv export breaks python csv parser due to double "" inside "
             input_ = input_.replace('"""', '"@')
             input_ = input_.replace('""', "@")
+            # usalliance has terrible newlines
+            input_ = input_.replace("\n\n", "\n")
+            # barclays adds garbage to the start of their csv
+            input_ = _clean_barclays(input_)
             dialect = csv.Sniffer().sniff(input_)
             tmpfile.write(input_)
 
