@@ -113,27 +113,43 @@ def add_description_widget(default_user_input):
             st.sidebar.warning(
                 "invalid description, only one of + or ^ supported at a time"
             )
-        return default_user_input
+        return default_user_input, []
+    if "+" in title or "^" in title:
+        operator = "+" if "+" in title else "^"
+        description_list = title.replace("!", "").split(operator)
     if "+" in title:
-        return extend_sql_statement(default_user_input) + " OR ".join(
-            [
-                f"description LIKE '%{s}%'"
-                if not s.startswith("!")
-                else f"description NOT LIKE '%{s[1:]}%'"
-                for s in title.split("+")
-            ]
-        )
+        return (
+            extend_sql_statement(default_user_input)
+            + "("
+            + " OR ".join(
+                [
+                    f"description LIKE '%{s}%'"
+                    if not s.startswith("!")
+                    else f"description NOT LIKE '%{s[1:]}%'"
+                    for s in title.split("+")
+                ]
+            )
+            + ")"
+        ), description_list
     if "^" in title:
-        return extend_sql_statement(default_user_input) + " AND ".join(
-            [
-                f"description LIKE '%{s}%'"
-                if not s.startswith("!")
-                else f"description NOT LIKE '%{s[1:]}%'"
-                for s in title.split("^")
-            ]
-        )
+        return (
+            extend_sql_statement(default_user_input)
+            + "("
+            + " AND ".join(
+                [
+                    f"description LIKE '%{s}%'"
+                    if not s.startswith("!")
+                    else f"description NOT LIKE '%{s[1:]}%'"
+                    for s in title.split("^")
+                ]
+            )
+            + ")"
+        ), description_list
 
-    return extend_sql_statement(default_user_input) + f"description LIKE '%{title}%'"
+    return (
+        extend_sql_statement(default_user_input) + f"description LIKE '%{title}%'",
+        [],
+    )
 
 
 def add_include_payment_widget(default_user_input):
@@ -342,7 +358,9 @@ def init(conn, data_dir, user):
         df_initial = pd.read_sql("SELECT * FROM expenses", conn)
         default_user_input = add_date_range_widget(df_initial)
         default_user_input = add_category_widget(df_initial, default_user_input)
-        default_user_input = add_description_widget(default_user_input)
+        default_user_input, description_list = add_description_widget(
+            default_user_input
+        )
         if st.session_state.expand:
             default_user_input = add_include_payment_widget(default_user_input)
         else:
