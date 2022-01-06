@@ -113,27 +113,43 @@ def add_description_widget(default_user_input):
             st.sidebar.warning(
                 "invalid description, only one of + or ^ supported at a time"
             )
-        return default_user_input
+        return default_user_input, []
+    if "+" in title or "^" in title:
+        operator = "+" if "+" in title else "^"
+        description_list = title.replace("!", "").split(operator)
     if "+" in title:
-        return extend_sql_statement(default_user_input) + " OR ".join(
-            [
-                f"description LIKE '%{s}%'"
-                if not s.startswith("!")
-                else f"description NOT LIKE '%{s[1:]}%'"
-                for s in title.split("+")
-            ]
-        )
+        return (
+            extend_sql_statement(default_user_input)
+            + "("
+            + " OR ".join(
+                [
+                    f"description LIKE '%{s}%'"
+                    if not s.startswith("!")
+                    else f"description NOT LIKE '%{s[1:]}%'"
+                    for s in title.split("+")
+                ]
+            )
+            + ")"
+        ), description_list
     if "^" in title:
-        return extend_sql_statement(default_user_input) + " AND ".join(
-            [
-                f"description LIKE '%{s}%'"
-                if not s.startswith("!")
-                else f"description NOT LIKE '%{s[1:]}%'"
-                for s in title.split("^")
-            ]
-        )
+        return (
+            extend_sql_statement(default_user_input)
+            + "("
+            + " AND ".join(
+                [
+                    f"description LIKE '%{s}%'"
+                    if not s.startswith("!")
+                    else f"description NOT LIKE '%{s[1:]}%'"
+                    for s in title.split("^")
+                ]
+            )
+            + ")"
+        ), description_list
 
-    return extend_sql_statement(default_user_input) + f"description LIKE '%{title}%'"
+    return (
+        extend_sql_statement(default_user_input) + f"description LIKE '%{title}%'",
+        [],
+    )
 
 
 def add_include_payment_widget(default_user_input):
@@ -211,6 +227,10 @@ def add_upload_files_widget(data_dir):
 
 def expand():
     st.session_state.expand = not st.session_state.expand
+
+
+def toggle_sql():
+    st.session_state.config["show_sql"] = not st.session_state.config["show_sql"]
 
 
 def add_card_to_config(token, card, alias, start_date):
@@ -338,7 +358,9 @@ def init(conn, data_dir, user):
         df_initial = pd.read_sql("SELECT * FROM expenses", conn)
         default_user_input = add_date_range_widget(df_initial)
         default_user_input = add_category_widget(df_initial, default_user_input)
-        default_user_input = add_description_widget(default_user_input)
+        default_user_input, description_list = add_description_widget(
+            default_user_input
+        )
         if st.session_state.expand:
             default_user_input = add_include_payment_widget(default_user_input)
         else:
@@ -346,17 +368,9 @@ def init(conn, data_dir, user):
                 extend_sql_statement(default_user_input) + "category != 'Payment'"
             )
 
-        # only set the default state to config if on first run
-        # otherwise you have to click twice
-        if "init_done" not in st.session_state:
-            show_sql = st.sidebar.checkbox(
-                "Show sql", value=st.session_state.config.get("show_sql", False)
-            )
-            st.session_state.show_sql = show_sql
-        else:
-            show_sql = st.sidebar.checkbox("Show sql", value=st.session_state.show_sql)
+        st.sidebar.button("Show sql", on_click=toggle_sql)
 
-        if show_sql:
+        if st.session_state.config["show_sql"]:
             user_input = st.text_input("label goes here", default_user_input)
             df = pd.read_sql(user_input, conn)
             st.dataframe(df)
@@ -364,7 +378,7 @@ def init(conn, data_dir, user):
                 add_download_csv_widget(df)
         else:
             df = pd.read_sql(default_user_input, conn)
-        st.session_state.config["show_sql"] = show_sql
+
     except pd.io.sql.DatabaseError:
         pass
 
@@ -503,6 +517,8 @@ def main():
         st.session_state.file_uploader_key = 1
     if "linked_accounts" not in st.session_state.config:
         st.session_state.config["linked_accounts"] = {}
+    if "show_sql" not in st.session_state.config:
+        st.session_state.config["show_sql"] = False
     if "link_account_button" not in st.session_state:
         st.session_state.link_account_button = False
     if "custom_start_date" not in st.session_state:
