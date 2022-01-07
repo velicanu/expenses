@@ -57,6 +57,8 @@ def add_date_range_widget(df):
         if st.session_state.config.get("max_date")
         else max_value
     )
+    min_default = max(min_value, min_default)
+    max_default = min(max_value, max_default)
     date_range = st.sidebar.date_input(
         "Date range",
         value=(min_default, max_default),
