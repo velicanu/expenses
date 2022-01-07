@@ -19,6 +19,7 @@ category_map = {
     "Restaurant, fast-food": "Dining",
     "Restaurant-Bar & Café": "Dining",
     "Restaurant-Restaurant": "Dining",
+    "Dining Out": "Dining",
     "Gas": "Car",
     "Gas/Automotive": "Car",
     "Automotive": "Car",
@@ -50,11 +51,12 @@ category_map = {
     "Electronics, accessories": "Shopping",
     "Merchandise": "Shopping",
     "Shopping": "Shopping",
+    "Specialty Stores": "Shopping",
     # Home
-    "Home, garden": "Home",
     "Rent": "Rent",
     "Services": "Services",
     "Life events": "Family",
+    "Car Rental": "Travel",
 }
 
 
@@ -63,6 +65,13 @@ description_map = {
     "UBER": "Rideshare",
     "REI": "Shopping",
     "Google Fi": "Bills",
+    "trvl": "Travel",
+    "vrbo": "Travel",
+    "nyct paygo": "Travel",
+    "trader joe": "Groceries",
+    "EASEWAY DE PR": "Travel",
+    "Sanador": "Health",
+    "CAPEAIR": "Travel",
 }
 
 grep_category_map = {
@@ -71,6 +80,11 @@ grep_category_map = {
     "payment": "Payment",
     "fitness": "Health",
     "travel": "Travel",
+    "shops": "Shopping",
+    "Merchandise": "Shopping",
+    "Telecommunication": "Bills",
+    "Insurance": "Bills",
+    "Home": "Shopping",
 }
 
 
