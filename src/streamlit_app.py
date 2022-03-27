@@ -10,7 +10,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
-from streamlit.report_thread import get_report_ctx
+from streamlit.script_run_context import add_script_run_ctx
 from streamlit.server.server import Server
 
 from detect import save_file_if_valid
@@ -489,7 +489,7 @@ def init_data_dir(user):
 
 
 def main():
-    session_id = get_report_ctx().session_id
+    session_id = add_script_run_ctx().streamlit_script_run_ctx.session_id
     session_info = Server.get_current()._get_session_info(session_id)
     user = ""
     try:

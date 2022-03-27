@@ -1,4 +1,5 @@
-[[ ! -d "./quickstart" ]] && git clone https://github.com/plaid/quickstart.git && cd quickstart && git checkout 828f8c83d0dab09b22e8faae2213f3c73011e2d5 && cd -
+# [[ ! -d "./quickstart" ]] && git clone https://github.com/plaid/quickstart.git && cd quickstart && git checkout 828f8c83d0dab09b22e8faae2213f3c73011e2d5 && cd - && cp requirements.txt quickstart/python
+[[ ! -d "./quickstart" ]] && git clone https://github.com/plaid/quickstart.git && cd quickstart && cd - && cp requirements.txt quickstart/python
 
 [[ -z "${PLAID_SECRET}" || -z "${PLAID_CLIENT_ID}" ]] && echo Plaid env variables PLAID_SECRET and PLAID_CLIENT_ID need to be set, exiting. && exit 1
 
