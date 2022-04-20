@@ -10,7 +10,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
-from streamlit.script_run_context import add_script_run_ctx
+from streamlit.scriptrunner import add_script_run_ctx
 from streamlit.server.server import Server
 
 from detect import save_file_if_valid
@@ -313,7 +313,8 @@ def pull(data_dir):
                 tx["institution"] = card["institution"]
                 outfile.write(f"{json.dumps(tx.to_dict(), default=json_serialize)}\n")
         db_file = merge_tx(card_dir, card_id)
-        dump_csv(data_dir, db_file, card_id)
+        if db_file:
+            dump_csv(data_dir, db_file, card_id)
 
         card["start_date"] = (date.today() - timedelta(days=30)).isoformat()
 
