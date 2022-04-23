@@ -40,6 +40,7 @@ def test_full_pipeline():
                 "source": "usbank",
                 "category": "Shopping",
                 "source_file": "usbank.csv",
+                "line": 0,
             },
             {
                 "date": "2019-01-02 00:00:00",
@@ -48,6 +49,7 @@ def test_full_pipeline():
                 "source": "usbank",
                 "category": "Other",
                 "source_file": "usbank.csv",
+                "line": 1,
             },
             {
                 "date": "2019-06-15 00:00:00",
@@ -56,6 +58,7 @@ def test_full_pipeline():
                 "source": "amex",
                 "category": "Groceries",
                 "source_file": "amex.csv",
+                "line": 2,
             },
             {
                 "date": "2019-12-28 00:00:00",
@@ -64,6 +67,7 @@ def test_full_pipeline():
                 "source": "capital_one",
                 "category": "Dining",
                 "source_file": "capital_one.csv",
+                "line": 0,
             },
             {
                 "date": "2019-12-29 00:00:00",
@@ -72,6 +76,7 @@ def test_full_pipeline():
                 "source": "capital_one",
                 "category": "Shopping",
                 "source_file": "capital_one.csv",
+                "line": 1,
             },
             {
                 "date": "2019-12-29 00:00:00",
@@ -80,6 +85,7 @@ def test_full_pipeline():
                 "source": "chase",
                 "category": "Dining",
                 "source_file": "chase.csv",
+                "line": 1,
             },
             {
                 "date": "2019-12-30 00:00:00",
@@ -88,6 +94,7 @@ def test_full_pipeline():
                 "source": "chase",
                 "category": "Dining",
                 "source_file": "chase.csv",
+                "line": 0,
             },
             {
                 "date": "2020-06-15 00:00:00",
@@ -96,6 +103,7 @@ def test_full_pipeline():
                 "source": "amex",
                 "category": "Groceries",
                 "source_file": "amex.csv",
+                "line": 1,
             },
             {
                 "date": "2020-06-19 00:00:00",
@@ -104,6 +112,8 @@ def test_full_pipeline():
                 "source": "amex",
                 "category": "Groceries",
                 "source_file": "amex.csv",
+                "line": 0,
             },
         ]
+
         assert actual == expected
