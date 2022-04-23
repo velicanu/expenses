@@ -27,8 +27,6 @@ def parse_record(record, card, card_def):
     if "category" not in parsed_record:
         parsed_record["category"] = ""
     parsed_record["source_file"] = record["source_file"]
-    if card == "plaid" and "usalliance" in record["source_file"]:
-        parsed_record["amount"] = parsed_record["amount"] * -1
     return parsed_record
 
 

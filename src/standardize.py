@@ -88,7 +88,7 @@ grep_category_map = {
 }
 
 
-def standardizer(record):
+def standardizer(record, line_num):
     record["date"] = parse(record["date"]).isoformat()
     record["new_category"] = (
         category_map[record.get("category")]
@@ -113,6 +113,8 @@ def standardizer(record):
         record["new_category"] = "Payment"
     record["category"] = record["new_category"]
     record.pop("new_category")
+
+    record["line"] = line_num
     return record
 
 
@@ -122,9 +124,9 @@ def standardize(infile, outfile):
     log.info(f"Standardizing {infile} into {outfile}")
 
     with open(infile, "r") as inf, open(outfile, "w") as outf:
-        for line in inf:
+        for line_num, line in enumerate(inf):
             record = json.loads(line)
-            standardized_record = standardizer(record)
+            standardized_record = standardizer(record, line_num)
             outf.write(f"{json.dumps(standardized_record)}\n")
 
 
