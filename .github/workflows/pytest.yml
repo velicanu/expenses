@@ -9,7 +9,7 @@ jobs:
       matrix:
         # TODO: uncomment other python versions later
         # python-version: [3.7, 3.8, 3.9]
-        python-version: [3.10]
+        python-version: ["3.10"]
         os: ['ubuntu-latest', 'windows-latest', 'macos-latest']
     steps:
     - uses: actions/checkout@v2
