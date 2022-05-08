@@ -108,7 +108,7 @@
     ],
     "date": "date",
     "note": "description",
-    "amount": "amount",
+    "amount": "-amount",
     "category": "category"
   }
 }

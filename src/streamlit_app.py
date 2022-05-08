@@ -10,7 +10,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
-from streamlit.report_thread import get_report_ctx
+from streamlit.scriptrunner import add_script_run_ctx
 from streamlit.server.server import Server
 
 from detect import save_file_if_valid
@@ -57,6 +57,8 @@ def add_date_range_widget(df):
         if st.session_state.config.get("max_date")
         else max_value
     )
+    min_default = max(min_value, min_default)
+    max_default = min(max_value, max_default)
     date_range = st.sidebar.date_input(
         "Date range",
         value=(min_default, max_default),
@@ -84,9 +86,23 @@ def add_date_range_widget(df):
 
 
 def add_category_widget(df, default_user_input):
-    selected = st.sidebar.multiselect("Categories", df["category"].unique())
+    selected = st.sidebar.multiselect("Categories", sorted(df["category"].unique()))
     if selected:
         default_user_input = extend_sql_statement(default_user_input) + "category in "
+        default_user_input = (
+            default_user_input + f"{tuple(c for c in selected)}"
+            if len(selected) > 1
+            else default_user_input + f"('{selected[0]}')"
+        )
+    return default_user_input
+
+
+def add_source_widget(df, default_user_input):
+    selected = st.sidebar.multiselect("Source file", sorted(df["source_file"].unique()))
+    if selected:
+        default_user_input = (
+            extend_sql_statement(default_user_input) + "source_file in "
+        )
         default_user_input = (
             default_user_input + f"{tuple(c for c in selected)}"
             if len(selected) > 1
@@ -311,7 +327,8 @@ def pull(data_dir):
                 tx["institution"] = card["institution"]
                 outfile.write(f"{json.dumps(tx.to_dict(), default=json_serialize)}\n")
         db_file = merge_tx(card_dir, card_id)
-        dump_csv(data_dir, db_file, card_id)
+        if db_file:
+            dump_csv(data_dir, db_file, card_id)
 
         card["start_date"] = (date.today() - timedelta(days=30)).isoformat()
 
@@ -361,6 +378,7 @@ def init(conn, data_dir, user):
         default_user_input, description_list = add_description_widget(
             default_user_input
         )
+        default_user_input = add_source_widget(df_initial, default_user_input)
         if st.session_state.expand:
             default_user_input = add_include_payment_widget(default_user_input)
         else:
@@ -487,7 +505,7 @@ def init_data_dir(user):
 
 
 def main():
-    session_id = get_report_ctx().session_id
+    session_id = add_script_run_ctx().streamlit_script_run_ctx.session_id
     session_info = Server.get_current()._get_session_info(session_id)
     user = ""
     try:

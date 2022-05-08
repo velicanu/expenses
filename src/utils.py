@@ -64,6 +64,8 @@ def dump_csv(data_dir, db_file, card_id):
 def merge_tx(card_dir, card_id):
     new_tx_file = os.path.join(card_dir, f"{card_id}.json")
     df = pd.read_json(open(new_tx_file).read(), lines=True)
+    if df.empty:
+        return
     df["categories"] = df["category"].apply(lambda x: ",".join(x))
 
     df_out = df[
@@ -86,6 +88,8 @@ def merge_tx(card_dir, card_id):
             name="temp", con=conn, if_exists="replace"
         )
         cur.execute("INSERT OR IGNORE INTO transactions SELECT * FROM temp")
+        conn.commit()
+        conn.close()
     else:
         conn = sqlite3.connect(db_file)
         df_out.to_sql(

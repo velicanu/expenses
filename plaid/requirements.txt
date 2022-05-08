@@ -1,0 +1,4 @@
+flask>=2.0.3
+plaid_python>=9.1.0
+python-dotenv>=0.15.0
+itsdangerous>=2.0.1

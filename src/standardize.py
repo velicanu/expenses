@@ -19,6 +19,7 @@ category_map = {
     "Restaurant, fast-food": "Dining",
     "Restaurant-Bar & Café": "Dining",
     "Restaurant-Restaurant": "Dining",
+    "Dining Out": "Dining",
     "Gas": "Car",
     "Gas/Automotive": "Car",
     "Automotive": "Car",
@@ -50,11 +51,12 @@ category_map = {
     "Electronics, accessories": "Shopping",
     "Merchandise": "Shopping",
     "Shopping": "Shopping",
+    "Specialty Stores": "Shopping",
     # Home
-    "Home, garden": "Home",
     "Rent": "Rent",
     "Services": "Services",
     "Life events": "Family",
+    "Car Rental": "Travel",
 }
 
 
@@ -63,6 +65,13 @@ description_map = {
     "UBER": "Rideshare",
     "REI": "Shopping",
     "Google Fi": "Bills",
+    "trvl": "Travel",
+    "vrbo": "Travel",
+    "nyct paygo": "Travel",
+    "trader joe": "Groceries",
+    "EASEWAY DE PR": "Travel",
+    "Sanador": "Health",
+    "CAPEAIR": "Travel",
 }
 
 grep_category_map = {
@@ -71,10 +80,15 @@ grep_category_map = {
     "payment": "Payment",
     "fitness": "Health",
     "travel": "Travel",
+    "shops": "Shopping",
+    "Merchandise": "Shopping",
+    "Telecommunication": "Bills",
+    "Insurance": "Bills",
+    "Home": "Shopping",
 }
 
 
-def standardizer(record):
+def standardizer(record, line_num):
     record["date"] = parse(record["date"]).isoformat()
     record["new_category"] = (
         category_map[record.get("category")]
@@ -99,6 +113,8 @@ def standardizer(record):
         record["new_category"] = "Payment"
     record["category"] = record["new_category"]
     record.pop("new_category")
+
+    record["line"] = line_num
     return record
 
 
@@ -108,9 +124,9 @@ def standardize(infile, outfile):
     log.info(f"Standardizing {infile} into {outfile}")
 
     with open(infile, "r") as inf, open(outfile, "w") as outf:
-        for line in inf:
+        for line_num, line in enumerate(inf):
             record = json.loads(line)
-            standardized_record = standardizer(record)
+            standardized_record = standardizer(record, line_num)
             outf.write(f"{json.dumps(standardized_record)}\n")
 
 
