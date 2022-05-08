@@ -86,9 +86,23 @@ def add_date_range_widget(df):
 
 
 def add_category_widget(df, default_user_input):
-    selected = st.sidebar.multiselect("Categories", df["category"].unique())
+    selected = st.sidebar.multiselect("Categories", sorted(df["category"].unique()))
     if selected:
         default_user_input = extend_sql_statement(default_user_input) + "category in "
+        default_user_input = (
+            default_user_input + f"{tuple(c for c in selected)}"
+            if len(selected) > 1
+            else default_user_input + f"('{selected[0]}')"
+        )
+    return default_user_input
+
+
+def add_source_widget(df, default_user_input):
+    selected = st.sidebar.multiselect("Source file", sorted(df["source_file"].unique()))
+    if selected:
+        default_user_input = (
+            extend_sql_statement(default_user_input) + "source_file in "
+        )
         default_user_input = (
             default_user_input + f"{tuple(c for c in selected)}"
             if len(selected) > 1
@@ -364,6 +378,7 @@ def init(conn, data_dir, user):
         default_user_input, description_list = add_description_widget(
             default_user_input
         )
+        default_user_input = add_source_widget(df_initial, default_user_input)
         if st.session_state.expand:
             default_user_input = add_include_payment_widget(default_user_input)
         else:

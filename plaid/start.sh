@@ -1,4 +1,4 @@
-[[ ! -d "./quickstart" ]] && git clone https://github.com/plaid/quickstart.git && cd quickstart && git checkout 828f8c83d0dab09b22e8faae2213f3c73011e2d5 && cd -
+[[ ! -d "./quickstart" ]] && git clone https://github.com/plaid/quickstart.git
 
 [[ -z "${PLAID_SECRET}" || -z "${PLAID_CLIENT_ID}" ]] && echo Plaid env variables PLAID_SECRET and PLAID_CLIENT_ID need to be set, exiting. && exit 1
 
@@ -14,7 +14,7 @@ EOL
 docker ps > /dev/null 2>&1
 [[ $? -ne 0 ]] && echo Docker not running, exiting. && exit 1
 
-# patch server
+# patch server until plaid fixes: https://github.com/plaid/quickstart/issues/349
 cd quickstart ; git checkout . ; cd - ; cp requirements.txt quickstart/python
 cat quickstart/python/server.py | sed '/api\/info/,+10 d' > tmp.py
 cat server.py >> tmp.py
