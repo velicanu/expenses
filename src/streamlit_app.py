@@ -466,18 +466,9 @@ def add_spending_over_time(df):
         return
 
     df = df.set_index(pd.DatetimeIndex(df["date"]))
-    df_month = df.resample("M").sum()
-    df_month["date"] = df_month.index
+    df_month = df.groupby("category").resample("M").sum().reset_index()
 
-    fig2 = go.Figure()
-    fig2.add_trace(
-        go.Scatter(
-            x=df_month["date"],
-            y=df_month["amount"],
-            mode="lines+markers",
-            name="lines+markers",
-        )
-    )
+    fig2 = px.bar(df_month, x="date", y="amount", color="category")
     fig2.update_layout(
         title="Spending over time",
         xaxis_title="Date",
