@@ -31,13 +31,16 @@ def get_pipeline_files(raw_dir, extracted_dir, parsed_dir, standardized_dir):
         yield raw_file, extracted_file, parsed_file, standardized_file
 
 
-def _etl(raw, extracted, parsed, standardized):
-    extract(raw, extracted)
-    parse(extracted, parsed)
-    standardize(parsed, standardized)
+def _etl(raw, extracted, parsed, standardized, standardize_only=False):
+    if standardize_only:
+        standardize(parsed, standardized)
+    else:
+        extract(raw, extracted)
+        parse(extracted, parsed)
+        standardize(parsed, standardized)
 
 
-def run(data_dir):
+def run(data_dir, standardize_only=False):
     """
     Run the pipeline, intermediate files go into
     data/extracted, data/parsed, and data/standardized
@@ -61,7 +64,11 @@ def run(data_dir):
         for raw, extracted, parsed, standardized in get_pipeline_files(
             raw_dir, extracted_dir, parsed_dir, tmp_standardized_dir
         ):
-            jobs.append(pool.apply_async(_etl, (raw, extracted, parsed, standardized)))
+            jobs.append(
+                pool.apply_async(
+                    _etl, (raw, extracted, parsed, standardized, standardize_only)
+                )
+            )
 
         [job.get() for job in jobs]
         # TODO: hardcoded expenses tablename and expenses.db

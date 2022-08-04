@@ -175,13 +175,12 @@ def add_include_payment_widget(default_user_input):
 
 
 def add_download_csv_widget(df):
-    if st.sidebar.button("Download csv"):
-        csv = df.to_csv(index=False)
-        b64 = base64.b64encode(csv.encode()).decode()
-        st.sidebar.markdown(
-            f'<a href="data:file/csv;base64,{b64}">Download csv file</a>',
-            unsafe_allow_html=True,
-        )
+    st.sidebar.download_button(
+        label="Download csv",
+        data=df.to_csv(index=False).encode(),
+        file_name="data.csv",
+        mime="text/csv",
+    )
 
 
 def delete_files():
@@ -247,6 +246,92 @@ def expand():
 
 def toggle_sql():
     st.session_state.config["show_sql"] = not st.session_state.config["show_sql"]
+
+
+def toggle_rules():
+    st.session_state.config["rules_button"] = not st.session_state.config[
+        "rules_button"
+    ]
+
+
+def save_rule(category_rule, description_rule, target, df):
+    for cat in df["category"].unique():
+        st.session_state.categories.add(cat.lower())
+    valid = True
+    if not category_rule and not description_rule:
+        st.warning("No rule specified")
+        valid = False
+    if category_rule and description_rule:
+        st.warning("Specify only one rule")
+        valid = False
+    if not target:
+        st.warning("Target must be specified")
+        valid = False
+    if valid:
+        if target.lower() not in st.session_state.categories:
+            st.warning(f"Target category: {target} doesn't exist, create new category?")
+            if st.button("Confirm"):
+                if description_rule:
+                    st.session_state.config["rules"]["description"][
+                        description_rule
+                    ] = target
+                if category_rule:
+                    st.session_state.config["rules"]["category"][category_rule] = target
+                st.session_state.categories.add(target.lower())
+        else:
+            if description_rule:
+                st.session_state.config["rules"]["description"][
+                    description_rule
+                ] = target
+            if category_rule:
+                st.session_state.config["rules"]["category"][category_rule] = target
+
+
+def list_rules():
+    st.json(st.session_state.config["rules"])
+
+
+def delete_rules():
+    st.json(st.session_state.config["rules"])
+
+
+def apply_rules(data_dir):
+    run(data_dir, standardize_only=True)
+
+
+def add_rules(data_dir, df_initial):
+    col1, col2, col3, col4 = st.columns([1, 1, 1, 1])
+    with col1:
+        category_rule = st.text_input("Category rule", "")
+    with col2:
+        description_rule = st.text_input("Description rule", "")
+    with col3:
+        target = st.text_input("Target category", "")
+    with col4:
+        st.button(
+            "Save rules",
+            on_click=save_rule,
+            kwargs={
+                "category_rule": category_rule,
+                "description_rule": description_rule,
+                "target": target,
+                "df": df_initial,
+            },
+        )
+        st.button("Apply rules", on_click=apply_rules, kwargs={"data_dir": data_dir})
+        st.button("List rules", on_click=list_rules)
+        st.button(
+            "Delete rules",
+            on_click=delete_rules,
+            kwargs={
+                "category_rule": category_rule,
+                "description_rule": description_rule,
+            },
+        )
+
+    st.write(category_rule)
+    st.write(description_rule)
+    st.write(target)
 
 
 def add_card_to_config(token, card, alias, start_date):
@@ -385,6 +470,11 @@ def init(conn, data_dir, user):
             default_user_input = (
                 extend_sql_statement(default_user_input) + "category != 'Payment'"
             )
+
+        st.sidebar.button("Rules", on_click=toggle_rules)
+
+        if st.session_state.config["rules_button"]:
+            add_rules(data_dir, df_initial)
 
         st.sidebar.button("Show sql", on_click=toggle_sql)
 
@@ -528,10 +618,16 @@ def main():
         st.session_state.config["linked_accounts"] = {}
     if "show_sql" not in st.session_state.config:
         st.session_state.config["show_sql"] = False
+    if "rules_button" not in st.session_state.config:
+        st.session_state.config["rules_button"] = False
     if "link_account_button" not in st.session_state:
         st.session_state.link_account_button = False
     if "custom_start_date" not in st.session_state:
         st.session_state.custom_start_date = False
+    if "rules" not in st.session_state.config:
+        st.session_state.config["rules"] = {"description": {}, "category": {}}
+    if "categories" not in st.session_state:
+        st.session_state.categories = set()
 
     df = init(conn=conn, data_dir=data_dir, user=user)
     put_config(config_file=config_file, config=st.session_state.config)
