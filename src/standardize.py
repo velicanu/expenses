@@ -32,9 +32,6 @@ default_category_map = {
     "Health & Wellness": "Health",
     "Health Care": "Health",
     "Active sport, fitness": "Health",
-    # Examples: tj, whole foods
-    "Groceries": "Groceries",
-    "Merchandise & Supplies-Groceries": "Groceries",
     # Examples: flights, ubers, airbnb
     "Airfare": "Travel",
     "Travel": "Travel",
@@ -67,6 +64,8 @@ default_category_map = {
     "Telecommunication": "Bills",
     "Insurance": "Bills",
     "Home": "Shopping",
+    # Examples: tj, whole foods
+    "Groceries": "Groceries",
 }
 
 
@@ -82,6 +81,7 @@ default_description_map = {
     "EASEWAY DE PR": "Travel",
     "Sanador": "Health",
     "CAPEAIR": "Travel",
+    "EATS": "Dining",
 }
 
 
@@ -90,13 +90,13 @@ def standardizer(record, line_num, rules):
     record["new_category"] = "Other"
 
     for rule, new_category in list(default_category_map.items()) + list(
-        rules["category"].items()
+        rules.get("category", {}).items()
     ):
         if rule.lower() in record["category"].lower():
             record["new_category"] = new_category
 
     for rule, new_category in list(default_description_map.items()) + list(
-        rules["description"].items()
+        rules.get("description", {}).items()
     ):
         if rule.lower() in record["description"].lower():
             record["new_category"] = new_category
