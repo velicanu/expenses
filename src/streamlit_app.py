@@ -1,4 +1,3 @@
-import base64
 import json
 import os
 import sqlite3
@@ -8,7 +7,6 @@ from datetime import date, datetime, timedelta
 import dateutil.parser
 import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go
 import streamlit as st
 from streamlit.scriptrunner import add_script_run_ctx
 from streamlit.server.server import Server
@@ -33,6 +31,22 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+color_discrete_map = {
+    "Rent": px.colors.qualitative.Plotly[0],
+    "Shopping": px.colors.qualitative.Plotly[1],
+    "Family": px.colors.qualitative.Plotly[2],
+    "Dining": px.colors.qualitative.Plotly[3],
+    "Travel": px.colors.qualitative.Plotly[4],
+    "Groceries": px.colors.qualitative.Plotly[5],
+    "Bills": px.colors.qualitative.Plotly[6],
+    "Entertainment": px.colors.qualitative.Plotly[7],
+    "Other": px.colors.qualitative.Plotly[8],
+    "Car": px.colors.qualitative.Plotly[9],
+    "Rideshare": px.colors.qualitative.D3[0],
+    "Fees": px.colors.qualitative.D3[1],
+    "Health": px.colors.qualitative.D3[2],
+    "Services": px.colors.qualitative.D3[3],
+}
 
 
 def extend_sql_statement(statement):
@@ -268,48 +282,53 @@ def save_rule(category_rule, description_rule, target, df):
         st.warning("Target must be specified")
         valid = False
     if valid:
-        if target.lower() not in st.session_state.categories:
-            st.warning(f"Target category: {target} doesn't exist, create new category?")
-            if st.button("Confirm"):
-                if description_rule:
-                    st.session_state.config["rules"]["description"][
-                        description_rule
-                    ] = target
-                if category_rule:
-                    st.session_state.config["rules"]["category"][category_rule] = target
-                st.session_state.categories.add(target.lower())
-        else:
-            if description_rule:
-                st.session_state.config["rules"]["description"][
-                    description_rule
-                ] = target
-            if category_rule:
-                st.session_state.config["rules"]["category"][category_rule] = target
+        if description_rule:
+            st.session_state.config["rules"]["description"][description_rule] = target
+        if category_rule:
+            st.session_state.config["rules"]["category"][category_rule] = target
 
 
 def list_rules():
-    st.json(st.session_state.config["rules"])
-
-
-def delete_rules():
-    st.json(st.session_state.config["rules"])
+    st.session_state.list_rules = not st.session_state.list_rules
 
 
 def apply_rules(data_dir):
-    run(data_dir, standardize_only=True)
+    run(data_dir, standardize_only=True, config=st.session_state.config)
+
+
+def delete_rule(collection, label):
+    delete_selection = st.multiselect(label, collection)
+    if delete_selection:
+        for selection in delete_selection:
+            collection.pop(selection)
 
 
 def add_rules(data_dir, df_initial):
     col1, col2, col3, col4 = st.columns([1, 1, 1, 1])
     with col1:
         category_rule = st.text_input("Category rule", "")
+        delete_rule(
+            st.session_state.config["rules"]["category"], "Delete category rule"
+        )
     with col2:
         description_rule = st.text_input("Description rule", "")
+        delete_rule(
+            st.session_state.config["rules"]["description"], "Delete description rule"
+        )
     with col3:
-        target = st.text_input("Target category", "")
+        new_categories = st.session_state.config["rules"]["new_categories"]
+        all_categories = sorted(
+            list(set(df_initial["category"].unique().tolist() + list(new_categories)))
+        )
+        target = st.selectbox("Target category", all_categories)
+        new_category = st.text_input("Add a new category").title()
+        if new_category and new_category not in new_categories:
+            new_categories[new_category] = ""
+        delete_rule(new_categories, "Delete new category")
+
     with col4:
         st.button(
-            "Save rules",
+            "Save rule",
             on_click=save_rule,
             kwargs={
                 "category_rule": category_rule,
@@ -320,18 +339,16 @@ def add_rules(data_dir, df_initial):
         )
         st.button("Apply rules", on_click=apply_rules, kwargs={"data_dir": data_dir})
         st.button("List rules", on_click=list_rules)
-        st.button(
-            "Delete rules",
-            on_click=delete_rules,
-            kwargs={
-                "category_rule": category_rule,
-                "description_rule": description_rule,
-            },
-        )
-
-    st.write(category_rule)
-    st.write(description_rule)
-    st.write(target)
+        # st.button(
+        #     "Delete rules",
+        #     on_click=delete_rules,
+        #     kwargs={
+        #         "category_rule": category_rule,
+        #         "description_rule": description_rule,
+        #     },
+        # )
+    if st.session_state.list_rules:
+        st.json(st.session_state.config["rules"])
 
 
 def add_card_to_config(token, card, alias, start_date):
@@ -515,22 +532,6 @@ def add_spending_by_category(df):
 
     total = df["amount"].sum()
 
-    color_discrete_map = {
-        "Rent": px.colors.qualitative.Plotly[0],
-        "Shopping": px.colors.qualitative.Plotly[1],
-        "Family": px.colors.qualitative.Plotly[2],
-        "Dining": px.colors.qualitative.Plotly[3],
-        "Travel": px.colors.qualitative.Plotly[4],
-        "Groceries": px.colors.qualitative.Plotly[5],
-        "Bills": px.colors.qualitative.Plotly[6],
-        "Entertainment": px.colors.qualitative.Plotly[7],
-        "Other": px.colors.qualitative.Plotly[8],
-        "Car": px.colors.qualitative.Plotly[9],
-        "Rideshare": px.colors.qualitative.D3[0],
-        "Fees": px.colors.qualitative.D3[1],
-        "Health": px.colors.qualitative.D3[2],
-        "Services": px.colors.qualitative.D3[3],
-    }
     fig = px.pie(
         df2,
         values="amount",
@@ -558,7 +559,13 @@ def add_spending_over_time(df):
     df = df.set_index(pd.DatetimeIndex(df["date"]))
     df_month = df.groupby("category").resample("M").sum().reset_index()
 
-    fig2 = px.bar(df_month, x="date", y="amount", color="category")
+    fig2 = px.bar(
+        df_month,
+        x="date",
+        y="amount",
+        color="category",
+        color_discrete_map=color_discrete_map,
+    )
     fig2.update_layout(
         title="Spending over time",
         xaxis_title="Date",
@@ -624,8 +631,14 @@ def main():
         st.session_state.link_account_button = False
     if "custom_start_date" not in st.session_state:
         st.session_state.custom_start_date = False
+    if "list_rules" not in st.session_state:
+        st.session_state.list_rules = False
     if "rules" not in st.session_state.config:
-        st.session_state.config["rules"] = {"description": {}, "category": {}}
+        st.session_state.config["rules"] = {
+            "description": {},
+            "category": {},
+            "new_categories": {},
+        }
     if "categories" not in st.session_state:
         st.session_state.categories = set()
 

@@ -31,16 +31,17 @@ def get_pipeline_files(raw_dir, extracted_dir, parsed_dir, standardized_dir):
         yield raw_file, extracted_file, parsed_file, standardized_file
 
 
-def _etl(raw, extracted, parsed, standardized, standardize_only=False):
+def _etl(raw, extracted, parsed, standardized, standardize_only, config):
+    rules = config.get("rules", {})
     if standardize_only:
-        standardize(parsed, standardized)
+        standardize(parsed, standardized, rules)
     else:
         extract(raw, extracted)
         parse(extracted, parsed)
-        standardize(parsed, standardized)
+        standardize(parsed, standardized, rules)
 
 
-def run(data_dir, standardize_only=False):
+def run(data_dir, standardize_only=False, config={}):
     """
     Run the pipeline, intermediate files go into
     data/extracted, data/parsed, and data/standardized
@@ -66,7 +67,8 @@ def run(data_dir, standardize_only=False):
         ):
             jobs.append(
                 pool.apply_async(
-                    _etl, (raw, extracted, parsed, standardized, standardize_only)
+                    _etl,
+                    (raw, extracted, parsed, standardized, standardize_only, config),
                 )
             )
 
