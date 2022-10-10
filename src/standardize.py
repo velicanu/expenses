@@ -7,7 +7,7 @@ from common import get_log
 
 log = get_log(__file__)
 
-category_map = {
+default_category_map = {
     # Examples: annual fees, interest fee, cash from cc rewards
     "Fee/Interest Charge": "Fees",
     "Fees & Adjustments": "Fees",
@@ -32,9 +32,6 @@ category_map = {
     "Health & Wellness": "Health",
     "Health Care": "Health",
     "Active sport, fitness": "Health",
-    # Examples: tj, whole foods
-    "Groceries": "Groceries",
-    "Merchandise & Supplies-Groceries": "Groceries",
     # Examples: flights, ubers, airbnb
     "Airfare": "Travel",
     "Travel": "Travel",
@@ -57,10 +54,22 @@ category_map = {
     "Services": "Services",
     "Life events": "Family",
     "Car Rental": "Travel",
+    "food": "Dining",
+    "entertainment": "Entertainment",
+    "payment": "Payment",
+    "fitness": "Health",
+    "travel": "Travel",
+    "shops": "Shopping",
+    "Merchandise": "Shopping",
+    "Telecommunication": "Bills",
+    "Insurance": "Bills",
+    "Home": "Shopping",
+    # Examples: tj, whole foods
+    "Groceries": "Groceries",
 }
 
 
-description_map = {
+default_description_map = {
     "LYFT": "Rideshare",
     "UBER": "Rideshare",
     "REI": "Shopping",
@@ -72,45 +81,29 @@ description_map = {
     "EASEWAY DE PR": "Travel",
     "Sanador": "Health",
     "CAPEAIR": "Travel",
-}
-
-grep_category_map = {
-    "food": "Dining",
-    "entertainment": "Entertainment",
-    "payment": "Payment",
-    "fitness": "Health",
-    "travel": "Travel",
-    "shops": "Shopping",
-    "Merchandise": "Shopping",
-    "Telecommunication": "Bills",
-    "Insurance": "Bills",
-    "Home": "Shopping",
+    "EATS": "Dining",
 }
 
 
-def standardizer(record, line_num):
+def standardizer(record, line_num, rules):
     record["date"] = parse(record["date"]).isoformat()
-    record["new_category"] = (
-        category_map[record.get("category")]
-        if record.get("category") in category_map
-        else "Other"
-    )
+    record["new_category"] = "Other"
 
-    for key in description_map:
-        if (
-            key.lower() in record["description"].lower()
-            and "EATS" not in record["description"]
-        ):
-            record["new_category"] = description_map[key]
+    for rule, new_category in list(default_category_map.items()) + list(
+        rules.get("category", {}).items()
+    ):
+        if rule.lower() in record["category"].lower():
+            record["new_category"] = new_category
 
-    if record["new_category"] == "Other":
-        for key in grep_category_map:
-            if key.lower() in record["category"].lower():
-                record["new_category"] = grep_category_map[key]
-                break
+    for rule, new_category in list(default_description_map.items()) + list(
+        rules.get("description", {}).items()
+    ):
+        if rule.lower() in record["description"].lower():
+            record["new_category"] = new_category
 
     if "pay" in record["description"].lower() and record["amount"] < 0:
         record["new_category"] = "Payment"
+    record["old_category"] = record["category"]
     record["category"] = record["new_category"]
     record.pop("new_category")
 
@@ -118,23 +111,25 @@ def standardizer(record, line_num):
     return record
 
 
-def standardize(infile, outfile):
+def standardize(infile, outfile, rules):
     """Standardizes parsed files"""
 
-    log.info(f"Standardizing {infile} into {outfile}")
+    log.info(f"Standardizing {infile} into {outfile} using {rules}")
 
     with open(infile, "r") as inf, open(outfile, "w") as outf:
         for line_num, line in enumerate(inf):
             record = json.loads(line)
-            standardized_record = standardizer(record, line_num)
+            standardized_record = standardizer(record, line_num, rules)
             outf.write(f"{json.dumps(standardized_record)}\n")
 
 
 @click.command()
 @click.argument("infile", type=str)
 @click.argument("outfile", type=str)
-def _standardize(infile, outfile):
-    standardize(infile, outfile)
+@click.argument("rules", type=str, default="{}")
+def _standardize(infile, outfile, rules):
+    rules_ = json.loads(rules)
+    standardize(infile, outfile, rules_)
 
 
 if __name__ == "__main__":

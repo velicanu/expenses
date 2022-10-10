@@ -15,9 +15,11 @@ def test_standardize():
         "amount": -44.0,
         "category": "Dining",
         "source": "chase",
+        "old_category": "Food & Drink",
         "line": 1,
     }
-    assert standardizer(input_, 1) == expected
+    actual = standardizer(input_, 1, {})
+    assert actual == expected
 
 
 def test_standardize_payment():
@@ -36,9 +38,11 @@ def test_standardize_payment():
         "category": "Payment",
         "source": "amex",
         "source_file": "amex.csv",
+        "old_category": "",
         "line": 1,
     }
-    assert standardizer(input_, 1) == expected
+    actual = standardizer(input_, 1, {})
+    assert actual == expected
 
 
 def test_standardize_rideshare():
@@ -57,9 +61,11 @@ def test_standardize_rideshare():
         "category": "Dining",
         "source": "capital_one",
         "source_file": "capital_one.csv",
+        "old_category": "Dining",
         "line": 1,
     }
-    assert standardizer(input_, 1) == expected
+    actual = standardizer(input_, 1, {})
+    assert actual == expected
 
     input_ = {
         "date": "2020-01-01",
@@ -76,6 +82,8 @@ def test_standardize_rideshare():
         "category": "Rideshare",
         "source": "capital_one",
         "source_file": "capital_one.csv",
+        "old_category": "Other Travel",
         "line": 1,
     }
-    assert standardizer(input_, 1) == expected
+    actual = standardizer(input_, 1, {})
+    assert actual == expected

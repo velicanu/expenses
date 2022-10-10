@@ -40,6 +40,7 @@ def test_full_pipeline():
                 "source": "usbank",
                 "category": "Shopping",
                 "source_file": "usbank.csv",
+                "old_category": "",
                 "line": 0,
             },
             {
@@ -49,6 +50,7 @@ def test_full_pipeline():
                 "source": "usbank",
                 "category": "Other",
                 "source_file": "usbank.csv",
+                "old_category": "",
                 "line": 1,
             },
             {
@@ -58,6 +60,7 @@ def test_full_pipeline():
                 "source": "amex",
                 "category": "Groceries",
                 "source_file": "amex.csv",
+                "old_category": "Merchandise & Supplies-Groceries",
                 "line": 2,
             },
             {
@@ -67,6 +70,7 @@ def test_full_pipeline():
                 "source": "capital_one",
                 "category": "Dining",
                 "source_file": "capital_one.csv",
+                "old_category": "Dining",
                 "line": 0,
             },
             {
@@ -76,6 +80,7 @@ def test_full_pipeline():
                 "source": "capital_one",
                 "category": "Shopping",
                 "source_file": "capital_one.csv",
+                "old_category": "Merchandise",
                 "line": 1,
             },
             {
@@ -85,6 +90,7 @@ def test_full_pipeline():
                 "source": "chase",
                 "category": "Dining",
                 "source_file": "chase.csv",
+                "old_category": "Food & Drink",
                 "line": 1,
             },
             {
@@ -94,6 +100,7 @@ def test_full_pipeline():
                 "source": "chase",
                 "category": "Dining",
                 "source_file": "chase.csv",
+                "old_category": "Food & Drink",
                 "line": 0,
             },
             {
@@ -103,6 +110,7 @@ def test_full_pipeline():
                 "source": "amex",
                 "category": "Groceries",
                 "source_file": "amex.csv",
+                "old_category": "Merchandise & Supplies-Groceries",
                 "line": 1,
             },
             {
@@ -112,6 +120,7 @@ def test_full_pipeline():
                 "source": "amex",
                 "category": "Groceries",
                 "source_file": "amex.csv",
+                "old_category": "Merchandise & Supplies-Groceries",
                 "line": 0,
             },
         ]
