@@ -11,18 +11,31 @@ import streamlit as st
 from streamlit.scriptrunner import add_script_run_ctx
 from streamlit.server.server import Server
 
-from detect import save_file_if_valid
-from pipeline import run
+from analysis import add_spending_by_category, add_spending_over_time
 from plaidlib import get_transactions
+from preprocess.detect import save_file_if_valid
+from preprocess.pipeline import run
+from rules import add_rules, toggle_rules
 from utils import (
     clear,
     dump_csv,
+    extend_sql_statement,
     get_access_token,
     get_config,
     get_institution_st,
     make_dirs,
     merge_tx,
     put_config,
+)
+from widgets import (
+    add_category_widget,
+    add_date_range_widget,
+    add_delete_files_widget,
+    add_description_widget,
+    add_download_csv_widget,
+    add_include_payment_widget,
+    add_source_widget,
+    add_upload_files_widget,
 )
 
 st.set_page_config(
@@ -49,211 +62,6 @@ color_discrete_map = {
 }
 
 
-def extend_sql_statement(statement):
-    return (
-        statement + " WHERE "
-        if " where " not in statement.lower()
-        else statement + " AND "
-    )
-
-
-def add_date_range_widget(df):
-
-    min_value = dateutil.parser.parse(df["date"].min())
-    max_value = dateutil.parser.parse(df["date"].max())
-    min_default = (
-        dateutil.parser.parse(st.session_state.config.get("min_date"))
-        if st.session_state.config.get("min_date")
-        else min_value
-    )
-    max_default = (
-        dateutil.parser.parse(st.session_state.config.get("max_date"))
-        if st.session_state.config.get("max_date")
-        else max_value
-    )
-    min_default = max(min_value, min_default)
-    max_default = min(max_value, max_default)
-    date_range = st.sidebar.date_input(
-        "Date range",
-        value=(min_default, max_default),
-        min_value=min_value,
-        max_value=max_value,
-    )
-    min_value_str = min_value.isoformat().replace("T00:00:00", "")
-    max_value_str = max_value.isoformat().replace("T00:00:00", "")
-    min_selected = date_range[0].isoformat()
-    max_selected = date_range[1].isoformat() if len(date_range) == 2 else None
-
-    default_user_input = "SELECT * FROM expenses"
-
-    if min_selected != min_value_str:
-        default_user_input = (
-            extend_sql_statement(default_user_input) + f'date >= "{min_selected}"'
-        )
-    if max_selected and max_selected != max_value_str:
-        default_user_input = (
-            extend_sql_statement(default_user_input) + f'date <= "{max_selected}"'
-        )
-    st.session_state.config["max_date"] = max_selected
-    st.session_state.config["min_date"] = min_selected
-    return default_user_input
-
-
-def add_category_widget(df, default_user_input):
-    selected = st.sidebar.multiselect("Categories", sorted(df["category"].unique()))
-    if selected:
-        default_user_input = extend_sql_statement(default_user_input) + "category in "
-        default_user_input = (
-            default_user_input + f"{tuple(c for c in selected)}"
-            if len(selected) > 1
-            else default_user_input + f"('{selected[0]}')"
-        )
-    return default_user_input
-
-
-def add_source_widget(df, default_user_input):
-    selected = st.sidebar.multiselect("Source file", sorted(df["source_file"].unique()))
-    if selected:
-        default_user_input = (
-            extend_sql_statement(default_user_input) + "source_file in "
-        )
-        default_user_input = (
-            default_user_input + f"{tuple(c for c in selected)}"
-            if len(selected) > 1
-            else default_user_input + f"('{selected[0]}')"
-        )
-    return default_user_input
-
-
-def validate_description_input(value):
-    num_operators = 0
-    for operator in ["+", "^"]:
-        if operator in value:
-            num_operators += 1
-    return num_operators <= 1 and value
-
-
-def add_description_widget(default_user_input):
-    title = st.sidebar.text_input(
-        "Description", "", help="^ is and, + is or, ! is not, * is wildcard"
-    )
-    title = title.replace("*", "%")
-    if not validate_description_input(title):
-        if title:
-            st.sidebar.warning(
-                "invalid description, only one of + or ^ supported at a time"
-            )
-        return default_user_input, []
-    if "+" in title or "^" in title:
-        operator = "+" if "+" in title else "^"
-        description_list = title.replace("!", "").split(operator)
-    if "+" in title:
-        return (
-            extend_sql_statement(default_user_input)
-            + "("
-            + " OR ".join(
-                [
-                    f"description LIKE '%{s}%'"
-                    if not s.startswith("!")
-                    else f"description NOT LIKE '%{s[1:]}%'"
-                    for s in title.split("+")
-                ]
-            )
-            + ")"
-        ), description_list
-    if "^" in title:
-        return (
-            extend_sql_statement(default_user_input)
-            + "("
-            + " AND ".join(
-                [
-                    f"description LIKE '%{s}%'"
-                    if not s.startswith("!")
-                    else f"description NOT LIKE '%{s[1:]}%'"
-                    for s in title.split("^")
-                ]
-            )
-            + ")"
-        ), description_list
-
-    return (
-        extend_sql_statement(default_user_input) + f"description LIKE '%{title}%'",
-        [],
-    )
-
-
-def add_include_payment_widget(default_user_input):
-    if not st.sidebar.checkbox("Include Payments"):
-        return extend_sql_statement(default_user_input) + "category != 'Payment'"
-    return default_user_input
-
-
-def add_download_csv_widget(df):
-    st.sidebar.download_button(
-        label="Download csv",
-        data=df.to_csv(index=False).encode(),
-        file_name="data.csv",
-        mime="text/csv",
-    )
-
-
-def delete_files():
-    for filename in st.session_state.delete_files:
-        os.remove(filename)
-    st.session_state.delete_files = set()
-
-
-def add_delete_files_widget(raw_data_dir):
-
-    if st.checkbox("Delete files"):
-        for file_ in os.listdir(raw_data_dir):
-            filename = os.path.join(raw_data_dir, file_)
-            if st.checkbox(f"Delete {file_}"):
-                st.session_state.delete_files.add(filename)
-            else:
-                try:
-                    st.session_state.delete_files.remove(filename)
-                except KeyError:
-                    pass
-        if st.session_state.delete_files:
-            st.button("Confirm Delete", on_click=delete_files)
-
-
-def save_files_to_disk(files, data_dir):
-    success = []
-    failed = []
-    for file_ in files:
-        status, msg = save_file_if_valid(file_, data_dir)
-        if status == "success":
-            success.append(msg)
-        else:
-            failed.append(msg)
-
-    if success:
-        status_info = st.success("Saved: " + " ".join(success))
-        run(data_dir)
-    if failed:
-        status_info = st.error("Failed: " + " ".join(failed))
-
-    # this key increment clears the upload dialog box after clicking upload
-    st.session_state.file_uploader_key += 1
-    clear(streamlit_object=status_info, seconds=2)
-
-
-def add_upload_files_widget(data_dir):
-    files = st.file_uploader(
-        "upload data",
-        type="csv",
-        accept_multiple_files=True,
-        key=f"file_uploader_{st.session_state.file_uploader_key}",
-    )
-    st.button(
-        "Upload files",
-        on_click=save_files_to_disk,
-        kwargs={"files": files, "data_dir": data_dir},
-    )
-
-
 def expand():
     st.session_state.expand = not st.session_state.expand
 
@@ -266,89 +74,6 @@ def toggle_rules():
     st.session_state.config["rules_button"] = not st.session_state.config[
         "rules_button"
     ]
-
-
-def save_rule(category_rule, description_rule, target, df):
-    for cat in df["category"].unique():
-        st.session_state.categories.add(cat.lower())
-    valid = True
-    if not category_rule and not description_rule:
-        st.warning("No rule specified")
-        valid = False
-    if category_rule and description_rule:
-        st.warning("Specify only one rule")
-        valid = False
-    if not target:
-        st.warning("Target must be specified")
-        valid = False
-    if valid:
-        if description_rule:
-            st.session_state.config["rules"]["description"][description_rule] = target
-        if category_rule:
-            st.session_state.config["rules"]["category"][category_rule] = target
-
-
-def list_rules():
-    st.session_state.list_rules = not st.session_state.list_rules
-
-
-def apply_rules(data_dir):
-    run(data_dir, standardize_only=True, config=st.session_state.config)
-
-
-def delete_rule(collection, label):
-    delete_selection = st.multiselect(label, collection)
-    if delete_selection:
-        for selection in delete_selection:
-            collection.pop(selection)
-
-
-def add_rules(data_dir, df_initial):
-    col1, col2, col3, col4 = st.columns([1, 1, 1, 1])
-    with col1:
-        category_rule = st.text_input("Category rule", "")
-        delete_rule(
-            st.session_state.config["rules"]["category"], "Delete category rule"
-        )
-    with col2:
-        description_rule = st.text_input("Description rule", "")
-        delete_rule(
-            st.session_state.config["rules"]["description"], "Delete description rule"
-        )
-    with col3:
-        new_categories = st.session_state.config["rules"]["new_categories"]
-        all_categories = sorted(
-            list(set(df_initial["category"].unique().tolist() + list(new_categories)))
-        )
-        target = st.selectbox("Target category", all_categories)
-        new_category = st.text_input("Add a new category").title()
-        if new_category and new_category not in new_categories:
-            new_categories[new_category] = ""
-        delete_rule(new_categories, "Delete new category")
-
-    with col4:
-        st.button(
-            "Save rule",
-            on_click=save_rule,
-            kwargs={
-                "category_rule": category_rule,
-                "description_rule": description_rule,
-                "target": target,
-                "df": df_initial,
-            },
-        )
-        st.button("Apply rules", on_click=apply_rules, kwargs={"data_dir": data_dir})
-        st.button("List rules", on_click=list_rules)
-        # st.button(
-        #     "Delete rules",
-        #     on_click=delete_rules,
-        #     kwargs={
-        #         "category_rule": category_rule,
-        #         "description_rule": description_rule,
-        #     },
-        # )
-    if st.session_state.list_rules:
-        st.json(st.session_state.config["rules"])
 
 
 def add_card_to_config(token, card, alias, start_date):
@@ -520,62 +245,6 @@ def init(conn, data_dir, user):
     )
     st.session_state.init_done = True
     return df
-
-
-def add_spending_by_category(df):
-    if "category" not in df or "amount" not in df:
-        st.markdown("**Spending by category**")
-        st.markdown("Missing category or amount columns.")
-        return
-
-    df2 = df.groupby(["category"], as_index=False)["amount"].agg("sum")
-
-    total = df["amount"].sum()
-
-    fig = px.pie(
-        df2,
-        values="amount",
-        names="category",
-        title=f"Spending by category, total: {total}",
-        height=600,
-        color="category",
-        color_discrete_map=color_discrete_map,
-    )
-
-    fig.update_layout(
-        font=dict(size=18, color="#7f7f7f"),
-        title={"xanchor": "center", "x": 0.5},
-    )
-
-    st.plotly_chart(fig, use_container_width=True)
-
-
-def add_spending_over_time(df):
-    if "date" not in df or "amount" not in df:
-        st.markdown("**Spending over time**")
-        st.markdown("Missing date or amount columns.")
-        return
-
-    df = df.set_index(pd.DatetimeIndex(df["date"]))
-    df_month = df.groupby("category").resample("M").sum().reset_index()
-
-    fig2 = px.bar(
-        df_month,
-        x="date",
-        y="amount",
-        color="category",
-        color_discrete_map=color_discrete_map,
-    )
-    fig2.update_layout(
-        title="Spending over time",
-        xaxis_title="Date",
-        yaxis_title="Amount",
-    )
-    fig2.update_layout(
-        font=dict(size=16, color="#7f7f7f"),
-        title={"xanchor": "center", "x": 0.5},
-    )
-    st.plotly_chart(fig2, use_container_width=True)
 
 
 def init_data_dir(user):

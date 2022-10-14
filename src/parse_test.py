@@ -1,5 +1,5 @@
-from detect import identify_card
-from parse import parse_record
+from preprocess.detect import identify_card
+from preprocess.parse import parse_record
 
 
 def test_parse():

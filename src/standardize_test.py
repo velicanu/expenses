@@ -1,4 +1,4 @@
-from standardize import standardizer
+from preprocess.standardize import standardizer
 
 
 def test_standardize():

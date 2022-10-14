@@ -5,7 +5,7 @@ import tempfile
 import pytest
 
 from common import _clean_barclays, records_from_file
-from detect import save_file_if_valid
+from preprocess.detect import save_file_if_valid
 
 input_string = """Transaction Date,Post Date,Description,Category,Type,Amount,Memo
 12/30/2019,12/31/2019,THE LANDING PIZZA AND KIT,Food & Drink,Sale,-44.00,
