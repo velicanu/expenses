@@ -3,11 +3,11 @@ import os
 import tempfile
 
 from common import get_files, get_log
-from detect import identify_file
-from extract import extract
-from ingest import ingest
-from parse import parse
-from standardize import standardize
+from .detect import identify_file
+from .extract import extract
+from .ingest import ingest
+from .parse import parse
+from .standardize import standardize
 from utils import make_dirs
 
 log = get_log(__file__)

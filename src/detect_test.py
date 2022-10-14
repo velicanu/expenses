@@ -1,5 +1,5 @@
-from detect import SCHEMALESS_CARD_DEFS as CARD_DEFINITIONS
-from detect import identify_card
+from preprocess.detect import SCHEMALESS_CARD_DEFS as CARD_DEFINITIONS
+from preprocess.detect import identify_card
 
 
 def test_detect_amex():

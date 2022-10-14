@@ -2,10 +2,10 @@
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from common import flip_spending_sign
-from extract import read_to_dict
-from parse import get_card_from_filename, get_parser
-from standardize import standardizer
+from .common import flip_spending_sign
+from .extract import read_to_dict
+from .parse import get_card_from_filename, get_parser
+from .standardize import standardizer
 
 
 class Card(object):

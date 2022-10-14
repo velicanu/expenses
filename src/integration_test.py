@@ -9,7 +9,7 @@ import pandas as pd
 import pytest
 
 from common import get_files
-from pipeline import run
+from preprocess.pipeline import run
 
 
 @pytest.mark.fails_on_windows

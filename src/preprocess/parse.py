@@ -4,7 +4,7 @@ import click
 from smart_open import open
 
 from common import get_log
-from detect import identify_card
+from .detect import identify_card
 
 log = get_log(__file__)
 

@@ -107,3 +107,13 @@ def merge_tx(card_dir, card_id):
             index=False,
         )
     return db_file
+
+
+
+def extend_sql_statement(statement):
+    return (
+        statement + " WHERE "
+        if " where " not in statement.lower()
+        else statement + " AND "
+    )
+
