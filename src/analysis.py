@@ -1,7 +1,7 @@
 """Analysis."""
-import streamlit as st
-import plotly.express as px
 import pandas as pd
+import plotly.express as px
+import streamlit as st
 
 
 def add_spending_by_category(df):

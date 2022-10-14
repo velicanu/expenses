@@ -11,38 +11,32 @@ import streamlit as st
 from streamlit.scriptrunner import add_script_run_ctx
 from streamlit.server.server import Server
 
+from analysis import add_spending_by_category, add_spending_over_time
+from plaidlib import get_transactions
 from preprocess.detect import save_file_if_valid
 from preprocess.pipeline import run
-from plaidlib import get_transactions
+from rules import add_rules, toggle_rules
 from utils import (
     clear,
     dump_csv,
+    extend_sql_statement,
     get_access_token,
     get_config,
     get_institution_st,
     make_dirs,
     merge_tx,
     put_config,
-    extend_sql_statement,
 )
-
 from widgets import (
-    add_source_widget,
-    add_include_payment_widget,
     add_category_widget,
-    add_description_widget,
-    add_delete_files_widget,
-    add_download_csv_widget,
-    add_upload_files_widget,
     add_date_range_widget,
+    add_delete_files_widget,
+    add_description_widget,
+    add_download_csv_widget,
+    add_include_payment_widget,
+    add_source_widget,
+    add_upload_files_widget,
 )
-
-from rules import (
-    toggle_rules,
-    add_rules,
-)
-
-from analysis import add_spending_over_time, add_spending_by_category
 
 st.set_page_config(
     page_title="Expense app",
