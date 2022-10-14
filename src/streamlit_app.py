@@ -23,7 +23,7 @@ from utils import (
     make_dirs,
     merge_tx,
     put_config,
-    extend_sql_statement
+    extend_sql_statement,
 )
 
 from widgets import (
@@ -34,8 +34,8 @@ from widgets import (
     add_delete_files_widget,
     add_download_csv_widget,
     add_upload_files_widget,
-    add_date_range_widget
-    )
+    add_date_range_widget,
+)
 
 st.set_page_config(
     page_title="Expense app",

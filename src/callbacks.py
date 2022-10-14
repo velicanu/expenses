@@ -1,5 +1,5 @@
-
 """Callbacks."""
+
 
 def delete_files():
     for filename in st.session_state.delete_files:

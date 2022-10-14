@@ -79,6 +79,6 @@ def add_rules(data_dir, df_initial):
         )
         st.button("Apply rules", on_click=apply_rules, kwargs={"data_dir": data_dir})
         st.button("List rules", on_click=list_rules)
-        
+
     if st.session_state.list_rules:
         st.json(st.session_state.config["rules"])
