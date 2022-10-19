@@ -6,10 +6,6 @@ with functionality improved and tests added
 
 import re
 
-from common import get_log
-
-log = get_log(__file__)
-
 
 def get_create_table_string(tablename, connection):
     sql = f'select * from sqlite_master where name = "{tablename}" and type = "table"'
@@ -42,5 +38,4 @@ def add_pk_to_sqlite_table(tablename, index_column, connection):
     """
 
     create_and_drop_sql = template.format(tablename=tablename, cts=cts)
-    log.info(create_and_drop_sql)
     connection.executescript(create_and_drop_sql)
