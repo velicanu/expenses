@@ -107,3 +107,31 @@ def merge_tx(card_dir, card_id):
             index=False,
         )
     return db_file
+
+
+def apply_changes(df, chdf):
+    mcon = sqlite3.connect(":memory:")
+    df.to_sql("df", mcon, index=False)
+    chdf.to_sql("chdf", mcon, index=False)
+    out = pd.read_sql(
+        """
+        SELECT chdf.*
+        FROM df
+            JOIN chdf
+                ON df.pk = chdf.pk
+        UNION ALL
+        SELECT chdf.*
+        FROM chdf
+            LEFT JOIN df
+                ON df.pk = chdf.pk
+        WHERE df.pk IS NULL
+        UNION ALL
+        SELECT df.*
+        FROM df
+            LEFT JOIN chdf
+                ON df.pk = chdf.pk
+        WHERE chdf.pk IS NULL
+        """,
+        mcon,
+    )
+    return out

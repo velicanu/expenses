@@ -17,6 +17,7 @@ from pipeline import run
 from plaidlib import get_transactions
 from sql import get_create_table_string
 from utils import (
+    apply_changes,
     clear,
     dump_csv,
     get_access_token,
@@ -509,33 +510,6 @@ def add_refresh_data(data_dir):
     )
 
 
-def apply_changes(df, chdf):
-    mcon = sqlite3.connect(":memory:")
-    df.to_sql("df", mcon)
-    chdf.to_sql("chdf", mcon)
-    return pd.read_sql(
-        """
-        SELECT chdf.*
-        FROM df
-            JOIN chdf
-                ON df.pk = chdf.pk
-        UNION ALL
-        SELECT chdf.*
-        FROM chdf
-            LEFT JOIN df
-                ON df.pk = chdf.pk
-        WHERE df.pk IS NULL
-        UNION ALL
-        SELECT df.*
-        FROM df
-            LEFT JOIN chdf
-                ON df.pk = chdf.pk
-        WHERE chdf.pk IS NULL
-        """,
-        mcon,
-    )
-
-
 def run_wrapper(data_dir):
     with st.spinner("Running pipeline..."):
         run(data_dir=data_dir)
@@ -603,6 +577,7 @@ def init(conn, conn_changes, data_dir, user):
             rawdf = pd.read_sql(user_input, conn)
             chdf = pd.read_sql(user_input, conn_changes)
             df = apply_changes(rawdf, chdf)
+            df = df[df.amount != 0]  # filter out empty transactions
             gb = GridOptionsBuilder.from_dataframe(df)
             gridOptions = gb.build()
             gridOptions["editable"] = True
@@ -639,8 +614,6 @@ def init(conn, conn_changes, data_dir, user):
                 )
                 if st.session_state.save_changes:
                     for row in changes.to_dict(orient="records"):
-                        if "index" in row:
-                            row.pop("index")
                         insert_row(row, conn_changes)
                     st.session_state.save_changes = False
                     st.experimental_rerun()
