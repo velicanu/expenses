@@ -233,6 +233,7 @@ pandas==1.5.0
     #   altair
     #   seaborn
     #   streamlit
+    #   streamlit-aggrid
 pandocfilters==1.5.0
     # via nbconvert
 parso==0.8.3
@@ -310,6 +311,8 @@ python-dateutil==2.8.2
     #   pandas
     #   plaid-python
     #   streamlit
+python-decouple==3.6
+    # via streamlit-aggrid
 pytz==2022.5
     # via pandas
 pytz-deprecation-shim==0.1.0.post0
@@ -355,6 +358,10 @@ soupsieve==2.3.2.post1
 stack-data==0.5.1
     # via ipython
 streamlit==1.13.0
+    # via
+    #   -r requirements.in
+    #   streamlit-aggrid
+streamlit-aggrid==0.3.3
     # via -r requirements.in
 tenacity==8.1.0
     # via plotly
