@@ -1,0 +1,46 @@
+"""
+sqlite util functions inspired by:
+https://stackoverflow.com/a/47346969
+with functionality improved and tests added
+"""
+
+import re
+
+from common import get_log
+
+log = get_log(__file__)
+
+
+def get_create_table_string(tablename, connection):
+    sql = f'select * from sqlite_master where name = "{tablename}" and type = "table"'
+    result = connection.execute(sql)
+
+    create_table_string = result.fetchmany()[0][4]
+    return create_table_string
+
+
+def add_pk_to_create_table_string(create_table_string, colname):
+    regex = f'"{colname}"\ ([A-Z]*)'
+    result = re.sub(regex, f'"{colname}" \\1 PRIMARY KEY', create_table_string, count=1)
+    return result
+
+
+def add_pk_to_sqlite_table(tablename, index_column, connection):
+    cts = get_create_table_string(tablename, connection)
+    cts = add_pk_to_create_table_string(cts, index_column)
+    template = """
+    BEGIN TRANSACTION;
+        ALTER TABLE {tablename} RENAME TO {tablename}_old_;
+
+        {cts};
+
+        INSERT INTO {tablename} SELECT * FROM {tablename}_old_;
+
+        DROP TABLE {tablename}_old_;
+
+    COMMIT TRANSACTION;
+    """
+
+    create_and_drop_sql = template.format(tablename=tablename, cts=cts)
+    log.info(create_and_drop_sql)
+    connection.executescript(create_and_drop_sql)
