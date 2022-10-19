@@ -8,6 +8,7 @@ def test_standardize():
         "amount": -44.0,
         "category": "Food & Drink",
         "source": "chase",
+        "source_file": "test",
     }
     expected = {
         "date": "2019-12-30T00:00:00",
@@ -15,7 +16,9 @@ def test_standardize():
         "amount": -44.0,
         "category": "Dining",
         "source": "chase",
+        "source_file": "test",
         "old_category": "Food & Drink",
+        "pk": "test-1",
         "line": 1,
     }
     actual = standardizer(input_, 1, {})
@@ -39,6 +42,7 @@ def test_standardize_payment():
         "source": "amex",
         "source_file": "amex.csv",
         "old_category": "",
+        "pk": "amex.csv-1",
         "line": 1,
     }
     actual = standardizer(input_, 1, {})
@@ -62,6 +66,7 @@ def test_standardize_rideshare():
         "source": "capital_one",
         "source_file": "capital_one.csv",
         "old_category": "Dining",
+        "pk": "capital_one.csv-1",
         "line": 1,
     }
     actual = standardizer(input_, 1, {})
@@ -83,6 +88,7 @@ def test_standardize_rideshare():
         "source": "capital_one",
         "source_file": "capital_one.csv",
         "old_category": "Other Travel",
+        "pk": "capital_one.csv-1",
         "line": 1,
     }
     actual = standardizer(input_, 1, {})

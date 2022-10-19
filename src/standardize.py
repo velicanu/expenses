@@ -107,7 +107,9 @@ def standardizer(record, line_num, rules):
     record["category"] = record["new_category"]
     record.pop("new_category")
 
+    record["pk"] = f"{record['source_file']}-{line_num}"
     record["line"] = line_num
+
     return record
 
 
