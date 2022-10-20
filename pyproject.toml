@@ -1,0 +1,10 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = "src"
+markers = [
+    "fails_on_windows: does not run in windows (deselect with '-m \"not fails_on_windows\"')"
+]
+
+[tool.isort]
+profile = "black"
+src_paths = "src"
