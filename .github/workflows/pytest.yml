@@ -25,6 +25,5 @@ jobs:
       run: pytest .
       if: matrix.os != 'windows-latest'
     - name: Test with nose on ubuntu and macOS
-      run: |
-        pytest . -m "not fails_on_windows"
+      run: pytest . -m "not fails_on_windows"
       if: matrix.os == 'windows-latest'
