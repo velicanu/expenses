@@ -16,6 +16,7 @@ from detect import save_file_if_valid
 from pipeline import run
 from plaidlib import get_transactions
 from sql import get_create_table_string
+from standardize import get_default_categories
 from utils import (
     apply_changes,
     clear,
@@ -394,9 +395,7 @@ def add_row(df, conn):
 
     with col4:
         new_categories = st.session_state.config["rules"]["new_categories"]
-        all_categories = sorted(
-            list(set(df["category"].unique().tolist() + list(new_categories)))
-        )
+        all_categories = sorted(list(set(new_categories) | get_default_categories()))
         input_category = st.selectbox("Category", all_categories)
 
     enabled = bool(input_description) and (input_amount != 0.0)
@@ -540,6 +539,9 @@ def init(conn, conn_changes, data_dir, user):
             add_delete_files_widget(os.path.join(data_dir, "raw"))
     try:
         df_initial = pd.read_sql("SELECT * FROM expenses", conn)
+        chdf_initial = pd.read_sql("SELECT * FROM expenses", conn_changes)
+        df_initial = apply_changes(df_initial, chdf_initial)
+        df_initial = df_initial[df_initial.amount != 0]  # filter out empty transactions
         default_user_input = add_date_range_widget(df_initial)
         default_user_input, selected = add_category_widget(
             df_initial, default_user_input
@@ -571,12 +573,12 @@ def init(conn, conn_changes, data_dir, user):
                     st.button("+", on_click=toggle_new_row)
                 else:
                     st.button("-", on_click=toggle_new_row)
-            if not st.session_state.new_row:
+            if not st.session_state.new_row and conn_changes:
                 add_row(df=df_initial, conn=conn_changes)
 
-            rawdf = pd.read_sql(user_input, conn)
+            df = pd.read_sql(user_input, conn)
             chdf = pd.read_sql(user_input, conn_changes)
-            df = apply_changes(rawdf, chdf)
+            df = apply_changes(df, chdf)
             df = df[df.amount != 0]  # filter out empty transactions
             gb = GridOptionsBuilder.from_dataframe(df)
             gridOptions = gb.build()
@@ -699,6 +701,8 @@ def init_changes_db(db_path, changes_path):
     if not os.path.exists(changes_path):
         with sqlite3.connect(db_path) as conn:
             cts = get_create_table_string("expenses", conn)
+        if not cts:
+            return None
         changes_conn = sqlite3.connect(changes_path)
         changes_conn.execute(cts)
         changes_conn.commit()

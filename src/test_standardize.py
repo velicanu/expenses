@@ -1,4 +1,4 @@
-from standardize import standardizer
+from standardize import get_default_categories, standardizer
 
 
 def test_standardize():
@@ -92,4 +92,26 @@ def test_standardize_rideshare():
         "line": 1,
     }
     actual = standardizer(input_, 1, {})
+    assert actual == expected
+
+
+def test_get_default_categories():
+    actual = get_default_categories()
+    expected = {
+        "Entertainment",
+        "Bills",
+        "Family",
+        "Fees",
+        "Groceries",
+        "Car",
+        "Shopping",
+        "Travel",
+        "Rent",
+        "Health",
+        "Rideshare",
+        "Dining",
+        "Services",
+        "Payment",
+    }
+
     assert actual == expected

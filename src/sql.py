@@ -9,10 +9,8 @@ import re
 
 def get_create_table_string(tablename, connection):
     sql = f'select * from sqlite_master where name = "{tablename}" and type = "table"'
-    result = connection.execute(sql)
-
-    create_table_string = result.fetchmany()[0][4]
-    return create_table_string
+    result = connection.execute(sql).fetchmany()
+    return result[0][4] if result else ""
 
 
 def add_pk_to_create_table_string(create_table_string, colname):
