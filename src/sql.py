@@ -37,3 +37,12 @@ def add_pk_to_sqlite_table(tablename, index_column, connection):
 
     create_and_drop_sql = template.format(tablename=tablename, cts=cts)
     connection.executescript(create_and_drop_sql)
+
+
+def insert_rows(rows, tablename, conn):
+    row = rows[0]
+    columns = ",".join(row.keys())
+    values = ",".join(["?" for _ in row])
+    sql = f"INSERT OR REPLACE INTO {tablename}({columns}) VALUES ({values})"
+    conn.executemany(sql, [list(r.values()) for r in rows])
+    conn.commit()

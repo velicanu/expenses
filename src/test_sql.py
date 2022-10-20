@@ -9,6 +9,7 @@ from sql import (
     add_pk_to_create_table_string,
     add_pk_to_sqlite_table,
     get_create_table_string,
+    insert_rows,
 )
 
 
@@ -20,14 +21,13 @@ def conn():
             {"date": datetime(2020, 1, 1, 1, 1, 1), "desc": "abc", "amount": 123},
             {"date": datetime(2020, 1, 1, 1, 1, 2), "desc": "def", "amount": 456},
         ]
-    ).to_sql("test", conn_)
+    ).to_sql("test", conn_, index=False)
     yield conn_
 
 
 CREATE_TABLE_STRING = """
 CREATE TABLE "test" (
-"index" INTEGER,
-  "date" TIMESTAMP,
+"date" TIMESTAMP,
   "desc" TEXT,
   "amount" INTEGER
 )
@@ -41,13 +41,12 @@ def test_get_create_table_string(conn):
 
 
 def test_add_pk_to_create_table_string():
-    actual = add_pk_to_create_table_string(CREATE_TABLE_STRING, "index")
+    actual = add_pk_to_create_table_string(CREATE_TABLE_STRING, "desc")
     expected = textwrap.dedent(
         """
     CREATE TABLE "test" (
-    "index" INTEGER PRIMARY KEY,
-      "date" TIMESTAMP,
-      "desc" TEXT,
+    "date" TIMESTAMP,
+      "desc" TEXT PRIMARY KEY,
       "amount" INTEGER
     )
     """
@@ -58,8 +57,7 @@ def test_add_pk_to_create_table_string():
     expected = textwrap.dedent(
         """
     CREATE TABLE "test" (
-    "index" INTEGER,
-      "date" TIMESTAMP,
+    "date" TIMESTAMP,
       "desc" TEXT,
       "amount" INTEGER PRIMARY KEY
     )
@@ -75,11 +73,26 @@ def test_add_pk_to_sqlite_table(conn):
     expected = textwrap.dedent(
         """
     CREATE TABLE "test" (
-    "index" INTEGER,
-      "date" TIMESTAMP PRIMARY KEY,
+    "date" TIMESTAMP PRIMARY KEY,
       "desc" TEXT,
       "amount" INTEGER
     )
     """
     ).strip()
+    assert actual == expected
+
+
+def test_insert_rows(conn):
+    input_ = [
+        {"date": datetime(2020, 1, 1, 1, 1, 3), "desc": "ggg", "amount": 777},
+        {"date": datetime(2020, 1, 1, 1, 1, 4), "desc": "hhh", "amount": 888},
+    ]
+    insert_rows(input_, "test", conn)
+    actual = pd.read_sql("SELECT * FROM test", conn).to_dict(orient="records")
+    expected = [
+        {"date": "2020-01-01 01:01:01", "desc": "abc", "amount": 123},
+        {"date": "2020-01-01 01:01:02", "desc": "def", "amount": 456},
+        {"date": "2020-01-01 01:01:03", "desc": "ggg", "amount": 777},
+        {"date": "2020-01-01 01:01:04", "desc": "hhh", "amount": 888},
+    ]
     assert actual == expected

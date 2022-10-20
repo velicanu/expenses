@@ -15,7 +15,7 @@ from st_aggrid.shared import GridUpdateMode
 from detect import save_file_if_valid
 from pipeline import run
 from plaidlib import get_transactions
-from sql import get_create_table_string
+from sql import get_create_table_string, insert_rows
 from standardize import get_default_categories
 from utils import (
     apply_changes,
@@ -348,14 +348,6 @@ def add_rules(data_dir, df_initial):
         st.json(st.session_state.config["rules"])
 
 
-def insert_row(row, conn):
-    columns = ",".join(row.keys())
-    values = '","'.join([str(s) for s in row.values()])
-    sql = f'INSERT OR REPLACE INTO expenses({columns}) VALUES ("{values}")'
-    conn.execute(sql)
-    conn.commit()
-
-
 def _make_new_row(date_, description, amount, category, df, conn):
     line_num = conn.execute("SELECT max(line) FROM expenses").fetchone()[0]
     new_line_num = line_num + 1 if line_num else 0
@@ -375,7 +367,7 @@ def _make_new_row(date_, description, amount, category, df, conn):
 
 def save_new_row(date_, description, amount, category, df, conn):
     new_row = _make_new_row(date_, description, amount, category, df, conn)
-    insert_row(new_row, conn)
+    insert_rows([new_row], "expenses", conn)
 
 
 def add_row(df, conn):
@@ -615,8 +607,9 @@ def init(conn, conn_changes, data_dir, user):
                     on_click=toggle_save_changes,
                 )
                 if st.session_state.save_changes:
-                    for row in changes.to_dict(orient="records"):
-                        insert_row(row, conn_changes)
+                    insert_rows(
+                        changes.to_dict(orient="records"), "expenses", conn_changes
+                    )
                     st.session_state.save_changes = False
                     st.experimental_rerun()
 
