@@ -10,15 +10,13 @@ import plotly.express as px
 import streamlit as st
 from st_aggrid import AgGrid
 from st_aggrid.grid_options_builder import GridOptionsBuilder
-from st_aggrid.shared import GridUpdateMode
 
 from detect import save_file_if_valid
 from pipeline import run
 from plaidlib import get_transactions
-from sql import get_create_table_string, insert_rows
+from sql import apply_changes, get_create_table_string, insert_rows, run_sql
 from standardize import get_default_categories
 from utils import (
-    apply_changes,
     clear,
     dump_csv,
     get_access_token,
@@ -568,10 +566,7 @@ def init(conn, conn_changes, data_dir, user):
             if not st.session_state.new_row and conn_changes:
                 add_row(df=df_initial, conn=conn_changes)
 
-            df = pd.read_sql(user_input, conn)
-            chdf = pd.read_sql(user_input, conn_changes)
-            df = apply_changes(df, chdf)
-            df = df[df.amount != 0]  # filter out empty transactions
+            df = run_sql(user_input, df_initial, table_name="expenses")
             gb = GridOptionsBuilder.from_dataframe(df)
             gridOptions = gb.build()
             gridOptions["editable"] = True
@@ -614,7 +609,7 @@ def init(conn, conn_changes, data_dir, user):
                     st.experimental_rerun()
 
         else:
-            df = pd.read_sql(default_user_input, conn)
+            df = run_sql(default_user_input, df_initial, table_name="expenses")
 
     except pd.io.sql.DatabaseError:
         pass

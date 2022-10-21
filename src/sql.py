@@ -5,6 +5,9 @@ with functionality improved and tests added
 """
 
 import re
+import sqlite3
+
+import pandas as pd
 
 
 def get_create_table_string(tablename, connection):
@@ -14,7 +17,7 @@ def get_create_table_string(tablename, connection):
 
 
 def add_pk_to_create_table_string(create_table_string, colname):
-    regex = f'"{colname}"\ ([A-Z]*)'
+    regex = f'"{colname}"' + r"\ ([A-Z]*)"
     result = re.sub(regex, f'"{colname}" \\1 PRIMARY KEY', create_table_string, count=1)
     return result
 
@@ -46,3 +49,39 @@ def insert_rows(rows, tablename, conn):
     sql = f"INSERT OR REPLACE INTO {tablename}({columns}) VALUES ({values})"
     conn.executemany(sql, [list(r.values()) for r in rows])
     conn.commit()
+
+
+def run_sql(query, df, table_name="df"):
+    with sqlite3.connect(":memory:") as conn:
+        df.to_sql(table_name, conn, index=False)
+        out = pd.read_sql(query, conn)
+
+    return out
+
+
+def apply_changes(df, chdf):
+    with sqlite3.connect(":memory:") as conn:
+        df.to_sql("df", conn, index=False)
+        chdf.to_sql("chdf", conn, index=False)
+        out = pd.read_sql(
+            """
+            SELECT chdf.*
+            FROM df
+                JOIN chdf
+                    ON df.pk = chdf.pk
+            UNION ALL
+            SELECT chdf.*
+            FROM chdf
+                LEFT JOIN df
+                    ON df.pk = chdf.pk
+            WHERE df.pk IS NULL
+            UNION ALL
+            SELECT df.*
+            FROM df
+                LEFT JOIN chdf
+                    ON df.pk = chdf.pk
+            WHERE chdf.pk IS NULL
+            """,
+            conn,
+        )
+    return out
