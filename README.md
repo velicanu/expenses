@@ -65,3 +65,26 @@ All intermediate data is available should you want it in the `data/` directory.
 ```bash
 pytest .
 ```
+
+### Requirements
+
+Requirements for this project are specified in two files, a `requirements.in` file and a
+`requirements.txt` file. The requirements.in file is where we manually insert the
+dependencies this project needs and the requirements.txt is auto-generated from the .in
+file using `pip-compile`. The workflow for adding or updating some dependencies looks
+like the following:
+
+```bash
+# one time install pip-tools if not already installed
+pip install pip-tools
+
+# update something in requirements.in
+pip-compile
+
+# the requirements.txt file has been auto-generated with pinned dependencies
+pip install -r requirements.txt
+```
+
+The benefit of this approach is that we can ensure all environments (dev / ci / etc)
+have the same exact same versions of each dependency installed, while making it easy to
+add and update top level requirements.

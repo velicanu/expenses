@@ -8,12 +8,14 @@ import dateutil.parser
 import pandas as pd
 import plotly.express as px
 import streamlit as st
-from streamlit.scriptrunner import add_script_run_ctx
-from streamlit.server.server import Server
+from st_aggrid import AgGrid
+from st_aggrid.grid_options_builder import GridOptionsBuilder
 
 from detect import save_file_if_valid
 from pipeline import run
 from plaidlib import get_transactions
+from sql import apply_changes, get_create_table_string, insert_rows, run_sql
+from standardize import get_default_categories
 from utils import (
     clear,
     dump_csv,
@@ -108,7 +110,7 @@ def add_category_widget(df, default_user_input):
             if len(selected) > 1
             else default_user_input + f"('{selected[0]}')"
         )
-    return default_user_input
+    return default_user_input, selected
 
 
 def add_source_widget(df, default_user_input):
@@ -179,21 +181,6 @@ def add_description_widget(default_user_input):
     return (
         extend_sql_statement(default_user_input) + f"description LIKE '%{title}%'",
         [],
-    )
-
-
-def add_include_payment_widget(default_user_input):
-    if not st.sidebar.checkbox("Include Payments"):
-        return extend_sql_statement(default_user_input) + "category != 'Payment'"
-    return default_user_input
-
-
-def add_download_csv_widget(df):
-    st.sidebar.download_button(
-        label="Download csv",
-        data=df.to_csv(index=False).encode(),
-        file_name="data.csv",
-        mime="text/csv",
     )
 
 
@@ -268,24 +255,21 @@ def toggle_rules():
     ]
 
 
+def toggle_new_row():
+    st.session_state.new_row = not st.session_state.new_row
+
+
+def toggle_save_changes():
+    st.session_state.save_changes = not st.session_state.save_changes
+
+
 def save_rule(category_rule, description_rule, target, df):
     for cat in df["category"].unique():
         st.session_state.categories.add(cat.lower())
-    valid = True
-    if not category_rule and not description_rule:
-        st.warning("No rule specified")
-        valid = False
-    if category_rule and description_rule:
-        st.warning("Specify only one rule")
-        valid = False
-    if not target:
-        st.warning("Target must be specified")
-        valid = False
-    if valid:
-        if description_rule:
-            st.session_state.config["rules"]["description"][description_rule] = target
-        if category_rule:
-            st.session_state.config["rules"]["category"][category_rule] = target
+    if description_rule:
+        st.session_state.config["rules"]["description"][description_rule] = target
+    if category_rule:
+        st.session_state.config["rules"]["category"][category_rule] = target
 
 
 def list_rules():
@@ -327,6 +311,15 @@ def add_rules(data_dir, df_initial):
         delete_rule(new_categories, "Delete new category")
 
     with col4:
+        disabled = False
+        help_ = ""
+        if not category_rule and not description_rule:
+            help_ = "No rule specified"
+            disabled = True
+        if category_rule and description_rule:
+            help_ = "Specify only one rule"
+            disabled = True
+
         st.button(
             "Save rule",
             on_click=save_rule,
@@ -336,6 +329,8 @@ def add_rules(data_dir, df_initial):
                 "target": target,
                 "df": df_initial,
             },
+            disabled=disabled,
+            help=help_,
         )
         st.button("Apply rules", on_click=apply_rules, kwargs={"data_dir": data_dir})
         st.button("List rules", on_click=list_rules)
@@ -349,6 +344,65 @@ def add_rules(data_dir, df_initial):
         # )
     if st.session_state.list_rules:
         st.json(st.session_state.config["rules"])
+
+
+def _make_new_row(date_, description, amount, category, df, conn):
+    line_num = conn.execute("SELECT max(line) FROM expenses").fetchone()[0]
+    new_line_num = line_num + 1 if line_num else 0
+    new_row = {
+        "date": date_.isoformat() + " 00:00:00",
+        "description": description,
+        "amount": str(amount),
+        "category": category,
+        "source": "input",
+        "source_file": "input",
+        "old_category": "Other",
+        "pk": f"input-{new_line_num}",
+        "line": str(new_line_num),
+    }
+    return new_row
+
+
+def save_new_row(date_, description, amount, category, df, conn):
+    new_row = _make_new_row(date_, description, amount, category, df, conn)
+    insert_rows([new_row], "expenses", conn)
+
+
+def add_row(df, conn):
+    st.write("Add a new row")
+    help_ = ""
+    col1, col2, col3, col4 = st.columns([1, 1, 1, 1])
+    with col1:
+        input_date = st.date_input("Date", value=date.today())
+    with col2:
+        input_description = st.text_input("Description")
+        if not input_description:
+            help_ = "No description"
+    with col3:
+        input_amount = st.number_input("Amount")
+        if input_amount == 0.0:
+            help_ = help_ + ", amount is 0" if help_ else "Amount is 0"
+
+    with col4:
+        new_categories = st.session_state.config["rules"]["new_categories"]
+        all_categories = sorted(list(set(new_categories) | get_default_categories()))
+        input_category = st.selectbox("Category", all_categories)
+
+    enabled = bool(input_description) and (input_amount != 0.0)
+    st.button(
+        "Save new row",
+        on_click=save_new_row,
+        kwargs={
+            "date_": input_date,
+            "description": input_description,
+            "amount": input_amount,
+            "category": input_category,
+            "df": df,
+            "conn": conn,
+        },
+        disabled=not enabled,
+        help=help_,
+    )
 
 
 def add_card_to_config(token, card, alias, start_date):
@@ -450,10 +504,10 @@ def run_wrapper(data_dir):
         run(data_dir=data_dir)
 
 
-def init(conn, data_dir, user):
+def init(conn, conn_changes, data_dir, user):
     df = None
 
-    st.sidebar.button("Expand", on_click=expand)
+    st.sidebar.button("Settings", on_click=expand)
     if st.session_state.expand and user:
         st.sidebar.write(f"{user} logged in")
 
@@ -475,34 +529,87 @@ def init(conn, data_dir, user):
             add_delete_files_widget(os.path.join(data_dir, "raw"))
     try:
         df_initial = pd.read_sql("SELECT * FROM expenses", conn)
+        chdf_initial = pd.read_sql("SELECT * FROM expenses", conn_changes)
+        df_initial = apply_changes(df_initial, chdf_initial)
+        df_initial = df_initial[df_initial.amount != 0]  # filter out empty transactions
         default_user_input = add_date_range_widget(df_initial)
-        default_user_input = add_category_widget(df_initial, default_user_input)
+        default_user_input, selected = add_category_widget(
+            df_initial, default_user_input
+        )
         default_user_input, description_list = add_description_widget(
             default_user_input
         )
         default_user_input = add_source_widget(df_initial, default_user_input)
-        if st.session_state.expand:
-            default_user_input = add_include_payment_widget(default_user_input)
-        else:
+        if "Payment" not in selected:
             default_user_input = (
                 extend_sql_statement(default_user_input) + "category != 'Payment'"
             )
 
-        st.sidebar.button("Rules", on_click=toggle_rules)
+        st.sidebar.button("Modify", on_click=toggle_rules)
 
         if st.session_state.config["rules_button"]:
             add_rules(data_dir, df_initial)
 
-        st.sidebar.button("Show sql", on_click=toggle_sql)
+        st.sidebar.button("Show data", on_click=toggle_sql)
 
         if st.session_state.config["show_sql"]:
-            user_input = st.text_input("label goes here", default_user_input)
-            df = pd.read_sql(user_input, conn)
-            st.dataframe(df)
-            if st.session_state.expand:
-                add_download_csv_widget(df)
+            col1, col2 = st.columns([20, 1])
+            with col1:
+                user_input = st.text_input(
+                    "Input sql", default_user_input, label_visibility="collapsed"
+                )
+            with col2:
+                if st.session_state.new_row:
+                    st.button("+", on_click=toggle_new_row)
+                else:
+                    st.button("-", on_click=toggle_new_row)
+            if not st.session_state.new_row and conn_changes:
+                add_row(df=df_initial, conn=conn_changes)
+
+            df = run_sql(user_input, df_initial, table_name="expenses")
+            gb = GridOptionsBuilder.from_dataframe(df)
+            gridOptions = gb.build()
+            gridOptions["editable"] = True
+            gridOptions["sortable"] = True
+            gridOptions["filter"] = True
+            gridOptions["columnDefs"] = [
+                {
+                    "headerName": col,
+                    "field": col,
+                    "editable": col not in {"pk", "source_file", "line"},
+                }
+                for col in df.columns
+            ]
+            edits = AgGrid(
+                df,
+                gridOptions,
+                data_return_mode="AS_INPUT",
+                update_mode="MODEL_CHANGED",
+                fit_columns_on_grid_load=False,
+                theme="streamlit",  # Add theme color to the table
+                enable_enterprise_modules=True,
+                height=350,
+                width="100%",
+                reload_data=False,
+            )
+            df_plus_edits = pd.concat([df, edits["data"]]).drop_duplicates(keep=False)
+            changes = pd.merge(edits["data"], df_plus_edits, how="inner")
+            if len(changes) > 0:
+                st.write("Unsaved changes:")
+                st.write(changes)
+                st.button(
+                    "Save Changes",
+                    on_click=toggle_save_changes,
+                )
+                if st.session_state.save_changes:
+                    insert_rows(
+                        changes.to_dict(orient="records"), "expenses", conn_changes
+                    )
+                    st.session_state.save_changes = False
+                    st.experimental_rerun()
+
         else:
-            df = pd.read_sql(default_user_input, conn)
+            df = run_sql(default_user_input, df_initial, table_name="expenses")
 
     except pd.io.sql.DatabaseError:
         pass
@@ -578,6 +685,20 @@ def add_spending_over_time(df):
     st.plotly_chart(fig2, use_container_width=True)
 
 
+def init_changes_db(db_path, changes_path):
+    if not os.path.exists(changes_path):
+        with sqlite3.connect(db_path) as conn:
+            cts = get_create_table_string("expenses", conn)
+        if not cts:
+            return None
+        changes_conn = sqlite3.connect(changes_path)
+        changes_conn.execute(cts)
+        changes_conn.commit()
+        return changes_conn
+    else:
+        return sqlite3.connect(changes_path)
+
+
 def init_data_dir(user):
     script_dir = os.path.dirname(os.path.realpath(__file__))
     data_dir = os.path.join(script_dir, "..", "data", user)
@@ -593,13 +714,9 @@ def init_data_dir(user):
 
 
 def main():
-    session_id = add_script_run_ctx().streamlit_script_run_ctx.session_id
-    session_info = Server.get_current()._get_session_info(session_id)
+    # TODO: try this approach of adding login instead of run_ctx session_id
+    # https://auth0.com/blog/introduction-to-streamlit-and-streamlit-components/
     user = ""
-    try:
-        user = session_info.ws.request.headers.get("X-Forwarded-User", "")
-    except AttributeError:
-        pass
     if not user and "no_user_warning" not in st.session_state:
         no_user_warning = st.warning("No user provided, defaulting to common directory")
         st.session_state.no_user_warning = True
@@ -607,8 +724,10 @@ def main():
     data_dir = init_data_dir(user)
 
     db_path = os.path.join(data_dir, "expenses.db")
+    changes_path = os.path.join(data_dir, "changes.db")
 
     conn = sqlite3.connect(db_path)
+    conn_changes = init_changes_db(db_path=db_path, changes_path=changes_path)
 
     config_file = os.path.join(data_dir, "config.json")
     if "config" not in st.session_state:
@@ -641,8 +760,12 @@ def main():
         }
     if "categories" not in st.session_state:
         st.session_state.categories = set()
+    if "save_changes" not in st.session_state:
+        st.session_state.save_changes = False
+    if "new_row" not in st.session_state:
+        st.session_state.new_row = True
 
-    df = init(conn=conn, data_dir=data_dir, user=user)
+    df = init(conn=conn, conn_changes=conn_changes, data_dir=data_dir, user=user)
     put_config(config_file=config_file, config=st.session_state.config)
     if df is None:
         st.write("Add some data and run the pipeline.")

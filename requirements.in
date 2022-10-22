@@ -1,0 +1,17 @@
+cython
+numpy
+matplotlib
+black
+click
+flake8
+isort
+jupyter
+pandas
+plaid-python
+streamlit
+plotly
+seaborn
+smart-open
+xlrd
+pytest
+streamlit-aggrid

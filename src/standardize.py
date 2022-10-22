@@ -85,6 +85,10 @@ default_description_map = {
 }
 
 
+def get_default_categories():
+    return set(default_description_map.values()) | set(default_category_map.values())
+
+
 def standardizer(record, line_num, rules):
     record["date"] = parse(record["date"]).isoformat()
     record["new_category"] = "Other"
@@ -107,7 +111,9 @@ def standardizer(record, line_num, rules):
     record["category"] = record["new_category"]
     record.pop("new_category")
 
+    record["pk"] = f"{record['source_file']}-{line_num}"
     record["line"] = line_num
+
     return record
 
 
@@ -128,6 +134,7 @@ def standardize(infile, outfile, rules):
 @click.argument("outfile", type=str)
 @click.argument("rules", type=str, default="{}")
 def _standardize(infile, outfile, rules):
+    get_default_categories()
     rules_ = json.loads(rules)
     standardize(infile, outfile, rules_)
 

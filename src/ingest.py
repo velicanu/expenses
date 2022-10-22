@@ -5,6 +5,7 @@ import click
 import pandas as pd
 
 from common import get_log
+from sql import add_pk_to_sqlite_table
 
 log = get_log(__file__)
 
@@ -27,6 +28,7 @@ def ingest(infiles, table, outfile):
         )
 
     df.to_sql(table, con, index=False)
+    add_pk_to_sqlite_table(tablename="expenses", index_column="pk", connection=con)
 
 
 @click.command()
