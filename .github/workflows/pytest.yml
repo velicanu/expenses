@@ -40,7 +40,9 @@ jobs:
         steps.cache.outputs.cache-hit != 'true'
         &&  matrix.os == 'windows-latest'
       run: |
-        del /F /Q .venv && python -m venv .venv && .venv/Scripts/activate.bat
+        del /F /Q .venv
+        python -m venv .venv
+        .venv/Scripts/activate.bat
         pip install --upgrade pip
         pip install -r requirements.txt
     - name: Test on ubuntu and macOS
