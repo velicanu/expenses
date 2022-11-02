@@ -2,6 +2,10 @@ name: tests
 
 on: [push]
 
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ${{matrix.os}}
@@ -19,13 +23,13 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
     - uses: actions/cache@v3
-      id: cache-python
+      id: cache
       with:
         path: .venv
-        key: ${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('requirements.txt') }}
+        key: ${{ runner.os }}-${{ steps.py.outputs.python-version }}-${{ hashFiles('requirements.txt') }}
     - name: Install dependencies unix
       if: |
-        steps.py.outputs.cache-hit != 'true'
+        steps.cache.outputs.cache-hit != 'true'
         &&  matrix.os != 'windows-latest'
       run: |
         rm -rf .venv && python -m venv .venv && source .venv/bin/activate
@@ -33,7 +37,7 @@ jobs:
         pip install -r requirements.txt
     - name: Install dependencies windows
       if: |
-        steps.py.outputs.cache-hit != 'true'
+        steps.cache.outputs.cache-hit != 'true'
         &&  matrix.os == 'windows-latest'
       run: |
         del /F /Q .venv && python -m venv .venv && .venv/Scripts/activate.bat
