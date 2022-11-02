@@ -1,6 +1,7 @@
 # python
 venv/
 __pycache__
+.direnv/
 
 # data
 data
