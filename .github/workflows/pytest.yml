@@ -40,7 +40,7 @@ jobs:
         steps.cache.outputs.cache-hit != 'true'
         &&  matrix.os == 'windows-latest'
       run: |
-        del /F /Q .venv
+        del /F .venv
         python -m venv .venv
         .venv/Scripts/activate.bat
         pip install --upgrade pip
