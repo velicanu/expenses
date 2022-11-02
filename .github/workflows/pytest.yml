@@ -41,7 +41,7 @@ jobs:
         &&  matrix.os == 'windows-latest'
       run: |
         python -m venv .venv
-        .venv/Scripts/activate.bat
+        .venv\Scripts\activate.bat
         pip install --upgrade pip
         pip install -r requirements.txt
     - name: Test on ubuntu and macOS
@@ -51,6 +51,6 @@ jobs:
       if: matrix.os != 'windows-latest'
     - name: Test with nose on ubuntu and macOS
       run: |
-        .venv/Scripts/activate.bat
+        .venv\Scripts\activate.bat
         pytest . -m "not fails_on_windows"
       if: matrix.os == 'windows-latest'
