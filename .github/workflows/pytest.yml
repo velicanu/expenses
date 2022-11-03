@@ -25,14 +25,14 @@ jobs:
     - uses: actions/cache@v3
       id: cache
       with:
-        path: .venv
+        path: venv
         key: ${{ runner.os }}-${{ steps.py.outputs.python-version }}-${{ hashFiles('requirements.txt') }}
     - name: Install dependencies unix
       if: |
         steps.cache.outputs.cache-hit != 'true'
         &&  matrix.os != 'windows-latest'
       run: |
-        python -m venv .venv && source .venv/bin/activate
+        python -m venv venv && source venv/bin/activate
         pip install --upgrade pip
         pip install -r requirements.txt
     - name: Install dependencies windows
@@ -40,17 +40,17 @@ jobs:
         steps.cache.outputs.cache-hit != 'true'
         &&  matrix.os == 'windows-latest'
       run: |
-        python -m venv .venv
-        .venv\Scripts\activate.bat
+        python -m venv venv
+        venv\Scripts\activate
         pip install --upgrade pip
         pip install -r requirements.txt
     - name: Test on ubuntu and macOS
       run: |
-        source .venv/bin/activate
+        source venv/bin/activate
         pytest .
       if: matrix.os != 'windows-latest'
     - name: Test with nose on ubuntu and macOS
       run: |
-        .venv\Scripts\activate.bat
+        venv\Scripts\activate
         pytest . -m "not fails_on_windows"
       if: matrix.os == 'windows-latest'
