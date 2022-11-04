@@ -1,18 +1,17 @@
-name: tests
+name: master-tests
 
-on: [push]
-
-concurrency:
-  group: test-${{ github.ref }}
-  cancel-in-progress: true
+on:
+  push:
+    branches:
+      - master
 
 jobs:
   build:
     runs-on: ${{matrix.os}}
     strategy:
       matrix:
-        python-version: ["3.10"]
-        os: ['ubuntu-latest']
+        python-version: ["3.7", "3.8", "3.9", "3.10"]
+        os: ['ubuntu-latest', 'windows-latest', 'macos-latest']
     steps:
     - uses: actions/checkout@v3
     - name: Set up ${{ matrix.python-version }}
