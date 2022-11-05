@@ -1,9 +1,11 @@
 name: master-tests
 
-on:
-  push:
-    branches:
-      - master
+# on:
+#   push:
+#     branches:
+#       - master
+
+on: [push]
 
 jobs:
   build:
