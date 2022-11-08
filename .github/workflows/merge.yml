@@ -10,7 +10,7 @@ jobs:
     runs-on: ${{matrix.os}}
     strategy:
       matrix:
-        python-version: ["3.7", "3.8", "3.9", "3.10"]
+        python-version: ["3.8", "3.9", "3.10"]
         os: ['ubuntu-latest', 'windows-latest', 'macos-latest']
     steps:
     - uses: actions/checkout@v3
@@ -30,7 +30,6 @@ jobs:
         &&  matrix.os != 'windows-latest'
       run: |
         python -m venv venv && source venv/bin/activate
-        pip install --upgrade pip
         pip install -r requirements.txt
     - name: Install dependencies windows
       if: |
@@ -39,7 +38,6 @@ jobs:
       run: |
         python -m venv venv
         venv\Scripts\activate
-        pip install --upgrade pip
         pip install -r requirements.txt
     - name: Test on ubuntu and macOS
       run: |
