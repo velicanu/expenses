@@ -1,11 +1,9 @@
 name: master-tests
 
-# on:
-#   push:
-#     branches:
-#       - master
-# cache test
-on: [push]
+on:
+  push:
+    branches:
+      - master
 
 jobs:
   build:
