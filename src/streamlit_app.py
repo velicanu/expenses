@@ -567,6 +567,7 @@ def init(conn, conn_changes, data_dir, user):
                 add_row(df=df_initial, conn=conn_changes)
 
             df = run_sql(user_input, df_initial, table_name="expenses")
+            df = df.round(2)
             gb = GridOptionsBuilder.from_dataframe(df)
             gridOptions = gb.build()
             gridOptions["editable"] = True
