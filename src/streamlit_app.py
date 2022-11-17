@@ -348,7 +348,7 @@ def add_rules(data_dir, df_initial):
 
 def _make_new_row(date_, description, amount, category, df, conn):
     line_num = conn.execute("SELECT max(line) FROM expenses").fetchone()[0]
-    new_line_num = line_num + 1 if line_num else 0
+    new_line_num = line_num + 1 if line_num is not None else 0
     new_row = {
         "date": date_.isoformat() + " 00:00:00",
         "description": description,
