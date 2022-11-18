@@ -29,6 +29,7 @@ in the `data/sample/` directory that can be used to test the code / UI.
 ## Demo
 
 The following 5 minute demo shows how to get started and use the app.
+
 [![Expense App Demo](https://img.youtube.com/vi/AQ31QACbZhY/0.jpg)](https://www.youtube.com/watch?v=AQ31QACbZhY)
 
 ## Usage
