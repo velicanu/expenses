@@ -11,7 +11,7 @@ import streamlit as st
 from st_aggrid import AgGrid
 from st_aggrid.grid_options_builder import GridOptionsBuilder
 
-from auth import is_logged_in
+from auth import get_user, is_logged_in
 from detect import save_file_if_valid
 from pipeline import run
 from plaidlib import get_transactions
@@ -785,6 +785,6 @@ def main(user):
 
 if __name__ == "__main__":
     if is_logged_in():
-        main(st.session_state["username"])
+        main(get_user())
     else:
         st.write("Not logged in.")

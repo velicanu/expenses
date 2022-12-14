@@ -1,3 +1,5 @@
+import os
+
 import streamlit as st
 import streamlit_authenticator as stauth
 
@@ -8,9 +10,15 @@ RESET_PASSWORD = "Reset Password"
 
 
 def is_logged_in():
-    return (
+    return os.getenv("SKIP_AUTH").lower() == "true" or (
         "authentication_status" in st.session_state
         and st.session_state["authentication_status"]
+    )
+
+
+def get_user():
+    return (
+        "" if os.getenv("SKIP_AUTH").lower() == "true" else st.session_state["username"]
     )
 
 
