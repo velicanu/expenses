@@ -703,7 +703,7 @@ def init_changes_db(db_path, changes_path):
 
 def init_data_dir(user):
     script_dir = os.path.dirname(os.path.realpath(__file__))
-    data_dir = os.path.join(script_dir, "..", "data", user)
+    data_dir = os.path.join(script_dir, "..", "..", "data", user)
     cards_dir = os.path.join(data_dir, "cards")
     raw_dir = os.path.join(data_dir, "raw")
     extracted_dir = os.path.join(data_dir, "extracted")
