@@ -17,21 +17,21 @@ BASE_CONFIG = {
 
 
 def load_config(config_path):
-    if os.getenv("SKIP_AUTH").lower() == "true":
+    if os.getenv("SKIP_AUTH", "").lower() == "true":
         return BASE_CONFIG
     with open(config_path) as file:
         return yaml.load(file, Loader=yaml.SafeLoader)
 
 
 def update_config(config_path, config):
-    if os.getenv("SKIP_AUTH").lower() == "true":
+    if os.getenv("SKIP_AUTH", "").lower() == "true":
         return
     with open(config_path, "w") as file:
         yaml.dump(config, file, default_flow_style=False)
 
 
 def is_logged_in():
-    return os.getenv("SKIP_AUTH").lower() == "true" or (
+    return os.getenv("SKIP_AUTH", "").lower() == "true" or (
         "authentication_status" in st.session_state
         and st.session_state["authentication_status"]
     )
@@ -39,7 +39,9 @@ def is_logged_in():
 
 def get_user():
     return (
-        "" if os.getenv("SKIP_AUTH").lower() == "true" else st.session_state["username"]
+        ""
+        if os.getenv("SKIP_AUTH", "").lower() == "true"
+        else st.session_state["username"]
     )
 
 
