@@ -91,7 +91,7 @@ def logged_in(authenticator):
     st.write(f'Welcome *{st.session_state["name"]}*')
     st.title("You are logged in!")
     toggle_button(
-        RESET_PASSWORD, reset_password, authenticator, {st.session_state["username"]}
+        RESET_PASSWORD, reset_password, authenticator, st.session_state["username"]
     )
 
 
