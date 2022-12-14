@@ -7,6 +7,13 @@ REGISTER = "Register"
 RESET_PASSWORD = "Reset Password"
 
 
+def is_logged_in():
+    return (
+        "authentication_status" in st.session_state
+        and st.session_state["authentication_status"]
+    )
+
+
 def register(authenticator):
     """
     Adds registration widgets.
