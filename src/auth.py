@@ -2,11 +2,32 @@ import os
 
 import streamlit as st
 import streamlit_authenticator as stauth
+import yaml
 
 from utils import toggle_button
 
 REGISTER = "Register"
 RESET_PASSWORD = "Reset Password"
+
+BASE_CONFIG = {
+    "cookie": {"expiry_days": 0, "key": "", "name": ""},
+    "credentials": {"usernames": {}},
+    "preauthorized": {"emails": []},
+}
+
+
+def load_config(config_path):
+    if os.getenv("SKIP_AUTH").lower() == "true":
+        return BASE_CONFIG
+    with open(config_path) as file:
+        return yaml.load(file, Loader=yaml.SafeLoader)
+
+
+def update_config(config_path, config):
+    if os.getenv("SKIP_AUTH").lower() == "true":
+        return
+    with open(config_path, "w") as file:
+        yaml.dump(config, file, default_flow_style=False)
 
 
 def is_logged_in():

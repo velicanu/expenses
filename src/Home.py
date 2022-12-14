@@ -1,9 +1,8 @@
 import os
 
 import streamlit as st
-import yaml
 
-from auth import init_auth, logged_in, logged_out
+from auth import init_auth, load_config, logged_in, logged_out, update_config
 
 
 def main(config):
@@ -24,11 +23,6 @@ if __name__ == "__main__":
     script_dir = os.path.dirname(os.path.realpath(__file__))
     config_path = os.path.join(script_dir, "..", "auth.yaml")
 
-    # load auth config
-    with open(config_path) as file:
-        config = yaml.load(file, Loader=yaml.SafeLoader)
+    config = load_config(config_path)
     main(config)
-
-    # save auth config, this is how register and change password persists
-    with open(config_path, "w") as file:
-        yaml.dump(config, file, default_flow_style=False)
+    update_config(config_path, config)

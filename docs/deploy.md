@@ -40,3 +40,32 @@ streamlit run src/Home.py  --server.enableCORS false --server.enableXsrfProtecti
 ```
 
 Note `/apps/` in the run command matches `/apps` in the nginx configuration above.
+
+## Auth config
+
+For auth to work you will need a `auth.yaml` file in the repo root directory. Don't
+check this into github! It will look something like this:
+
+```yaml
+cookie:
+  expiry_days: 30
+  key: <key - random string>
+  name: expense_app_cookie
+credentials:
+  usernames:
+    user1:
+      email: user1@example.com
+      name: "user one"
+      password: password_hash
+preauthorized:
+  emails:
+  - user2@example.com
+  - user3@example.com
+```
+
+Note: the emails field is only used to allow users to register, no confirmation or
+password reset emails are sent.
+
+The easiest way to get started is to start with a dummy credential, add the user you
+want to create in preauthorized emails, and register the new user through the app and
+let the app update the auth.yaml config file.
