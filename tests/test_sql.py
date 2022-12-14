@@ -6,6 +6,8 @@ import pandas as pd
 import pytest
 
 from sql import (
+    _get_apply_changes_query,
+    _get_columns,
     add_pk_to_create_table_string,
     add_pk_to_sqlite_table,
     apply_changes,
@@ -136,4 +138,36 @@ def test_run_sql(df):
     )
     actual = actual_df.to_dict(orient="records")
     expected = [{"desc": "abc", "amount": 123}]
+    assert actual == expected
+
+
+def test_get_columns(df):
+    actual = _get_columns(df, "foo")
+    expected = "foo.date,foo.desc,foo.amount"
+    assert actual == expected
+
+
+def test_get_apply_changes_query(df):
+    actual = _get_apply_changes_query(df).strip()
+    expected = textwrap.dedent(
+        """
+    SELECT chdf.date,chdf.desc,chdf.amount
+    FROM df
+        JOIN chdf
+            ON df.pk = chdf.pk
+    UNION ALL
+    SELECT chdf.date,chdf.desc,chdf.amount
+    FROM chdf
+        LEFT JOIN df
+            ON df.pk = chdf.pk
+    WHERE df.pk IS NULL
+    UNION ALL
+    SELECT df.date,df.desc,df.amount
+    FROM df
+        LEFT JOIN chdf
+            ON df.pk = chdf.pk
+    WHERE chdf.pk IS NULL
+    """
+    ).strip()
+
     assert actual == expected
