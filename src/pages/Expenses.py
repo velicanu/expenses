@@ -714,10 +714,7 @@ def init_data_dir(user):
     return data_dir
 
 
-def main():
-    # TODO: try this approach of adding login instead of run_ctx session_id
-    # https://auth0.com/blog/introduction-to-streamlit-and-streamlit-components/
-    user = ""
+def main(user):
     if not user and "no_user_warning" not in st.session_state:
         no_user_warning = st.warning("No user provided, defaulting to common directory")
         st.session_state.no_user_warning = True
@@ -786,4 +783,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    if st.session_state["authentication_status"]:
+        main(st.session_state["username"])
+    else:
+        st.write("Not logged in.")
