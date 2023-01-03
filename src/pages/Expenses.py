@@ -700,7 +700,27 @@ def add_spending_over_time(df):
         return
 
     df = df.set_index(pd.DatetimeIndex(df["date"]))
-    df_month = df.groupby("category").resample("M").sum().reset_index()
+    max_date = dateutil.parser.parse(df["date"].max())
+    min_date = dateutil.parser.parse(df["date"].min())
+    n_days = (max_date - min_date).days
+    grouping = {"auto": "", "month": "M", "week": "W", "day": "D"}
+    if n_days > 91:  # month bins if over 2 months
+        group = "M"
+    if n_days > 31:  # month bins if over 2 months
+        group = "W"
+    else:
+        group = "D"
+
+    group_selection = st.select_slider("Time bin", list(grouping))
+    group = group if group_selection == "auto" else grouping[group_selection]
+
+    group_titles = {
+        "M": "Monthly spending",
+        "W": "Weekly spending",
+        "D": "Daily spending",
+    }
+
+    df_month = df.groupby("category").resample(group).sum().reset_index()
 
     fig2 = px.bar(
         df_month,
@@ -713,7 +733,7 @@ def add_spending_over_time(df):
         },
     )
     fig2.update_layout(
-        title="Spending over time",
+        title=group_titles[group],
         xaxis_title="Date",
         yaxis_title="Amount",
     )
