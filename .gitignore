@@ -12,3 +12,6 @@ data
 
 # plaid
 quickstart
+
+# auth
+auth.yaml

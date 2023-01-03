@@ -6,6 +6,7 @@ with functionality improved and tests added
 
 import re
 import sqlite3
+import textwrap
 
 import pandas as pd
 
@@ -59,29 +60,39 @@ def run_sql(query, df, table_name="df"):
     return out
 
 
+def _get_columns(df, prefix):
+    return ",".join([f"{prefix}.{c}" for c in df.columns])
+
+
+def _get_apply_changes_query(df):
+    return textwrap.dedent(
+        f"""
+        SELECT {_get_columns(df, "chdf")}
+        FROM df
+            JOIN chdf
+                ON df.pk = chdf.pk
+        UNION ALL
+        SELECT {_get_columns(df, "chdf")}
+        FROM chdf
+            LEFT JOIN df
+                ON df.pk = chdf.pk
+        WHERE df.pk IS NULL
+        UNION ALL
+        SELECT {_get_columns(df, "df")}
+        FROM df
+            LEFT JOIN chdf
+                ON df.pk = chdf.pk
+        WHERE chdf.pk IS NULL
+        """
+    )
+
+
 def apply_changes(df, chdf):
     with sqlite3.connect(":memory:") as conn:
         df.to_sql("df", conn, index=False)
         chdf.to_sql("chdf", conn, index=False)
         out = pd.read_sql(
-            """
-            SELECT chdf.*
-            FROM df
-                JOIN chdf
-                    ON df.pk = chdf.pk
-            UNION ALL
-            SELECT chdf.*
-            FROM chdf
-                LEFT JOIN df
-                    ON df.pk = chdf.pk
-            WHERE df.pk IS NULL
-            UNION ALL
-            SELECT df.*
-            FROM df
-                LEFT JOIN chdf
-                    ON df.pk = chdf.pk
-            WHERE chdf.pk IS NULL
-            """,
+            _get_apply_changes_query(df),
             conn,
         )
     return out

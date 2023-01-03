@@ -20,7 +20,7 @@ pip install -r requirements.txt
 Spin up the main UI via:
 
 ```bash
-streamlit run src/streamlit_app.py
+SKIP_AUTH=true streamlit run src/Home.py
 ```
 
 Then open http://localhost:8501 on your browser. There is sample data to play with

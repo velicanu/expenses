@@ -11,6 +11,7 @@ import streamlit as st
 from st_aggrid import AgGrid
 from st_aggrid.grid_options_builder import GridOptionsBuilder
 
+from auth import get_user, is_logged_in
 from detect import save_file_if_valid
 from pipeline import run
 from plaidlib import get_transactions
@@ -702,7 +703,7 @@ def init_changes_db(db_path, changes_path):
 
 def init_data_dir(user):
     script_dir = os.path.dirname(os.path.realpath(__file__))
-    data_dir = os.path.join(script_dir, "..", "data", user)
+    data_dir = os.path.join(script_dir, "..", "..", "data", user)
     cards_dir = os.path.join(data_dir, "cards")
     raw_dir = os.path.join(data_dir, "raw")
     extracted_dir = os.path.join(data_dir, "extracted")
@@ -714,10 +715,7 @@ def init_data_dir(user):
     return data_dir
 
 
-def main():
-    # TODO: try this approach of adding login instead of run_ctx session_id
-    # https://auth0.com/blog/introduction-to-streamlit-and-streamlit-components/
-    user = ""
+def main(user):
     if not user and "no_user_warning" not in st.session_state:
         no_user_warning = st.warning("No user provided, defaulting to common directory")
         st.session_state.no_user_warning = True
@@ -786,4 +784,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    if is_logged_in():
+        main(get_user())
+    else:
+        st.write("Not logged in.")

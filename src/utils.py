@@ -5,11 +5,22 @@ import time
 
 import pandas as pd
 import requests
+import streamlit as st
 
 from common import get_log
 from plaidlib import get_institution, get_item
 
 log = get_log(__file__)
+
+
+def toggle(state):
+    st.session_state[state] = not st.session_state[state]
+
+
+def toggle_button(key, function, *args, **kwargs):
+    st.button(key, on_click=toggle, args=[key])
+    if st.session_state[key]:
+        function(*args, **kwargs)
 
 
 def make_dirs(list_of_dirs):
