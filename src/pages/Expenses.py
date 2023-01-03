@@ -273,6 +273,10 @@ def save_rule(category_rule, description_rule, target, df):
         st.session_state.config["rules"]["category"][category_rule] = target
 
 
+def save_category(category, color):
+    st.session_state.config["rules"]["new_categories"][category] = color
+
+
 def list_rules():
     st.session_state.list_rules = not st.session_state.list_rules
 
@@ -281,35 +285,38 @@ def apply_rules(data_dir):
     run(data_dir, standardize_only=True, config=st.session_state.config)
 
 
-def delete_rule(collection, label):
-    delete_selection = st.multiselect(label, collection)
-    if delete_selection:
-        for selection in delete_selection:
-            collection.pop(selection)
+def delete_selections(category_rules, description_rules, new_categories):
+    for rule in category_rules:
+        st.session_state.config["rules"]["category"].pop(rule)
+    for rule in description_rules:
+        st.session_state.config["rules"]["description"].pop(rule)
+    for category in new_categories:
+        st.session_state.config["rules"]["new_categories"].pop(category)
 
 
 def add_rules(data_dir, df_initial):
+    new_categories = st.session_state.config["rules"]["new_categories"]
     col1, col2, col3, col4 = st.columns([1, 1, 1, 1])
     with col1:
-        category_rule = st.text_input("Category rule", "")
-        delete_rule(
-            st.session_state.config["rules"]["category"], "Delete category rule"
+        delete_category_selection = st.multiselect(
+            "Delete category rule", st.session_state.config["rules"]["category"]
+        )
+        delete_description_selection = st.multiselect(
+            "Delete description rule", st.session_state.config["rules"]["description"]
+        )
+        delete_newcat_selection = st.multiselect(
+            "Delete new category", st.session_state.config["rules"]["new_categories"]
         )
     with col2:
-        description_rule = st.text_input("Description rule", "")
-        delete_rule(
-            st.session_state.config["rules"]["description"], "Delete description rule"
-        )
-    with col3:
-        new_categories = st.session_state.config["rules"]["new_categories"]
+        category_rule = st.text_input("Create category rule", "")
+        description_rule = st.text_input("Create description rule", "")
         all_categories = sorted(
             list(set(df_initial["category"].unique().tolist() + list(new_categories)))
         )
         target = st.selectbox("Target category", all_categories)
-        new_category = st.text_input("Add a new category").title()
-        if new_category and new_category not in new_categories:
-            new_categories[new_category] = ""
-        delete_rule(new_categories, "Delete new category")
+    with col3:
+        new_category = st.text_input("Save category").title()
+        color = st.color_picker("Pick A Color", "#ffffff")
 
     with col4:
         disabled = False
@@ -335,14 +342,37 @@ def add_rules(data_dir, df_initial):
         )
         st.button("Apply rules", on_click=apply_rules, kwargs={"data_dir": data_dir})
         st.button("List rules", on_click=list_rules)
-        # st.button(
-        #     "Delete rules",
-        #     on_click=delete_rules,
-        #     kwargs={
-        #         "category_rule": category_rule,
-        #         "description_rule": description_rule,
-        #     },
-        # )
+
+        help_ = ""
+        disabled = False
+        if not new_category:
+            help_ = "No category specified"
+            disabled = True
+
+        st.button(
+            "Save category",
+            on_click=save_category,
+            kwargs={"category": new_category.strip().title(), "color": color},
+            disabled=disabled,
+            help=help_,
+        )
+        disabled = (
+            not delete_category_selection
+            and not delete_description_selection
+            and not delete_newcat_selection
+        )
+        st.button(
+            "Delete selections",
+            on_click=delete_selections,
+            kwargs={
+                "category_rules": delete_category_selection,
+                "description_rules": delete_description_selection,
+                "new_categories": delete_newcat_selection,
+            },
+            disabled=disabled,
+            help="Nothing to delete" if disabled else "",
+        )
+
     if st.session_state.list_rules:
         st.json(st.session_state.config["rules"])
 
@@ -641,6 +671,10 @@ def add_spending_by_category(df):
 
     total = df["amount"].sum()
 
+    cdm = {
+        **color_discrete_map,
+        **st.session_state.config["rules"]["new_categories"],
+    }
     fig = px.pie(
         df2,
         values="amount",
@@ -648,7 +682,7 @@ def add_spending_by_category(df):
         title=f"Spending by category, total: {total}",
         height=600,
         color="category",
-        color_discrete_map=color_discrete_map,
+        color_discrete_map=cdm,
     )
 
     fig.update_layout(
@@ -673,7 +707,10 @@ def add_spending_over_time(df):
         x="date",
         y="amount",
         color="category",
-        color_discrete_map=color_discrete_map,
+        color_discrete_map={
+            **color_discrete_map,
+            **st.session_state.config["rules"]["new_categories"],
+        },
     )
     fig2.update_layout(
         title="Spending over time",
