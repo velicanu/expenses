@@ -704,9 +704,9 @@ def add_spending_over_time(df):
     min_date = dateutil.parser.parse(df["date"].min())
     n_days = (max_date - min_date).days
     grouping = {"auto": "", "month": "M", "week": "W", "day": "D"}
-    if n_days > 91:  # month bins if over 2 months
+    if n_days > 91:
         group = "M"
-    if n_days > 31:  # month bins if over 2 months
+    elif n_days > 31:
         group = "W"
     else:
         group = "D"
