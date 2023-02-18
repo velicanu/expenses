@@ -27,6 +27,11 @@ def parse_record(record, card, card_def):
     if "category" not in parsed_record:
         parsed_record["category"] = ""
     parsed_record["source_file"] = record["source_file"]
+
+    # plaid hack
+    if not parsed_record["date"]:
+        parsed_record["date"] = record["date"]
+
     return parsed_record
 
 
