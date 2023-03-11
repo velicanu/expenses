@@ -1,7 +1,7 @@
 cython
 numpy
 matplotlib
-black==23.1.0
+black
 click
 flake8
 isort
