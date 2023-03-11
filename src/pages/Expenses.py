@@ -61,7 +61,6 @@ def extend_sql_statement(statement):
 
 
 def add_date_range_widget(df):
-
     min_value = dateutil.parser.parse(df["date"].min())
     max_value = dateutil.parser.parse(df["date"].max())
     min_default = (
@@ -192,7 +191,6 @@ def delete_files():
 
 
 def add_delete_files_widget(raw_data_dir):
-
     if st.checkbox("Delete files"):
         for file_ in os.listdir(raw_data_dir):
             filename = os.path.join(raw_data_dir, file_)
