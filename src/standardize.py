@@ -1,6 +1,7 @@
 import json
 
 import click
+import pandas as pd
 from dateutil.parser import parse
 
 from common import get_log
@@ -89,7 +90,7 @@ def get_default_categories():
     return set(default_description_map.values()) | set(default_category_map.values())
 
 
-def standardizer(record, line_num, rules):
+def standardizer(record, rules):
     record["date"] = parse(record["date"]).isoformat()
     record["new_category"] = "Other"
 
@@ -111,10 +112,17 @@ def standardizer(record, line_num, rules):
     record["category"] = record["new_category"]
     record.pop("new_category")
 
-    record["pk"] = f"{record['source_file']}-{line_num}"
-    record["line"] = line_num
-
     return record
+
+
+def ordered(records):
+    df = pd.DataFrame(records)
+    ordered_df = df.sort_values(by=["date"])
+    ordered_records = ordered_df.to_dict(orient="records")
+    for line, record in enumerate(ordered_records):
+        record["pk"] = f"{record['source_file']}-{line}"
+        record["line"] = line
+    return ordered_records
 
 
 def standardize(infile, outfile, rules):
@@ -123,10 +131,10 @@ def standardize(infile, outfile, rules):
     log.info(f"Standardizing {infile} into {outfile} using {rules}")
 
     with open(infile, "r") as inf, open(outfile, "w") as outf:
-        for line_num, line in enumerate(inf):
-            record = json.loads(line)
-            standardized_record = standardizer(record, line_num, rules)
-            outf.write(f"{json.dumps(standardized_record)}\n")
+        standardized = [standardizer(json.loads(line), rules) for line in inf]
+        ordered_records = ordered(standardized)
+        for record in ordered_records:
+            outf.write(f"{json.dumps(record)}\n")
 
 
 @click.command()

@@ -63,8 +63,8 @@ def test_full_pipeline():
                 "category": "Groceries",
                 "source_file": "amex.csv",
                 "old_category": "Merchandise & Supplies-Groceries",
-                "pk": "amex.csv-2",
-                "line": 2,
+                "pk": "amex.csv-0",
+                "line": 0,
             },
             {
                 "date": "2019-12-28 00:00:00",
@@ -96,8 +96,8 @@ def test_full_pipeline():
                 "category": "Dining",
                 "source_file": "chase.csv",
                 "old_category": "Food & Drink",
-                "pk": "chase.csv-1",
-                "line": 1,
+                "pk": "chase.csv-0",
+                "line": 0,
             },
             {
                 "date": "2019-12-30 00:00:00",
@@ -107,8 +107,8 @@ def test_full_pipeline():
                 "category": "Dining",
                 "source_file": "chase.csv",
                 "old_category": "Food & Drink",
-                "pk": "chase.csv-0",
-                "line": 0,
+                "pk": "chase.csv-1",
+                "line": 1,
             },
             {
                 "date": "2020-06-15 00:00:00",
@@ -129,8 +129,8 @@ def test_full_pipeline():
                 "category": "Groceries",
                 "source_file": "amex.csv",
                 "old_category": "Merchandise & Supplies-Groceries",
-                "pk": "amex.csv-0",
-                "line": 0,
+                "pk": "amex.csv-2",
+                "line": 2,
             },
         ]
 
