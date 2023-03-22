@@ -77,6 +77,7 @@ def merge_tx(card_dir, card_id):
     df = pd.read_json(open(new_tx_file).read(), lines=True)
     if df.empty:
         return
+    df.fillna("", inplace=True)
     df["categories"] = df["category"].apply(lambda x: ",".join(x))
 
     df_out = df[
