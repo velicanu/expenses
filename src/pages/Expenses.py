@@ -309,7 +309,7 @@ def add_rules(data_dir, df_initial):
         category_rule = st.text_input("Create category rule", "")
         description_rule = st.text_input("Create description rule", "")
         all_categories = sorted(
-            list(set(df_initial["category"].unique().tolist() + list(new_categories)))
+            set(df_initial["category"].unique().tolist() + list(new_categories))
         )
         target = st.selectbox("Target category", all_categories)
     with col3:
@@ -414,7 +414,7 @@ def add_row(df, conn):
 
     with col4:
         new_categories = st.session_state.config["rules"]["new_categories"]
-        all_categories = sorted(list(set(new_categories) | get_default_categories()))
+        all_categories = sorted(set(new_categories) | get_default_categories())
         input_category = st.selectbox("Category", all_categories)
 
     enabled = bool(input_description) and (input_amount != 0.0)
@@ -684,7 +684,7 @@ def add_spending_by_category(df):
     )
 
     fig.update_layout(
-        font=dict(size=18, color="#7f7f7f"),
+        font={"size": 18, "color": "#7f7f7f"},
         title={"xanchor": "center", "x": 0.5},
     )
 
@@ -736,7 +736,7 @@ def add_spending_over_time(df):
         yaxis_title="Amount",
     )
     fig2.update_layout(
-        font=dict(size=16, color="#7f7f7f"),
+        font={"size": 16, "color": "#7f7f7f"},
         title={"xanchor": "center", "x": 0.5},
     )
     st.plotly_chart(fig2, use_container_width=True)

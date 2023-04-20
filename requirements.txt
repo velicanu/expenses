@@ -76,8 +76,6 @@ extra-streamlit-components==0.1.56
     # via streamlit-authenticator
 fastjsonschema==2.16.3
     # via nbformat
-flake8==6.0.0
-    # via -r requirements.in
 fonttools==4.39.3
     # via matplotlib
 fqdn==1.5.1
@@ -117,8 +115,6 @@ ipywidgets==8.0.6
     # via jupyter
 isoduration==20.11.0
     # via jsonschema
-isort==5.12.0
-    # via -r requirements.in
 jedi==0.18.2
     # via ipython
 jinja2==3.1.2
@@ -189,8 +185,6 @@ matplotlib-inline==0.1.6
     # via
     #   ipykernel
     #   ipython
-mccabe==0.7.0
-    # via flake8
 mdurl==0.1.2
     # via markdown-it-py
 mistune==2.0.5
@@ -300,14 +294,10 @@ pure-eval==0.2.2
     # via stack-data
 pyarrow==11.0.0
     # via streamlit
-pycodestyle==2.10.0
-    # via flake8
 pycparser==2.21
     # via cffi
 pydeck==0.8.0
     # via streamlit
-pyflakes==3.0.1
-    # via flake8
 pygments==2.14.0
     # via
     #   ipython
@@ -370,6 +360,8 @@ rfc3986-validator==0.1.1
     #   jupyter-events
 rich==13.3.3
     # via streamlit
+ruff==0.0.261
+    # via -r requirements.in
 seaborn==0.12.2
     # via -r requirements.in
 send2trash==1.8.0
@@ -449,9 +441,7 @@ typing-extensions==4.5.0
     #   blinker
     #   streamlit
 tzdata==2023.3
-    # via
-    #   pandas
-    #   pytz-deprecation-shim
+    # via pytz-deprecation-shim
 tzlocal==4.3
     # via streamlit
 uri-template==1.2.0

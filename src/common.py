@@ -68,8 +68,8 @@ def records_from_file(infile):
             reader = csv.reader(tmpfile, dialect)
             header = next(reader)
             for row in reader:
-                _row = {k: v for k, v in zip(header, row)}
+                _row = dict(zip(header, row, strict=True))
                 # don't return null rows
-                if any([v for v in _row.values()]):
+                if any(_row.values()):
                     records.append(_row)
         return records
