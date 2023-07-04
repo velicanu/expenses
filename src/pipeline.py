@@ -41,12 +41,14 @@ def _etl(raw, extracted, parsed, standardized, standardize_only, config):
         standardize(parsed, standardized, rules)
 
 
-def run(data_dir, standardize_only=False, config={}):
+def run(data_dir, standardize_only=False, config=None):
     """
     Run the pipeline, intermediate files go into
     data/extracted, data/parsed, and data/standardized
     which is ingested into ./expenses.db
     """
+    if not config:
+        config = {}
 
     cores = mp.cpu_count()
     pool = mp.Pool(cores)

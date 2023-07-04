@@ -11,7 +11,7 @@ script_dir = os.path.dirname(os.path.realpath(__file__))
 
 CARD_DEFINITIONS = json.load(open(os.path.join(script_dir, "card_definitions.json")))
 SCHEMALESS_CARD_DEFS = copy.deepcopy(CARD_DEFINITIONS)
-for key, value in SCHEMALESS_CARD_DEFS.items():
+for value in SCHEMALESS_CARD_DEFS.values():
     value.pop("schema")
 
 
