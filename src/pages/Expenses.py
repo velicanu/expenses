@@ -745,7 +745,7 @@ def add_spending_over_time(df):
 
 def init_changes_db(db_path, changes_path):
     if not os.path.exists(changes_path):
-        with sqlite3.connect(db_path) as conn:
+        with sqlite3.connect(db_path, check_same_thread=False) as conn:
             cts = get_create_table_string("expenses", conn)
         if not cts:
             return None
@@ -754,7 +754,7 @@ def init_changes_db(db_path, changes_path):
         changes_conn.commit()
         return changes_conn
     else:
-        return sqlite3.connect(changes_path)
+        return sqlite3.connect(changes_path, check_same_thread=False)
 
 
 def init_data_dir(user):
