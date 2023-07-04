@@ -32,7 +32,6 @@ def get_item(access_token):
     )["item"]
 
 
-
 def get_institution(access_token, institution_id, country_codes=None):
     if not country_codes:
         country_codes = [CountryCode("US")]
