@@ -45,7 +45,7 @@ Account Balance as of January 1 2022:    $0.00
  
 Transaction Date,Description,Category,Amount
 11/13/2021,"Payment Received","CREDIT",193.64
-10/22/2021,"THDCAPEAIR AIR TKT","DEBIT",-193.64"""
+10/22/2021,"THDCAPEAIR AIR TKT","DEBIT",-193.64"""  # noqa: W293
     expected = """Transaction Date,Description,Category,Amount
 11/13/2021,"Payment Received","CREDIT",193.64
 10/22/2021,"THDCAPEAIR AIR TKT","DEBIT",-193.64"""

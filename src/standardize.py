@@ -61,7 +61,6 @@ default_category_map = {
     "fitness": "Health",
     "travel": "Travel",
     "shops": "Shopping",
-    "Merchandise": "Shopping",
     "Telecommunication": "Bills",
     "Insurance": "Bills",
     "Home": "Shopping",

@@ -3,8 +3,7 @@ numpy
 matplotlib
 black
 click
-flake8
-isort
+ruff
 jupyter
 pandas
 plaid-python

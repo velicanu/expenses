@@ -42,6 +42,12 @@ jobs:
           venv\Scripts\activate
           pip install --upgrade pip
           pip install -r requirements.txt
+      - name: lint
+        run: |
+          source venv/bin/activate
+          ruff .
+          black --check .
+        if: matrix.os != 'windows-latest'
       - name: Test on ubuntu and macOS
         run: |
           source venv/bin/activate

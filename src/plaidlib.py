@@ -32,7 +32,10 @@ def get_item(access_token):
     )["item"]
 
 
-def get_institution(access_token, institution_id, country_codes=US):
+
+def get_institution(access_token, institution_id, country_codes=None):
+    if not country_codes:
+        country_codes = [CountryCode("US")]
     return client.institutions_get_by_id(
         InstitutionsGetByIdRequest(
             institution_id=institution_id,
