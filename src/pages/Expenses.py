@@ -501,6 +501,7 @@ def pull(data_dir):
     for card in cards.values():
         with st.spinner(f"Pulling {card} transactions"):
             transactions = get_transactions(
+                card=card,
                 access_token=card["token"],
                 start_date=card["start_date"],
                 end_date=date.today().isoformat(),
@@ -701,9 +702,9 @@ def add_spending_over_time(df):
     max_date = dateutil.parser.parse(df["date"].max())
     min_date = dateutil.parser.parse(df["date"].min())
     n_days = (max_date - min_date).days
-    grouping = {"auto": "", "month": "M", "week": "W", "day": "D"}
+    grouping = {"auto": "", "month": "MS", "week": "W", "day": "D"}
     if n_days > 91:
-        group = "M"
+        group = "MS"
     elif n_days > 31:
         group = "W"
     else:
@@ -713,7 +714,7 @@ def add_spending_over_time(df):
     group = group if group_selection == "auto" else grouping[group_selection]
 
     group_titles = {
-        "M": "Monthly spending",
+        "MS": "Monthly spending",
         "W": "Weekly spending",
         "D": "Daily spending",
     }
@@ -744,7 +745,7 @@ def add_spending_over_time(df):
 
 def init_changes_db(db_path, changes_path):
     if not os.path.exists(changes_path):
-        with sqlite3.connect(db_path) as conn:
+        with sqlite3.connect(db_path, check_same_thread=False) as conn:
             cts = get_create_table_string("expenses", conn)
         if not cts:
             return None
@@ -753,7 +754,7 @@ def init_changes_db(db_path, changes_path):
         changes_conn.commit()
         return changes_conn
     else:
-        return sqlite3.connect(changes_path)
+        return sqlite3.connect(changes_path, check_same_thread=False)
 
 
 def init_data_dir(user):
