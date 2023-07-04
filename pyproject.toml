@@ -19,7 +19,6 @@ ignore = [
     "E501",  # line too long, handled by black
     "C901",  # too complex
 ]
-
 unfixable = ["F841"]
 extend-exclude = ["plaid/"]
 
