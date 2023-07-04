@@ -702,9 +702,9 @@ def add_spending_over_time(df):
     max_date = dateutil.parser.parse(df["date"].max())
     min_date = dateutil.parser.parse(df["date"].min())
     n_days = (max_date - min_date).days
-    grouping = {"auto": "", "month": "M", "week": "W", "day": "D"}
+    grouping = {"auto": "", "month": "MS", "week": "W", "day": "D"}
     if n_days > 91:
-        group = "M"
+        group = "MS"
     elif n_days > 31:
         group = "W"
     else:
@@ -714,7 +714,7 @@ def add_spending_over_time(df):
     group = group if group_selection == "auto" else grouping[group_selection]
 
     group_titles = {
-        "M": "Monthly spending",
+        "MS": "Monthly spending",
         "W": "Weekly spending",
         "D": "Daily spending",
     }
