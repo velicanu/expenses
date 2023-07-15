@@ -68,6 +68,8 @@ def records_from_file(infile):
             reader = csv.reader(tmpfile, dialect)
             header = next(reader)
             for row in reader:
+                if not row:
+                    continue
                 _row = dict(zip(header, row, strict=True))
                 # don't return null rows
                 if any(_row.values()):
