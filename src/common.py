@@ -70,7 +70,10 @@ def records_from_file(infile):
             for row in reader:
                 if not row:
                     continue
-                _row = dict(zip(header, row, strict=True))
+                # for python 3.8 and 3.9 compatibility. strict zip is 3.10+
+                if len(header) != len(row):
+                    raise ValueError(f"length mismatch: {len(header)}!={len(row)}")
+                _row = dict(zip(header, row))  # noqa:B905
                 # don't return null rows
                 if any(_row.values()):
                     records.append(_row)
