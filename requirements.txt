@@ -8,10 +8,6 @@ altair==4.2.2
     # via streamlit
 anyio==3.6.2
     # via jupyter-server
-appnope==0.1.3
-    # via
-    #   ipykernel
-    #   ipython
 argon2-cffi==21.3.0
     # via
     #   jupyter-server
@@ -446,11 +442,13 @@ tzlocal==4.3
     # via streamlit
 uri-template==1.2.0
     # via jsonschema
-urllib3==1.26.15
+urllib3==1.26.17
     # via
     #   plaid-python
     #   requests
 validators==0.20.0
+    # via streamlit
+watchdog==3.0.0
     # via streamlit
 wcwidth==0.2.6
     # via prompt-toolkit
