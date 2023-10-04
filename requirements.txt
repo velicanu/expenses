@@ -8,10 +8,6 @@ altair==4.2.2
     # via streamlit
 anyio==3.6.2
     # via jupyter-server
-appnope==0.1.3
-    # via
-    #   ipykernel
-    #   ipython
 argon2-cffi==21.3.0
     # via
     #   jupyter-server
@@ -259,7 +255,7 @@ pexpect==4.8.0
     # via ipython
 pickleshare==0.7.5
     # via ipython
-pillow==9.5.0
+pillow==10.0.1
     # via
     #   matplotlib
     #   streamlit
@@ -451,6 +447,8 @@ urllib3==1.26.15
     #   plaid-python
     #   requests
 validators==0.20.0
+    # via streamlit
+watchdog==3.0.0
     # via streamlit
 wcwidth==0.2.6
     # via prompt-toolkit
