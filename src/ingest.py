@@ -19,13 +19,7 @@ def ingest(infiles, table, outfile):
         os.remove(outfile)
 
     con = sqlite3.connect(outfile)
-    df = None
-    for infile in infiles:
-        df = (
-            df.append(pd.read_json(infile, lines=True), sort=False)
-            if df is not None
-            else pd.read_json(infile, lines=True)
-        )
+    df = pd.concat([pd.read_json(f, lines=True) for f in infiles])
 
     df.to_sql(table, con, index=False)
     add_pk_to_sqlite_table(tablename="expenses", index_column="pk", connection=con)
