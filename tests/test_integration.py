@@ -34,7 +34,7 @@ def test_full_pipeline():
         )
         expected = [
             {
-                "date": "2018-12-18 00:00:00",
+                "date": "2018-12-18T00:00:00",
                 "description": "REI #80 BOSTON BOSTON MA",
                 "amount": -59.89,
                 "source": "usbank",
@@ -45,7 +45,7 @@ def test_full_pipeline():
                 "line": 0,
             },
             {
-                "date": "2019-01-02 00:00:00",
+                "date": "2019-01-02T00:00:00",
                 "description": "LATE FEE - PAYMENT DUE ON 01/01",
                 "amount": 27.0,
                 "source": "usbank",
@@ -56,7 +56,7 @@ def test_full_pipeline():
                 "line": 1,
             },
             {
-                "date": "2019-06-15 00:00:00",
+                "date": "2019-06-15T00:00:00",
                 "description": "Hannaford",
                 "amount": 2.55,
                 "source": "amex",
@@ -67,7 +67,7 @@ def test_full_pipeline():
                 "line": 0,
             },
             {
-                "date": "2019-12-28 00:00:00",
+                "date": "2019-12-28T00:00:00",
                 "description": "NIGHT SHIFT BREWING @",
                 "amount": 4.0,
                 "source": "capital_one",
@@ -78,7 +78,7 @@ def test_full_pipeline():
                 "line": 0,
             },
             {
-                "date": "2019-12-29 00:00:00",
+                "date": "2019-12-29T00:00:00",
                 "description": "KOHL'S #0531",
                 "amount": 39.98,
                 "source": "capital_one",
@@ -89,7 +89,7 @@ def test_full_pipeline():
                 "line": 1,
             },
             {
-                "date": "2019-12-29 00:00:00",
+                "date": "2019-12-29T00:00:00",
                 "description": "TST* SWEET RICE - JP",
                 "amount": 51.37,
                 "source": "chase",
@@ -100,7 +100,7 @@ def test_full_pipeline():
                 "line": 0,
             },
             {
-                "date": "2019-12-30 00:00:00",
+                "date": "2019-12-30T00:00:00",
                 "description": "THE LANDING PIZZA AND KIT",
                 "amount": 44.0,
                 "source": "chase",
@@ -111,7 +111,7 @@ def test_full_pipeline():
                 "line": 1,
             },
             {
-                "date": "2020-06-15 00:00:00",
+                "date": "2020-06-15T00:00:00",
                 "description": "Trader Joe's",
                 "amount": 24.17,
                 "source": "amex",
@@ -122,7 +122,7 @@ def test_full_pipeline():
                 "line": 1,
             },
             {
-                "date": "2020-06-19 00:00:00",
+                "date": "2020-06-19T00:00:00",
                 "description": "Trader Joe's",
                 "amount": 10.76,
                 "source": "amex",

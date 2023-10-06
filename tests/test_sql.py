@@ -99,10 +99,10 @@ def test_insert_rows(conn):
     insert_rows(input_, "test", conn)
     actual = pd.read_sql("SELECT * FROM test", conn).to_dict(orient="records")
     expected = [
-        {"date": "2020-01-01 01:01:01", "desc": "abc", "amount": 123},
-        {"date": "2020-01-01 01:01:02", "desc": "def", "amount": 456},
-        {"date": "2020-01-01 01:01:03", "desc": "ggg", "amount": 777},
-        {"date": "2020-01-01 01:01:04", "desc": "hhh", "amount": 888},
+        {"date": "2020-01-01T01:01:01", "desc": "abc", "amount": 123},
+        {"date": "2020-01-01T01:01:02", "desc": "def", "amount": 456},
+        {"date": "2020-01-01T01:01:03", "desc": "ggg", "amount": 777},
+        {"date": "2020-01-01T01:01:04", "desc": "hhh", "amount": 888},
     ]
     assert actual == expected
 
