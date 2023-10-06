@@ -44,7 +44,7 @@ def records_from_file(infile):
     :param infile: Input csv file or stream
     :return: generator of json records
     """
-    if type(infile) == str:
+    if isinstance(infile, str):
         infile = open(infile, "r", newline=_get_newline(infile))
 
     with tempfile.TemporaryDirectory() as tmpdir:
