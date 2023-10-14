@@ -9,8 +9,6 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 from dateutil.parser import parse
-from st_aggrid import AgGrid
-from st_aggrid.grid_options_builder import GridOptionsBuilder
 
 from auth import get_user, is_logged_in
 from detect import save_file_if_valid

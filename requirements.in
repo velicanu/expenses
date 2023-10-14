@@ -13,5 +13,4 @@ seaborn
 smart-open
 xlrd
 pytest
-streamlit-aggrid
 streamlit-authenticator

@@ -253,7 +253,6 @@ pandas==2.1.1
     #   altair
     #   seaborn
     #   streamlit
-    #   streamlit-aggrid
 pandocfilters==1.5.0
     # via nbconvert
 parso==0.8.3
@@ -321,8 +320,6 @@ python-dateutil==2.8.2
     #   pandas
     #   plaid-python
     #   streamlit
-python-decouple==3.8
-    # via streamlit-aggrid
 python-json-logger==2.0.7
     # via jupyter-events
 pytz==2023.3.post1
@@ -391,10 +388,7 @@ streamlit==1.27.2
     # via
     #   -r requirements.in
     #   extra-streamlit-components
-    #   streamlit-aggrid
     #   streamlit-authenticator
-streamlit-aggrid==0.3.4.post3
-    # via -r requirements.in
 streamlit-authenticator==0.2.3
     # via -r requirements.in
 tenacity==8.2.3
