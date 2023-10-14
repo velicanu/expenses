@@ -613,6 +613,7 @@ def init(conn, conn_changes, data_dir, user):
                 df_table,
                 disabled=["pk", "source_file", "line"],
                 hide_index=True,
+                # this sets the key in st.session_state where the changes are stored
                 key="expenses_df",
                 column_config={
                     "amount": st.column_config.NumberColumn("amount"),
@@ -623,6 +624,9 @@ def init(conn, conn_changes, data_dir, user):
                 },
             )
 
+            # TODO: move this to a separate function and add a test
+            # changes are stored in st.session_state.expenses_df["edited_rows"]
+            # and look like this: {0: {'amount': 1751}, 3: {'category': 'Bills'}}
             changes = []
             for idx, change in st.session_state.expenses_df["edited_rows"].items():
                 changed_row = df.iloc[idx].to_dict()
