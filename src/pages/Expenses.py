@@ -8,6 +8,7 @@ import dateutil.parser
 import pandas as pd
 import plotly.express as px
 import streamlit as st
+from dateutil.parser import parse
 from st_aggrid import AgGrid
 from st_aggrid.grid_options_builder import GridOptionsBuilder
 
@@ -60,7 +61,7 @@ def extend_sql_statement(statement):
     )
 
 
-def add_date_range_widget(df):
+def add_date_range_widget(df, input_form):
     min_value = dateutil.parser.parse(df["date"].min())
     max_value = dateutil.parser.parse(df["date"].max())
     min_default = (
@@ -75,7 +76,7 @@ def add_date_range_widget(df):
     )
     min_default = max(min_value, min_default)
     max_default = min(max_value, max_default)
-    date_range = st.sidebar.date_input(
+    date_range = input_form.date_input(
         "Date range",
         value=(min_default, max_default),
         min_value=min_value,
@@ -101,20 +102,27 @@ def add_date_range_widget(df):
     return default_user_input
 
 
-def add_category_widget(df, default_user_input):
-    selected = st.sidebar.multiselect("Categories", sorted(df["category"].unique()))
+def add_category_widget(df, default_user_input, selection, input_form):
+    selected = input_form.multiselect(
+        label=f"Categories {selection}",
+        options=sorted(df["category"].unique()),
+        default=st.session_state.config.get(f"categories {selection}", []),
+    )
     if selected:
-        default_user_input = extend_sql_statement(default_user_input) + "category in "
+        default_user_input = (
+            extend_sql_statement(default_user_input) + f"category {selection} "
+        )
         default_user_input = (
             default_user_input + f"{tuple(c for c in selected)}"
             if len(selected) > 1
             else default_user_input + f"('{selected[0]}')"
         )
+        st.session_state.config[f"categories {selection}"] = selected
     return default_user_input, selected
 
 
-def add_source_widget(df, default_user_input):
-    selected = st.sidebar.multiselect("Source file", sorted(df["source_file"].unique()))
+def add_source_widget(df, default_user_input, input_form):
+    selected = input_form.multiselect("Source file", sorted(df["source_file"].unique()))
     if selected:
         default_user_input = (
             extend_sql_statement(default_user_input) + "source_file in "
@@ -135,8 +143,8 @@ def validate_description_input(value):
     return num_operators <= 1 and value
 
 
-def add_description_widget(default_user_input):
-    title = st.sidebar.text_input(
+def add_description_widget(default_user_input, input_form):
+    title = input_form.text_input(
         "Description", "", help="^ is and, + is or, ! is not, * is wildcard"
     )
     title = title.replace("*", "%")
@@ -313,7 +321,7 @@ def add_rules(data_dir, df_initial):
         )
         target = st.selectbox("Target category", all_categories)
     with col3:
-        new_category = st.text_input("Save category").title()
+        new_category = st.text_input("Create new category").title()
         color = st.color_picker("Pick A Color", "#ffffff")
 
     with col4:
@@ -519,6 +527,7 @@ def pull(data_dir):
         card["start_date"] = (date.today() - timedelta(days=30)).isoformat()
 
     run_wrapper(data_dir)
+    run(data_dir, standardize_only=True, config=st.session_state.config)
 
 
 def add_refresh_data(data_dir):
@@ -537,7 +546,6 @@ def run_wrapper(data_dir):
 def init(conn, conn_changes, data_dir, user):
     df = None
 
-    st.sidebar.button("Settings", on_click=expand)
     if st.session_state.expand and user:
         st.sidebar.write(f"{user} logged in")
 
@@ -562,20 +570,24 @@ def init(conn, conn_changes, data_dir, user):
         chdf_initial = pd.read_sql("SELECT * FROM expenses", conn_changes)
         df_initial = apply_changes(df_initial, chdf_initial)
         df_initial = df_initial[df_initial.amount != 0]  # filter out empty transactions
-        default_user_input = add_date_range_widget(df_initial)
+        input_form = st.sidebar.form("my_form")
+        default_user_input = add_date_range_widget(df_initial, input_form)
         default_user_input, selected = add_category_widget(
-            df_initial, default_user_input
+            df_initial, default_user_input, "in", input_form
+        )
+        default_user_input, selected = add_category_widget(
+            df_initial, default_user_input, "not in", input_form
         )
         default_user_input, description_list = add_description_widget(
-            default_user_input
+            default_user_input, input_form
         )
-        default_user_input = add_source_widget(df_initial, default_user_input)
-        if "Payment" not in selected:
-            default_user_input = (
-                extend_sql_statement(default_user_input) + "category != 'Payment'"
-            )
+        default_user_input = add_source_widget(
+            df_initial, default_user_input, input_form
+        )
+        input_form.form_submit_button("Submit")
 
-        st.sidebar.button("Modify", on_click=toggle_rules)
+        st.sidebar.button("Inputs", on_click=expand)
+        st.sidebar.button("Rules", on_click=toggle_rules)
 
         if st.session_state.config["rules_button"]:
             add_rules(data_dir, df_initial)
@@ -597,37 +609,32 @@ def init(conn, conn_changes, data_dir, user):
                 add_row(df=df_initial, conn=conn_changes)
 
             df = run_sql(user_input, df_initial, table_name="expenses")
-            df = df.round(2)
-            gb = GridOptionsBuilder.from_dataframe(df)
-            gridOptions = gb.build()
-            gridOptions["editable"] = True
-            gridOptions["sortable"] = True
-            gridOptions["filter"] = True
-            gridOptions["columnDefs"] = [
-                {
-                    "headerName": col,
-                    "field": col,
-                    "editable": col not in {"pk", "source_file", "line"},
-                }
-                for col in df.columns
-            ]
-            edits = AgGrid(
-                df,
-                gridOptions,
-                data_return_mode="AS_INPUT",
-                update_mode="MODEL_CHANGED",
-                fit_columns_on_grid_load=False,
-                theme="streamlit",  # Add theme color to the table
-                enable_enterprise_modules=True,
-                height=350,
-                width="100%",
-                reload_data=False,
+            df_table = df.round(2)
+            df_table["date"] = df_table["date"].apply(lambda x: parse(x))
+            st.data_editor(
+                df_table,
+                disabled=["pk", "source_file", "line"],
+                hide_index=True,
+                key="expenses_df",
+                column_config={
+                    "amount": st.column_config.NumberColumn("amount"),
+                    "date": st.column_config.DateColumn("date"),
+                    "category": st.column_config.SelectboxColumn(
+                        "category", options=sorted(df_initial["category"].unique())
+                    ),
+                },
             )
-            df_plus_edits = pd.concat([df, edits["data"]]).drop_duplicates(keep=False)
-            changes = pd.merge(edits["data"], df_plus_edits, how="inner")
+
+            changes = []
+            for idx, change in st.session_state.expenses_df["edited_rows"].items():
+                changed_row = df.iloc[idx].to_dict()
+                for key, value in change.items():
+                    changed_row[key] = value
+                changes.append(changed_row)
+
             if len(changes) > 0:
                 st.write("Unsaved changes:")
-                st.write(changes)
+                st.write(pd.DataFrame.from_records(changes))
                 st.button(
                     "Save Changes",
                     on_click=toggle_save_changes,
@@ -637,7 +644,7 @@ def init(conn, conn_changes, data_dir, user):
                         changes.to_dict(orient="records"), "expenses", conn_changes
                     )
                     st.session_state.save_changes = False
-                    st.experimental_rerun()
+                    st.rerun()
 
         else:
             df = run_sql(default_user_input, df_initial, table_name="expenses")
@@ -719,7 +726,13 @@ def add_spending_over_time(df):
         "D": "Daily spending",
     }
 
-    df_month = df.groupby("category").resample(group).sum().reset_index()
+    df_month = (
+        df.groupby("category")
+        .resample(group)
+        .sum()
+        .rename(columns={"date": "_date", "category": "_category"})
+        .reset_index()
+    )
 
     fig2 = px.bar(
         df_month,
