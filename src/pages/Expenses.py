@@ -642,9 +642,7 @@ def init(conn, conn_changes, data_dir, user):
                     on_click=toggle_save_changes,
                 )
                 if st.session_state.save_changes:
-                    insert_rows(
-                        changes.to_dict(orient="records"), "expenses", conn_changes
-                    )
+                    insert_rows(changes, "expenses", conn_changes)
                     st.session_state.save_changes = False
                     st.rerun()
 
