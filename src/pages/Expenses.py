@@ -115,7 +115,7 @@ def add_category_widget(df, default_user_input, selection, input_form):
             if len(selected) > 1
             else default_user_input + f"('{selected[0]}')"
         )
-        st.session_state.config[f"categories {selection}"] = selected
+    st.session_state.config[f"categories {selection}"] = selected
     return default_user_input, selected
 
 
