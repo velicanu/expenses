@@ -13,7 +13,7 @@ from plaid.model.transactions_get_request import TransactionsGetRequest
 from plaid.model.transactions_get_request_options import TransactionsGetRequestOptions
 
 configuration = plaid.Configuration(
-    host=plaid.Environment.Development,
+    host=plaid.Environment.Production,
     api_key={
         "clientId": os.getenv("PLAID_CLIENT_ID"),
         "secret": os.getenv("PLAID_SECRET"),
