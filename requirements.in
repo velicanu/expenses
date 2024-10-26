@@ -3,7 +3,7 @@ numpy
 matplotlib
 black
 click
-ruff<=0.4.10
+ruff
 jupyter
 pandas
 plaid-python
