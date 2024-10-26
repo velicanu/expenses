@@ -11,7 +11,7 @@ def main(config):
     # this will create the login widgets and also update session_state:
     # st.session_state["authentication_status"] - True, False, or None
     # st.session_state["name"] and  st.session_state["username"] as also populated
-    authenticator.login("Login", "main")
+    authenticator.login()
 
     if st.session_state["authentication_status"]:
         logged_in(authenticator)

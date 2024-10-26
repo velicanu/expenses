@@ -854,6 +854,7 @@ def main(user):
 
 if __name__ == "__main__":
     if is_logged_in():
-        main(get_user())
+        main("dragos")
+        # main(get_user())
     else:
         st.write("Not logged in.")
