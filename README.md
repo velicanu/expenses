@@ -1,6 +1,6 @@
 # Expenses
 
-This repository gathers data from different credit cards and bank  transactions exports
+This repository gathers data from different credit cards and bank transactions exports
 and standardizes it in order to figure out incomnig and outgoing cash flows.
 
 ## Installation
