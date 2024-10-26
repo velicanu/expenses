@@ -23,28 +23,6 @@ def test_standardize():
     assert actual == expected
 
 
-def test_standardize_payment():
-    input_ = {
-        "date": "12/4/19",
-        "description": "ONLINE PAYMENT - THANK YOU",
-        "amount": -8,
-        "category": "",
-        "source": "amex",
-        "source_file": "amex.csv",
-    }
-    expected = {
-        "date": "2019-12-04T00:00:00",
-        "description": "ONLINE PAYMENT - THANK YOU",
-        "amount": -8,
-        "category": "Payment",
-        "source": "amex",
-        "source_file": "amex.csv",
-        "old_category": "",
-    }
-    actual = standardizer(input_, {})
-    assert actual == expected
-
-
 def test_standardize_rideshare():
     input_ = {
         "date": "2020-03-26",

@@ -29,7 +29,7 @@ def df():
 
 @pytest.fixture()
 def conn(df):
-    with sqlite3.connect(":memory:") as conn_:
+    with sqlite3.connect(":memory:", detect_types=sqlite3.PARSE_DECLTYPES) as conn_:
         df.to_sql("test", conn_, index=False)
         yield conn_
 
@@ -97,7 +97,9 @@ def test_insert_rows(conn):
         {"date": datetime(2020, 1, 1, 1, 1, 4), "desc": "hhh", "amount": 888},
     ]
     insert_rows(input_, "test", conn)
-    actual = pd.read_sql("SELECT * FROM test", conn).to_dict(orient="records")
+    df = pd.read_sql("SELECT * FROM test", conn)
+    df["date"] = df["date"].map(lambda x: x.isoformat())
+    actual = df.to_dict(orient="records")
     expected = [
         {"date": "2020-01-01T01:01:01", "desc": "abc", "amount": 123},
         {"date": "2020-01-01T01:01:02", "desc": "def", "amount": 456},

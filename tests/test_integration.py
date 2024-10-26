@@ -24,14 +24,13 @@ def test_full_pipeline():
 
         run(tmpdir)
 
-        conn = sqlite3.connect(os.path.join(tmpdir, "expenses.db"))
-
-        actual = sorted(
-            pd.read_sql("SELECT * FROM expenses", conn)
-            .replace({np.nan: None})
-            .to_dict(orient="records"),
-            key=lambda i: json.dumps(i),
+        conn = sqlite3.connect(
+            os.path.join(tmpdir, "expenses.db"), detect_types=sqlite3.PARSE_DECLTYPES
         )
+
+        df = pd.read_sql("SELECT * FROM expenses", conn).replace({np.nan: None})
+        df["date"] = df["date"].map(lambda x: x.isoformat())
+        actual = sorted(df.to_dict(orient="records"), key=lambda i: json.dumps(i))
         expected = [
             {
                 "date": "2018-12-18T00:00:00",

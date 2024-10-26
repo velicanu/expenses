@@ -106,12 +106,6 @@ def standardizer(record, rules):
             record["new_category"] = new_category
 
     if (
-        "pay" in record["description"].lower()
-        and record["amount"] < 0
-        and "roll" not in record["description"].lower()
-    ):
-        record["new_category"] = "Payment"
-    if (
         "venmo" in record["description"].lower()
         and "mitfcu" in record["source_file"].lower()
     ):

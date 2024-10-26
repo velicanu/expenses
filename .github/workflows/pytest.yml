@@ -1,60 +1,30 @@
-name: tests
-
-on: [push]
+name: pr ci
+on:
+  pull_request:
 
 concurrency:
-  group: test-${{ github.ref }}
+  group: pr-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  build:
-    runs-on: ${{matrix.os}}
-    strategy:
-      matrix:
-        python-version: ["3.11"]
-        os: ["ubuntu-latest"]
+  pr:
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - name: Set up ${{ matrix.python-version }}
+      - name: checkout
+        uses: actions/checkout@v4
+      - name: Set up python
         uses: actions/setup-python@v4
-        id: py
         with:
-          python-version: ${{ matrix.python-version }}
-      - uses: actions/cache@v3
-        id: cache
-        with:
-          path: venv
-          key: ${{ runner.os }}-${{ steps.py.outputs.python-version }}-${{ hashFiles('requirements.txt') }}
-      - name: Install dependencies unix
-        if: |
-          steps.cache.outputs.cache-hit != 'true'
-          &&  matrix.os != 'windows-latest'
+          python-version: "3.12"
+      - name: Install dependencies
         run: |
-          python -m venv venv && source venv/bin/activate
-          pip install --upgrade pip
-          pip install -r requirements.txt
-      - name: Install dependencies windows
-        if: |
-          steps.cache.outputs.cache-hit != 'true'
-          &&  matrix.os == 'windows-latest'
+          pip install uv
+          uv pip install -r requirements.txt --system
+      - name: lint and test
         run: |
-          python -m venv venv
-          venv\Scripts\activate
-          pip install --upgrade pip
-          pip install -r requirements.txt
-      - name: lint
-        run: |
-          source venv/bin/activate
-          ruff .
-          black --check .
-        if: matrix.os != 'windows-latest'
-      - name: Test on ubuntu and macOS
-        run: |
-          source venv/bin/activate
-          pytest .
-        if: matrix.os != 'windows-latest'
-      - name: Test with nose on ubuntu and macOS
-        run: |
-          venv\Scripts\activate
-          pytest . -m "not fails_on_windows"
-        if: matrix.os == 'windows-latest'
+          echo Checking formatting...
+          ruff format --check .
+          echo Checking linting...
+          ruff check  .
+          echo Running tests...
+          pytest
