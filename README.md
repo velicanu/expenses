@@ -1,7 +1,7 @@
 # Expenses
 
-This repository gathers data from different credit card transactions exports and
-standardizes it in order to figure out where money is being spent.
+This repository gathers data from different credit cards and bank transactions exports
+and standardizes it in order to figure out incomnig and outgoing cash flows.
 
 ## Installation
 
@@ -64,12 +64,11 @@ All intermediate data is available should you want it in the `data/` directory.
 
 ## Development
 
-`black` + `isort` for python code. `prettier` for html/js
-
-### Tests
-
-```bash
-pytest .
+The linting checks and tests are the following:
+```
+ruff check .
+ruff format --check .
+pytest
 ```
 
 ### Requirements
@@ -77,18 +76,18 @@ pytest .
 Requirements for this project are specified in two files, a `requirements.in` file and a
 `requirements.txt` file. The requirements.in file is where we manually insert the
 dependencies this project needs and the requirements.txt is auto-generated from the .in
-file using `pip-compile`. The workflow for adding or updating some dependencies looks
+file using `uv pip compile`. The workflow for adding or updating some dependencies looks
 like the following:
 
 ```bash
-# one time install pip-tools if not already installed
-pip install pip-tools
+# one time install uv
+pip install uv
 
 # update something in requirements.in
-pip-compile
+uv pip compile requirements.in > requirements.txt
 
 # the requirements.txt file has been auto-generated with pinned dependencies
-pip install -r requirements.txt
+uv pip install -r requirements.txt
 ```
 
 The benefit of this approach is that we can ensure all environments (dev / ci / etc)
