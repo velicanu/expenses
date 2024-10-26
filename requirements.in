@@ -1,15 +1,9 @@
-cython
-numpy
-matplotlib
-black
 click
 ruff
-jupyter
 pandas
 plaid-python
 streamlit
 plotly
-seaborn
 smart-open
 xlrd
 pytest
