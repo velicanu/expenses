@@ -129,7 +129,7 @@ tenacity==9.0.0
     #   streamlit
 toml==0.10.2
     # via streamlit
-tornado==6.4.1
+tornado==6.4.2
     # via streamlit
 typing-extensions==4.12.2
     # via
@@ -141,6 +141,8 @@ urllib3==2.2.3
     # via
     #   plaid-python
     #   requests
+watchdog==5.0.3
+    # via streamlit
 wrapt==1.16.0
     # via smart-open
 xlrd==2.0.1
