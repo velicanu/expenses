@@ -93,3 +93,13 @@ uv pip install -r requirements.txt
 The benefit of this approach is that we can ensure all environments (dev / ci / etc)
 have the same exact same versions of each dependency installed, while making it easy to
 add and update top level requirements.
+
+### Removing old plaid items:
+
+```
+curl -X POST https://production.plaid.com/item/remove   -H 'Content-Type: application/json'   -d '{
+    "client_id": "${PLAID_CLIENT_ID}",
+    "secret": "${PLAID_SECRET}",
+    "access_token": String
+  }'
+```

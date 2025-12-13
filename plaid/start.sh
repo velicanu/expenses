@@ -15,7 +15,7 @@ docker ps > /dev/null 2>&1
 [[ $? -ne 0 ]] && echo Docker not running, exiting. && exit 1
 
 # patch server until plaid fixes: https://github.com/plaid/quickstart/issues/349
-cd quickstart ; git checkout . ; cd - ; cp requirements.txt quickstart/python
+cd quickstart ; git checkout . ; cd - 
 cat quickstart/python/server.py | sed '/api\/info/,+10 d' > tmp.py
 cat server.py >> tmp.py
 mv tmp.py quickstart/python/server.py

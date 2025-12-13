@@ -251,7 +251,7 @@ def expand():
 
 
 def toggle_sql():
-    st.session_state.config["show_sql"] = not st.session_state.config["show_sql"]
+    st.session_state.config["show_sql"] = not st.session_state.config["show_sql"]  # 88c
 
 
 def toggle_rules():
@@ -565,6 +565,7 @@ def init(conn, conn_changes, data_dir, user):
             add_delete_files_widget(os.path.join(data_dir, "raw"))
     try:
         df_initial = pd.read_sql("SELECT * FROM expenses", conn)
+        df = df_initial
         chdf_initial = pd.read_sql("SELECT * FROM expenses", conn_changes)
         df_initial = apply_changes(df_initial, chdf_initial)
         df_initial = df_initial[df_initial.amount != 0]  # filter out empty transactions
@@ -677,26 +678,34 @@ def add_spending_by_category(df):
 
     total = df["amount"].sum()
 
+    col1, col2 = st.columns([3, 10], vertical_alignment="center")
+    with col1:
+        df2 = st.data_editor(df2, hide_index=True)
+
     cdm = {
         **color_discrete_map,
         **st.session_state.config["rules"]["new_categories"],
     }
+
     fig = px.pie(
         df2,
         values="amount",
         names="category",
-        title=f"Spending by category, total: {total}",
+        title=f"Spending by category, total: {total:.2f}",
         height=600,
         color="category",
+        # color_discrete_sequence=px.colors.qualitative.Plotly,
         color_discrete_map=cdm,
     )
+    fig.update_traces(textinfo="label+value")
 
     fig.update_layout(
         font={"size": 18, "color": "#7f7f7f"},
         title={"xanchor": "center", "x": 0.5},
     )
 
-    st.plotly_chart(fig, use_container_width=True)
+    with col2:
+        st.plotly_chart(fig, use_container_width=True)
 
 
 def add_spending_over_time(df):

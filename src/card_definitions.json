@@ -18,6 +18,31 @@
     "Amount": "amount",
     "Category": "category"
   },
+  "svb": {
+    "schema": [
+      "Date",
+      "Bank ID",
+      "Account Number",
+      "Account Title",
+      "Entity",
+      "Tran Type",
+      "BAI Type Code",
+      "Currency",
+      "Credit Amount",
+      "Debit Amount",
+      "Bank Ref #",
+      "End to End ID",
+      "Customer Ref #",
+      "Description",
+      "Reason for Payment",
+      "Notes"
+    ],
+    "Date": "date",
+    "Description": "description",
+    "Credit Amount": "-amount",
+    "Debit Amount": "amount",
+    "Tran Type": "category"
+  },
   "barclays": {
     "schema": ["Transaction Date", "Description", "Category", "Amount"],
     "Transaction Date": "date",
@@ -40,6 +65,13 @@
     "Debit": "amount",
     "Credit": "-amount",
     "Category": "category"
+  },
+  "citi": {
+    "schema": ["Status", "Date", "Description", "Debit", "Credit"],
+    "Date": "date",
+    "Description": "description",
+    "Credit": "-amount",
+    "Debit": "amount"
   },
   "chase": {
     "schema": [
@@ -70,6 +102,36 @@
     "name": "description",
     "amount": "amount",
     "categories": "category"
+  },
+  "venmo": {
+    "schema": [
+      "",
+      "ID",
+      "Datetime",
+      "Type",
+      "Status",
+      "Note",
+      "From",
+      "To",
+      "Amount (total)",
+      "Amount (tip)",
+      "Amount (tax)",
+      "Amount (fee)",
+      "Tax Rate",
+      "Tax Exempt",
+      "Funding Source",
+      "Destination",
+      "Beginning Balance",
+      "Ending Balance",
+      "Statement Period Venmo Fees",
+      "Terminal Location",
+      "Year to Date Venmo Fees",
+      "Disclaimer"
+    ],
+    "Datetime": "date",
+    "Note": "description",
+    "Amount (total)": "-amount",
+    "Type": "category"
   },
   "usbank": {
     "schema": ["Date", "Transaction", "Name", "Memo", "Amount"],
