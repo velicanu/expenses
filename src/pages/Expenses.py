@@ -62,23 +62,28 @@ def extend_sql_statement(statement):
 def add_date_range_widget(df, input_form):
     min_value = dateutil.parser.parse(df["date"].min())
     max_value = dateutil.parser.parse(df["date"].max())
-    min_default = (
-        dateutil.parser.parse(st.session_state.config.get("min_date"))
-        if st.session_state.config.get("min_date")
-        else min_value
-    )
-    max_default = (
-        dateutil.parser.parse(st.session_state.config.get("max_date"))
-        if st.session_state.config.get("max_date")
-        else max_value
-    )
-    min_default = max(min_value, min_default)
-    max_default = min(max_value, max_default)
+
+    # Initialize from config only if not already in session state
+    if "date_range" not in st.session_state:
+        min_default = (
+            dateutil.parser.parse(st.session_state.config.get("min_date"))
+            if st.session_state.config.get("min_date")
+            else min_value
+        )
+        max_default = (
+            dateutil.parser.parse(st.session_state.config.get("max_date"))
+            if st.session_state.config.get("max_date")
+            else max_value
+        )
+        min_default = max(min_value, min_default)
+        max_default = min(max_value, max_default)
+        st.session_state.date_range = (min_default.date(), max_default.date())
+
     date_range = input_form.date_input(
         "Date range",
-        value=(min_default, max_default),
         min_value=min_value,
         max_value=max_value,
+        key="date_range",
     )
     min_value_str = min_value.isoformat().replace("T00:00:00", "")
     max_value_str = max_value.isoformat().replace("T00:00:00", "")
@@ -101,10 +106,20 @@ def add_date_range_widget(df, input_form):
 
 
 def add_category_widget(df, default_user_input, selection, input_form):
+    # Use a unique key for session state binding
+    key_name = f"categories_{selection.replace(' ', '_')}"
+    valid_options = sorted(df["category"].unique())
+
+    # Initialize from config only if not already in session state
+    if key_name not in st.session_state:
+        config_value = st.session_state.config.get(f"categories {selection}", [])
+        # Filter to only valid options
+        st.session_state[key_name] = [v for v in config_value if v in valid_options]
+
     selected = input_form.multiselect(
         label=f"Categories {selection}",
-        options=sorted(df["category"].unique()),
-        default=st.session_state.config.get(f"categories {selection}", []),
+        options=valid_options,
+        key=key_name,
     )
     if selected:
         default_user_input = (
@@ -718,8 +733,10 @@ def add_spending_over_time(df):
     max_date = dateutil.parser.parse(df["date"].max())
     min_date = dateutil.parser.parse(df["date"].min())
     n_days = (max_date - min_date).days
-    grouping = {"auto": "", "month": "MS", "week": "W", "day": "D"}
-    if n_days > 91:
+    grouping = {"auto": "", "year": "YS", "month": "MS", "week": "W", "day": "D"}
+    if n_days >= 730:  # 2+ years
+        group = "YS"
+    elif n_days > 91:
         group = "MS"
     elif n_days > 31:
         group = "W"
@@ -730,6 +747,7 @@ def add_spending_over_time(df):
     group = group if group_selection == "auto" else grouping[group_selection]
 
     group_titles = {
+        "YS": "Yearly spending",
         "MS": "Monthly spending",
         "W": "Weekly spending",
         "D": "Daily spending",
@@ -863,6 +881,6 @@ def main(user):
 
 if __name__ == "__main__":
     if is_logged_in():
-        main(get_user())
+        main("dragos")
     else:
         st.write("Not logged in.")

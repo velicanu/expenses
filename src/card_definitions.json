@@ -43,6 +43,29 @@
     "Debit Amount": "amount",
     "Tran Type": "category"
   },
+  "wealthfront": {
+    "schema": ["Transaction date", "Description", "Type", "Amount"],
+    "Transaction date": "date",
+    "Description": "description",
+    "Amount": "-amount",
+    "Type": "category"
+  },
+  "wealthfront-plaid": {
+    "schema": [
+      "amount",
+      "authorized_date",
+      "categories",
+      "date",
+      "institution",
+      "name",
+      "source_file",
+      "transaction_id"
+    ],
+    "date": "date",
+    "name": "description",
+    "amount": "amount",
+    "categories": "category"
+  },
   "barclays": {
     "schema": ["Transaction Date", "Description", "Category", "Amount"],
     "Transaction Date": "date",
