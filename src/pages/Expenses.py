@@ -761,6 +761,9 @@ def add_spending_over_time(df):
         .reset_index()
     )
 
+    # Calculate totals per time bin for annotations
+    df_totals = df_month.groupby("date")["amount"].sum().reset_index()
+
     fig2 = px.bar(
         df_month,
         x="date",
@@ -771,6 +774,18 @@ def add_spending_over_time(df):
             **st.session_state.config["rules"]["new_categories"],
         },
     )
+
+    # Add total annotations on top of each bar
+    for _, row in df_totals.iterrows():
+        fig2.add_annotation(
+            x=row["date"],
+            y=row["amount"],
+            text=f"{row['amount']:.0f}",
+            showarrow=False,
+            yshift=10,
+            font={"size": 11},
+        )
+
     fig2.update_layout(
         title=group_titles[group],
         xaxis_title="Date",
