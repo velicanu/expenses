@@ -10,7 +10,6 @@ import plotly.express as px
 import streamlit as st
 from dateutil.parser import parse
 
-from auth import get_user, is_logged_in
 from detect import save_file_if_valid
 from pipeline import run
 from plaidlib import get_transactions
@@ -62,23 +61,28 @@ def extend_sql_statement(statement):
 def add_date_range_widget(df, input_form):
     min_value = dateutil.parser.parse(df["date"].min())
     max_value = dateutil.parser.parse(df["date"].max())
-    min_default = (
-        dateutil.parser.parse(st.session_state.config.get("min_date"))
-        if st.session_state.config.get("min_date")
-        else min_value
-    )
-    max_default = (
-        dateutil.parser.parse(st.session_state.config.get("max_date"))
-        if st.session_state.config.get("max_date")
-        else max_value
-    )
-    min_default = max(min_value, min_default)
-    max_default = min(max_value, max_default)
+
+    # Initialize from config only if not already in session state
+    if "date_range" not in st.session_state:
+        min_default = (
+            dateutil.parser.parse(st.session_state.config.get("min_date"))
+            if st.session_state.config.get("min_date")
+            else min_value
+        )
+        max_default = (
+            dateutil.parser.parse(st.session_state.config.get("max_date"))
+            if st.session_state.config.get("max_date")
+            else max_value
+        )
+        min_default = max(min_value, min_default)
+        max_default = min(max_value, max_default)
+        st.session_state.date_range = (min_default.date(), max_default.date())
+
     date_range = input_form.date_input(
         "Date range",
-        value=(min_default, max_default),
         min_value=min_value,
         max_value=max_value,
+        key="date_range",
     )
     min_value_str = min_value.isoformat().replace("T00:00:00", "")
     max_value_str = max_value.isoformat().replace("T00:00:00", "")
@@ -101,10 +105,20 @@ def add_date_range_widget(df, input_form):
 
 
 def add_category_widget(df, default_user_input, selection, input_form):
+    # Use a unique key for session state binding
+    key_name = f"categories_{selection.replace(' ', '_')}"
+    valid_options = sorted(df["category"].unique())
+
+    # Initialize from config only if not already in session state
+    if key_name not in st.session_state:
+        config_value = st.session_state.config.get(f"categories {selection}", [])
+        # Filter to only valid options
+        st.session_state[key_name] = [v for v in config_value if v in valid_options]
+
     selected = input_form.multiselect(
         label=f"Categories {selection}",
-        options=sorted(df["category"].unique()),
-        default=st.session_state.config.get(f"categories {selection}", []),
+        options=valid_options,
+        key=key_name,
     )
     if selected:
         default_user_input = (
@@ -251,7 +265,7 @@ def expand():
 
 
 def toggle_sql():
-    st.session_state.config["show_sql"] = not st.session_state.config["show_sql"]
+    st.session_state.config["show_sql"] = not st.session_state.config["show_sql"]  # 88c
 
 
 def toggle_rules():
@@ -565,6 +579,7 @@ def init(conn, conn_changes, data_dir, user):
             add_delete_files_widget(os.path.join(data_dir, "raw"))
     try:
         df_initial = pd.read_sql("SELECT * FROM expenses", conn)
+        df = df_initial
         chdf_initial = pd.read_sql("SELECT * FROM expenses", conn_changes)
         df_initial = apply_changes(df_initial, chdf_initial)
         df_initial = df_initial[df_initial.amount != 0]  # filter out empty transactions
@@ -677,26 +692,34 @@ def add_spending_by_category(df):
 
     total = df["amount"].sum()
 
+    col1, col2 = st.columns([3, 10], vertical_alignment="center")
+    with col1:
+        df2 = st.data_editor(df2, hide_index=True)
+
     cdm = {
         **color_discrete_map,
         **st.session_state.config["rules"]["new_categories"],
     }
+
     fig = px.pie(
         df2,
         values="amount",
         names="category",
-        title=f"Spending by category, total: {total}",
+        title=f"Spending by category, total: {total:.2f}",
         height=600,
         color="category",
+        # color_discrete_sequence=px.colors.qualitative.Plotly,
         color_discrete_map=cdm,
     )
+    fig.update_traces(textinfo="label+value")
 
     fig.update_layout(
         font={"size": 18, "color": "#7f7f7f"},
         title={"xanchor": "center", "x": 0.5},
     )
 
-    st.plotly_chart(fig, use_container_width=True)
+    with col2:
+        st.plotly_chart(fig, use_container_width=True)
 
 
 def add_spending_over_time(df):
@@ -709,8 +732,10 @@ def add_spending_over_time(df):
     max_date = dateutil.parser.parse(df["date"].max())
     min_date = dateutil.parser.parse(df["date"].min())
     n_days = (max_date - min_date).days
-    grouping = {"auto": "", "month": "MS", "week": "W", "day": "D"}
-    if n_days > 91:
+    grouping = {"auto": "", "year": "YS", "month": "MS", "week": "W", "day": "D"}
+    if n_days >= 730:  # 2+ years
+        group = "YS"
+    elif n_days > 91:
         group = "MS"
     elif n_days > 31:
         group = "W"
@@ -721,6 +746,7 @@ def add_spending_over_time(df):
     group = group if group_selection == "auto" else grouping[group_selection]
 
     group_titles = {
+        "YS": "Yearly spending",
         "MS": "Monthly spending",
         "W": "Weekly spending",
         "D": "Daily spending",
@@ -734,6 +760,9 @@ def add_spending_over_time(df):
         .reset_index()
     )
 
+    # Calculate totals per time bin for annotations
+    df_totals = df_month.groupby("date")["amount"].sum().reset_index()
+
     fig2 = px.bar(
         df_month,
         x="date",
@@ -744,6 +773,18 @@ def add_spending_over_time(df):
             **st.session_state.config["rules"]["new_categories"],
         },
     )
+
+    # Add total annotations on top of each bar
+    for _, row in df_totals.iterrows():
+        fig2.add_annotation(
+            x=row["date"],
+            y=row["amount"],
+            text=f"{row['amount']:.0f}",
+            showarrow=False,
+            yshift=10,
+            font={"size": 11},
+        )
+
     fig2.update_layout(
         title=group_titles[group],
         xaxis_title="Date",
@@ -853,7 +894,10 @@ def main(user):
 
 
 if __name__ == "__main__":
-    if is_logged_in():
-        main(get_user())
-    else:
-        st.write("Not logged in.")
+    user = os.getenv("EXPENSES_USER")
+    if not user:
+        st.error(
+            "EXPENSES_USER environment variable is not set. Please set it to your username and restart the app."
+        )
+        st.stop()
+    main(user)

@@ -13,12 +13,12 @@ def parse_record(record, card, card_def):
     parsed_record = {k: record.get(v) for v, k in card_def.items()}
     if "amount" in parsed_record and parsed_record["amount"]:
         parsed_record["amount"] = (
-            parsed_record["amount"].replace("$", "").replace(",", "")
+            parsed_record["amount"].replace("$", "").replace(",", "").replace(" ", "")
         )
         parsed_record["amount"] = float(parsed_record["amount"])
     if "-amount" in parsed_record and parsed_record["-amount"]:
         parsed_record["-amount"] = (
-            parsed_record["-amount"].replace("$", "").replace(",", "")
+            parsed_record["-amount"].replace("$", "").replace(",", "").replace(" ", "")
         )
         parsed_record["amount"] = -1 * float(parsed_record["-amount"])
     if "-amount" in parsed_record:
@@ -31,6 +31,12 @@ def parse_record(record, card, card_def):
     # plaid hack
     if not parsed_record["date"]:
         parsed_record["date"] = record["date"]
+
+    # venmo hack
+    if card == "venmo":
+        parsed_record["description"] = (
+            f"{record['From']} --> {record['To']}: {record['Note']}"
+        )
 
     return parsed_record
 
@@ -46,6 +52,8 @@ def parse(infile, outfile):
         for line in inf:
             record = json.loads(line)
             parsed_record = parse_record(record, card, card_def)
+            # if not parsed_record["amount"]:
+            #     continue  # skip records without amount
             outf.write(f"{json.dumps(parsed_record)}\n")
 
 

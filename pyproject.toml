@@ -1,3 +1,20 @@
+[project]
+name = "expenses"
+version = "0.0.0"
+description = "Expense tracking and visualization"
+readme = "README.md"
+dependencies = [
+    "click",
+    "ruff",
+    "pandas",
+    "plaid-python",
+    "streamlit",
+    "plotly",
+    "smart-open",
+    "xlrd",
+    "pytest",
+]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = "src"

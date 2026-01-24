@@ -10,9 +10,11 @@ Clone/fork this repository from it do the following:
 ```bash
 git clone https://github.com/velicanu/expenses.git
 cd expenses/
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+python3 -m venv .venv
+source .venv/bin/activate
+make install
+# or
+uv pip install -r requirements.txt
 ```
 
 ## Getting started
@@ -64,32 +66,32 @@ All intermediate data is available should you want it in the `data/` directory.
 
 ## Development
 
-The linting checks and tests are the following:
-```
-ruff check .
+### Run checks
+
+```bash
+make checks
+# or
 ruff format --check .
+ruff check .
 pytest
 ```
 
-### Requirements
+### Dependencies
 
-Requirements for this project are specified in two files, a `requirements.in` file and a
-`requirements.txt` file. The requirements.in file is where we manually insert the
-dependencies this project needs and the requirements.txt is auto-generated from the .in
-file using `uv pip compile`. The workflow for adding or updating some dependencies looks
-like the following:
+Dependencies are declared in `pyproject.toml` and compiled into `requirements.txt`. This separation keeps dependency declarations simple while ensuring reproducible installs with pinned versions.
 
 ```bash
-# one time install uv
-pip install uv
-
-# update something in requirements.in
-uv pip compile requirements.in > requirements.txt
-
-# the requirements.txt file has been auto-generated with pinned dependencies
-uv pip install -r requirements.txt
+make compile
+# or
+uv pip compile pyproject.toml > requirements.txt
 ```
 
-The benefit of this approach is that we can ensure all environments (dev / ci / etc)
-have the same exact same versions of each dependency installed, while making it easy to
-add and update top level requirements.
+### Removing old plaid items:
+
+```
+curl -X POST https://production.plaid.com/item/remove   -H 'Content-Type: application/json'   -d '{
+    "client_id": "${PLAID_CLIENT_ID}",
+    "secret": "${PLAID_SECRET}",
+    "access_token": String
+  }'
+```
