@@ -76,7 +76,10 @@ def test_records_from_file_stream():
 
 @pytest.mark.fails_on_windows
 def test_save_file_if_valid_valid():
-    with tempfile.TemporaryDirectory() as tmpdir, tempfile.TemporaryDirectory() as data_dir:
+    with (
+        tempfile.TemporaryDirectory() as tmpdir,
+        tempfile.TemporaryDirectory() as data_dir,
+    ):
         filename = "input.csv"
         input_ = os.path.join(tmpdir, filename)
         with open(input_, "w") as _f:
@@ -93,7 +96,10 @@ def test_save_file_if_valid_valid():
 
 @pytest.mark.fails_on_windows
 def test_save_file_if_valid_invalid():
-    with tempfile.TemporaryDirectory() as tmpdir, tempfile.TemporaryDirectory() as data_dir:
+    with (
+        tempfile.TemporaryDirectory() as tmpdir,
+        tempfile.TemporaryDirectory() as data_dir,
+    ):
         filename = "input.csv"
         input_ = os.path.join(tmpdir, filename)
         with open(input_, "w") as _f:

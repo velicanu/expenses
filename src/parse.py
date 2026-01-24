@@ -35,7 +35,7 @@ def parse_record(record, card, card_def):
     # venmo hack
     if card == "venmo":
         parsed_record["description"] = (
-            f'{record["From"]} --> {record["To"]}: {record["Note"]}'
+            f"{record['From']} --> {record['To']}: {record['Note']}"
         )
 
     return parsed_record

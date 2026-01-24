@@ -10,7 +10,6 @@ import plotly.express as px
 import streamlit as st
 from dateutil.parser import parse
 
-from auth import is_logged_in
 from detect import save_file_if_valid
 from pipeline import run
 from plaidlib import get_transactions
@@ -895,7 +894,10 @@ def main(user):
 
 
 if __name__ == "__main__":
-    if is_logged_in():
-        main("dragos")
-    else:
-        st.write("Not logged in.")
+    user = os.getenv("EXPENSES_USER")
+    if not user:
+        st.error(
+            "EXPENSES_USER environment variable is not set. Please set it to your username and restart the app."
+        )
+        st.stop()
+    main(user)
