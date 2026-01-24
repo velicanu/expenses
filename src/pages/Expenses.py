@@ -10,7 +10,7 @@ import plotly.express as px
 import streamlit as st
 from dateutil.parser import parse
 
-from auth import get_user, is_logged_in
+from auth import is_logged_in
 from detect import save_file_if_valid
 from pipeline import run
 from plaidlib import get_transactions
