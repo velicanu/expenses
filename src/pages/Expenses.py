@@ -259,11 +259,6 @@ def add_upload_files_widget(data_dir):
         kwargs={"files": files, "data_dir": data_dir},
     )
 
-
-def expand():
-    st.session_state.expand = not st.session_state.expand
-
-
 def toggle_sql():
     st.session_state.config["show_sql"] = not st.session_state.config["show_sql"]  # 88c
 
@@ -558,25 +553,24 @@ def run_wrapper(data_dir):
 def init(conn, conn_changes, data_dir, user):
     df = None
 
-    if st.session_state.expand and user:
+    if user:
         st.sidebar.write(f"{user} logged in")
 
     col1, col2, col3 = st.columns([2, 5, 5])
-    if st.session_state.expand:
-        st.subheader("Linked cards:")
-        st.table(data=st.session_state.config["linked_accounts"])
-        with col1:
-            st.button(
-                "Run pipeline",
-                on_click=run_wrapper,
-                kwargs={"data_dir": data_dir},
-            )
-            add_refresh_data(data_dir)
-            add_link_account()
-        with col2:
-            add_upload_files_widget(data_dir)
-        with col3:
-            add_delete_files_widget(os.path.join(data_dir, "raw"))
+    st.subheader("Linked cards:")
+    st.table(data=st.session_state.config["linked_accounts"])
+    with col1:
+        st.button(
+            "Run pipeline",
+            on_click=run_wrapper,
+            kwargs={"data_dir": data_dir},
+        )
+        add_refresh_data(data_dir)
+        add_link_account()
+    with col2:
+        add_upload_files_widget(data_dir)
+    with col3:
+        add_delete_files_widget(os.path.join(data_dir, "raw"))
     try:
         df_initial = pd.read_sql("SELECT * FROM expenses", conn)
         df = df_initial
@@ -843,8 +837,6 @@ def main(user):
         st.session_state.config = get_config(config_file)
 
     # init session state
-    if "expand" not in st.session_state:
-        st.session_state.expand = False
     if "delete_files" not in st.session_state:
         st.session_state.delete_files = set()
     if "file_uploader_key" not in st.session_state:
