@@ -259,6 +259,7 @@ def add_upload_files_widget(data_dir):
         kwargs={"files": files, "data_dir": data_dir},
     )
 
+
 def toggle_sql():
     st.session_state.config["show_sql"] = not st.session_state.config["show_sql"]  # 88c
 
