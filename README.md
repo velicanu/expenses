@@ -10,10 +10,8 @@ Clone/fork this repository from it do the following:
 ```bash
 git clone https://github.com/velicanu/expenses.git
 cd expenses/
-python3 -m venv .venv
+uv venv
 source .venv/bin/activate
-make install
-# or
 uv pip install -r requirements.txt
 ```
 
@@ -22,7 +20,7 @@ uv pip install -r requirements.txt
 Spin up the main UI via:
 
 ```bash
-SKIP_AUTH=true streamlit run src/Home.py
+EXPENSES_USER=dragos streamlit run src/main.py
 ```
 
 Then open http://localhost:8501 on your browser. There is sample data to play with
