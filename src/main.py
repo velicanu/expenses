@@ -557,6 +557,7 @@ def run_wrapper(data_dir):
 
 def init(conn, conn_changes, data_dir, user):
     df = None
+    description_list = []
 
     if st.session_state.expand and user:
         st.sidebar.write(f"{user} logged in")
@@ -679,7 +680,7 @@ def init(conn, conn_changes, data_dir, user):
         unsafe_allow_html=True,
     )
     st.session_state.init_done = True
-    return df
+    return df, description_list
 
 
 def add_spending_by_category(df):
@@ -797,6 +798,34 @@ def add_spending_over_time(df):
     st.plotly_chart(fig2, use_container_width=True)
 
 
+def add_description_breakdown(df, description_list):
+    data = []
+    for term in description_list:
+        mask = df["description"].str.contains(term, case=False, na=False)
+        total = df.loc[mask, "amount"].sum()
+        data.append({"term": term, "amount": total})
+
+    df_breakdown = pd.DataFrame(data)
+    df_breakdown = df_breakdown[df_breakdown["amount"] != 0]
+
+    if df_breakdown.empty:
+        return
+
+    fig = px.pie(
+        df_breakdown,
+        values="amount",
+        names="term",
+        title=f"Breakdown by description term, total: {df_breakdown['amount'].sum():.2f}",
+        height=500,
+    )
+    fig.update_traces(textinfo="label+value")
+    fig.update_layout(
+        font={"size": 18, "color": "#7f7f7f"},
+        title={"xanchor": "center", "x": 0.5},
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+
 def init_changes_db(db_path, changes_path):
     if not os.path.exists(changes_path):
         with sqlite3.connect(db_path, check_same_thread=False) as conn:
@@ -874,7 +903,7 @@ def main(user):
     if "new_row" not in st.session_state:
         st.session_state.new_row = True
 
-    df = init(conn=conn, conn_changes=conn_changes, data_dir=data_dir, user=user)
+    df, description_list = init(conn=conn, conn_changes=conn_changes, data_dir=data_dir, user=user)
     put_config(config_file=config_file, config=st.session_state.config)
     if df is None:
         st.write("Add some data and run the pipeline.")
@@ -883,6 +912,8 @@ def main(user):
         st.warning("Current selection is empty.")
     else:
         add_spending_by_category(df)
+        if len(description_list) > 1:
+            add_description_breakdown(df, description_list)
         add_spending_over_time(df)
 
     if not user:
