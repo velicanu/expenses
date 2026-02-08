@@ -558,6 +558,7 @@ def run_wrapper(data_dir):
 def init(conn, conn_changes, data_dir, user):
     df = None
     description_list = []
+    base_total = None
 
     if st.session_state.expand and user:
         st.sidebar.write(f"{user} logged in")
@@ -592,11 +593,12 @@ def init(conn, conn_changes, data_dir, user):
         default_user_input, selected = add_category_widget(
             df_initial, default_user_input, "not in", input_form
         )
-        default_user_input, description_list = add_description_widget(
-            default_user_input, input_form
-        )
         default_user_input = add_source_widget(
             df_initial, default_user_input, input_form
+        )
+        base_sql = default_user_input
+        default_user_input, description_list = add_description_widget(
+            default_user_input, input_form
         )
         input_form.form_submit_button("Submit")
 
@@ -665,6 +667,10 @@ def init(conn, conn_changes, data_dir, user):
         else:
             df = run_sql(default_user_input, df_initial, table_name="expenses")
 
+        if len(description_list) > 1:
+            df_base = run_sql(base_sql, df_initial, table_name="expenses")
+            base_total = df_base["amount"].sum()
+
     except pd.io.sql.DatabaseError:
         pass
 
@@ -680,7 +686,7 @@ def init(conn, conn_changes, data_dir, user):
         unsafe_allow_html=True,
     )
     st.session_state.init_done = True
-    return df, description_list
+    return df, description_list, base_total
 
 
 def add_spending_by_category(df):
@@ -798,12 +804,18 @@ def add_spending_over_time(df):
     st.plotly_chart(fig2, use_container_width=True)
 
 
-def add_description_breakdown(df, description_list):
+def add_description_breakdown(df, description_list, base_total=None):
     data = []
     for term in description_list:
         mask = df["description"].str.contains(term, case=False, na=False)
         total = df.loc[mask, "amount"].sum()
         data.append({"term": term, "amount": total})
+
+    if base_total is not None:
+        matched_total = df["amount"].sum()
+        other_amount = base_total - matched_total
+        if abs(other_amount) > 0.01:
+            data.append({"term": "Other", "amount": other_amount})
 
     df_breakdown = pd.DataFrame(data)
     df_breakdown = df_breakdown[df_breakdown["amount"] != 0]
@@ -903,7 +915,7 @@ def main(user):
     if "new_row" not in st.session_state:
         st.session_state.new_row = True
 
-    df, description_list = init(conn=conn, conn_changes=conn_changes, data_dir=data_dir, user=user)
+    df, description_list, base_total = init(conn=conn, conn_changes=conn_changes, data_dir=data_dir, user=user)
     put_config(config_file=config_file, config=st.session_state.config)
     if df is None:
         st.write("Add some data and run the pipeline.")
@@ -913,7 +925,7 @@ def main(user):
     else:
         add_spending_by_category(df)
         if len(description_list) > 1:
-            add_description_breakdown(df, description_list)
+            add_description_breakdown(df, description_list, base_total)
         add_spending_over_time(df)
 
     if not user:
