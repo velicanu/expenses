@@ -291,6 +291,11 @@ def save_rule(category_rule, description_rule, target, df):
         st.session_state.config["rules"]["category"][category_rule] = target
 
 
+def save_amount_rule(description, amount, target):
+    key = f"{description} @ {amount}"
+    st.session_state.config["rules"]["description_amount"][key] = target
+
+
 def save_category(category, color):
     st.session_state.config["rules"]["new_categories"][category] = color
 
@@ -303,13 +308,15 @@ def apply_rules(data_dir):
     run(data_dir, standardize_only=True, config=st.session_state.config)
 
 
-def delete_selections(category_rules, description_rules, new_categories):
+def delete_selections(category_rules, description_rules, new_categories, amount_rules):
     for rule in category_rules:
         st.session_state.config["rules"]["category"].pop(rule)
     for rule in description_rules:
         st.session_state.config["rules"]["description"].pop(rule)
     for category in new_categories:
         st.session_state.config["rules"]["new_categories"].pop(category)
+    for rule in amount_rules:
+        st.session_state.config["rules"]["description_amount"].pop(rule)
 
 
 def add_rules(data_dir, df_initial):
@@ -325,6 +332,9 @@ def add_rules(data_dir, df_initial):
         delete_newcat_selection = st.multiselect(
             "Delete new category", st.session_state.config["rules"]["new_categories"]
         )
+        delete_amount_rule_selection = st.multiselect(
+            "Delete amount rule", st.session_state.config["rules"]["description_amount"]
+        )
     with col2:
         category_rule = st.text_input("Create category rule", "")
         description_rule = st.text_input("Create description rule", "")
@@ -332,6 +342,8 @@ def add_rules(data_dir, df_initial):
             set(df_initial["category"].unique().tolist() + list(new_categories))
         )
         target = st.selectbox("Target category", all_categories)
+        amount_rule_desc = st.text_input("Amount rule description", "")
+        amount_rule_amount = st.number_input("Amount rule amount", value=0.0, format="%.2f")
     with col3:
         new_category = st.text_input("Create new category").title()
         color = st.color_picker("Pick A Color", "#ffffff")
@@ -358,6 +370,23 @@ def add_rules(data_dir, df_initial):
             disabled=disabled,
             help=help_,
         )
+        amount_rule_disabled = not amount_rule_desc or amount_rule_amount == 0.0
+        amount_rule_help = ""
+        if not amount_rule_desc:
+            amount_rule_help = "No description"
+        elif amount_rule_amount == 0.0:
+            amount_rule_help = "Amount is 0"
+        st.button(
+            "Save amount rule",
+            on_click=save_amount_rule,
+            kwargs={
+                "description": amount_rule_desc,
+                "amount": amount_rule_amount,
+                "target": target,
+            },
+            disabled=amount_rule_disabled,
+            help=amount_rule_help,
+        )
         st.button("Apply rules", on_click=apply_rules, kwargs={"data_dir": data_dir})
         st.button("List rules", on_click=list_rules)
 
@@ -378,6 +407,7 @@ def add_rules(data_dir, df_initial):
             not delete_category_selection
             and not delete_description_selection
             and not delete_newcat_selection
+            and not delete_amount_rule_selection
         )
         st.button(
             "Delete selections",
@@ -386,6 +416,7 @@ def add_rules(data_dir, df_initial):
                 "category_rules": delete_category_selection,
                 "description_rules": delete_description_selection,
                 "new_categories": delete_newcat_selection,
+                "amount_rules": delete_amount_rule_selection,
             },
             disabled=disabled,
             help="Nothing to delete" if disabled else "",
@@ -907,7 +938,10 @@ def main(user):
             "description": {},
             "category": {},
             "new_categories": {},
+            "description_amount": {},
         }
+    if "description_amount" not in st.session_state.config["rules"]:
+        st.session_state.config["rules"]["description_amount"] = {}
     if "categories" not in st.session_state:
         st.session_state.categories = set()
     if "save_changes" not in st.session_state:

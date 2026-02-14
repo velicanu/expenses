@@ -105,6 +105,14 @@ def standardizer(record, rules):
         if rule.lower() in record["description"].lower():
             record["new_category"] = new_category
 
+    for rule, new_category in rules.get("description_amount", {}).items():
+        desc, amount_str = rule.rsplit(" @ ", 1)
+        if (
+            desc.lower() in record["description"].lower()
+            and round(float(record["amount"]), 2) == round(float(amount_str), 2)
+        ):
+            record["new_category"] = new_category
+
     if (
         "venmo" in record["description"].lower()
         and "mitfcu" in record["source_file"].lower()
