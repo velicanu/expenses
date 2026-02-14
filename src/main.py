@@ -343,7 +343,9 @@ def add_rules(data_dir, df_initial):
         )
         target = st.selectbox("Target category", all_categories)
         amount_rule_desc = st.text_input("Amount rule description", "")
-        amount_rule_amount = st.number_input("Amount rule amount", value=0.0, format="%.2f")
+        amount_rule_amount = st.number_input(
+            "Amount rule amount", value=0.0, format="%.2f"
+        )
     with col3:
         new_category = st.text_input("Create new category").title()
         color = st.color_picker("Pick A Color", "#ffffff")
@@ -949,7 +951,9 @@ def main(user):
     if "new_row" not in st.session_state:
         st.session_state.new_row = True
 
-    df, description_list, base_total = init(conn=conn, conn_changes=conn_changes, data_dir=data_dir, user=user)
+    df, description_list, base_total = init(
+        conn=conn, conn_changes=conn_changes, data_dir=data_dir, user=user
+    )
     put_config(config_file=config_file, config=st.session_state.config)
     if df is None:
         st.write("Add some data and run the pipeline.")
