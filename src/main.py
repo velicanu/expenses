@@ -291,6 +291,11 @@ def save_rule(category_rule, description_rule, target, df):
         st.session_state.config["rules"]["category"][category_rule] = target
 
 
+def save_amount_rule(description, amount, target):
+    key = f"{description} @ {amount}"
+    st.session_state.config["rules"]["description_amount"][key] = target
+
+
 def save_category(category, color):
     st.session_state.config["rules"]["new_categories"][category] = color
 
@@ -303,13 +308,15 @@ def apply_rules(data_dir):
     run(data_dir, standardize_only=True, config=st.session_state.config)
 
 
-def delete_selections(category_rules, description_rules, new_categories):
+def delete_selections(category_rules, description_rules, new_categories, amount_rules):
     for rule in category_rules:
         st.session_state.config["rules"]["category"].pop(rule)
     for rule in description_rules:
         st.session_state.config["rules"]["description"].pop(rule)
     for category in new_categories:
         st.session_state.config["rules"]["new_categories"].pop(category)
+    for rule in amount_rules:
+        st.session_state.config["rules"]["description_amount"].pop(rule)
 
 
 def add_rules(data_dir, df_initial):
@@ -325,6 +332,9 @@ def add_rules(data_dir, df_initial):
         delete_newcat_selection = st.multiselect(
             "Delete new category", st.session_state.config["rules"]["new_categories"]
         )
+        delete_amount_rule_selection = st.multiselect(
+            "Delete amount rule", st.session_state.config["rules"]["description_amount"]
+        )
     with col2:
         category_rule = st.text_input("Create category rule", "")
         description_rule = st.text_input("Create description rule", "")
@@ -332,6 +342,10 @@ def add_rules(data_dir, df_initial):
             set(df_initial["category"].unique().tolist() + list(new_categories))
         )
         target = st.selectbox("Target category", all_categories)
+        amount_rule_desc = st.text_input("Amount rule description", "")
+        amount_rule_amount = st.number_input(
+            "Amount rule amount", value=0.0, format="%.2f"
+        )
     with col3:
         new_category = st.text_input("Create new category").title()
         color = st.color_picker("Pick A Color", "#ffffff")
@@ -358,6 +372,23 @@ def add_rules(data_dir, df_initial):
             disabled=disabled,
             help=help_,
         )
+        amount_rule_disabled = not amount_rule_desc or amount_rule_amount == 0.0
+        amount_rule_help = ""
+        if not amount_rule_desc:
+            amount_rule_help = "No description"
+        elif amount_rule_amount == 0.0:
+            amount_rule_help = "Amount is 0"
+        st.button(
+            "Save amount rule",
+            on_click=save_amount_rule,
+            kwargs={
+                "description": amount_rule_desc,
+                "amount": amount_rule_amount,
+                "target": target,
+            },
+            disabled=amount_rule_disabled,
+            help=amount_rule_help,
+        )
         st.button("Apply rules", on_click=apply_rules, kwargs={"data_dir": data_dir})
         st.button("List rules", on_click=list_rules)
 
@@ -378,6 +409,7 @@ def add_rules(data_dir, df_initial):
             not delete_category_selection
             and not delete_description_selection
             and not delete_newcat_selection
+            and not delete_amount_rule_selection
         )
         st.button(
             "Delete selections",
@@ -386,6 +418,7 @@ def add_rules(data_dir, df_initial):
                 "category_rules": delete_category_selection,
                 "description_rules": delete_description_selection,
                 "new_categories": delete_newcat_selection,
+                "amount_rules": delete_amount_rule_selection,
             },
             disabled=disabled,
             help="Nothing to delete" if disabled else "",
@@ -557,6 +590,8 @@ def run_wrapper(data_dir):
 
 def init(conn, conn_changes, data_dir, user):
     df = None
+    description_list = []
+    base_total = None
 
     if st.session_state.expand and user:
         st.sidebar.write(f"{user} logged in")
@@ -591,11 +626,12 @@ def init(conn, conn_changes, data_dir, user):
         default_user_input, selected = add_category_widget(
             df_initial, default_user_input, "not in", input_form
         )
-        default_user_input, description_list = add_description_widget(
-            default_user_input, input_form
-        )
         default_user_input = add_source_widget(
             df_initial, default_user_input, input_form
+        )
+        base_sql = default_user_input
+        default_user_input, description_list = add_description_widget(
+            default_user_input, input_form
         )
         input_form.form_submit_button("Submit")
 
@@ -664,6 +700,10 @@ def init(conn, conn_changes, data_dir, user):
         else:
             df = run_sql(default_user_input, df_initial, table_name="expenses")
 
+        if len(description_list) > 1:
+            df_base = run_sql(base_sql, df_initial, table_name="expenses")
+            base_total = df_base["amount"].sum()
+
     except pd.io.sql.DatabaseError:
         pass
 
@@ -679,7 +719,7 @@ def init(conn, conn_changes, data_dir, user):
         unsafe_allow_html=True,
     )
     st.session_state.init_done = True
-    return df
+    return df, description_list, base_total
 
 
 def add_spending_by_category(df):
@@ -797,6 +837,40 @@ def add_spending_over_time(df):
     st.plotly_chart(fig2, use_container_width=True)
 
 
+def add_description_breakdown(df, description_list, base_total=None):
+    data = []
+    for term in description_list:
+        mask = df["description"].str.contains(term, case=False, na=False)
+        total = df.loc[mask, "amount"].sum()
+        data.append({"term": term, "amount": total})
+
+    if base_total is not None:
+        matched_total = df["amount"].sum()
+        other_amount = base_total - matched_total
+        if abs(other_amount) > 0.01:
+            data.append({"term": "Other", "amount": other_amount})
+
+    df_breakdown = pd.DataFrame(data)
+    df_breakdown = df_breakdown[df_breakdown["amount"] != 0]
+
+    if df_breakdown.empty:
+        return
+
+    fig = px.pie(
+        df_breakdown,
+        values="amount",
+        names="term",
+        title=f"Breakdown by description term, total: {df_breakdown['amount'].sum():.2f}",
+        height=500,
+    )
+    fig.update_traces(textinfo="label+value")
+    fig.update_layout(
+        font={"size": 18, "color": "#7f7f7f"},
+        title={"xanchor": "center", "x": 0.5},
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+
 def init_changes_db(db_path, changes_path):
     if not os.path.exists(changes_path):
         with sqlite3.connect(db_path, check_same_thread=False) as conn:
@@ -866,7 +940,10 @@ def main(user):
             "description": {},
             "category": {},
             "new_categories": {},
+            "description_amount": {},
         }
+    if "description_amount" not in st.session_state.config["rules"]:
+        st.session_state.config["rules"]["description_amount"] = {}
     if "categories" not in st.session_state:
         st.session_state.categories = set()
     if "save_changes" not in st.session_state:
@@ -874,7 +951,9 @@ def main(user):
     if "new_row" not in st.session_state:
         st.session_state.new_row = True
 
-    df = init(conn=conn, conn_changes=conn_changes, data_dir=data_dir, user=user)
+    df, description_list, base_total = init(
+        conn=conn, conn_changes=conn_changes, data_dir=data_dir, user=user
+    )
     put_config(config_file=config_file, config=st.session_state.config)
     if df is None:
         st.write("Add some data and run the pipeline.")
@@ -883,6 +962,8 @@ def main(user):
         st.warning("Current selection is empty.")
     else:
         add_spending_by_category(df)
+        if len(description_list) > 1:
+            add_description_breakdown(df, description_list, base_total)
         add_spending_over_time(df)
 
     if not user:
