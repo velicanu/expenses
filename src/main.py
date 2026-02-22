@@ -1,8 +1,14 @@
 import json
 import os
+import sys
 import sqlite3
 import webbrowser
 from datetime import date, datetime, timedelta
+
+# Ensure src is on path so local modules (parse, pipeline, etc.) resolve when run via streamlit
+_src_dir = os.path.dirname(os.path.abspath(__file__))
+if _src_dir not in sys.path:
+    sys.path.insert(0, _src_dir)
 
 import dateutil.parser
 import pandas as pd
@@ -10,6 +16,13 @@ import plotly.express as px
 import streamlit as st
 from dateutil.parser import parse
 
+from analysis import (
+    flag_high_dining,
+    flag_recurring_in_catchall,
+    identify_frequent_merchants,
+    identify_recurring,
+    monthly_outliers,
+)
 from detect import save_file_if_valid
 from pipeline import run
 from plaidlib import get_transactions
@@ -225,7 +238,9 @@ def add_delete_files_widget(raw_data_dir):
             st.button("Confirm Delete", on_click=delete_files)
 
 
-def save_files_to_disk(files, data_dir):
+def save_files_to_disk(data_dir):
+    # Use session state so we see the files that were in the uploader when the button was clicked
+    files = st.session_state.get("uploaded_files") or []
     success = []
     failed = []
     for file_ in files:
@@ -241,8 +256,10 @@ def save_files_to_disk(files, data_dir):
     if failed:
         status_info = st.error("Failed: " + " ".join(failed))
 
-    # this key increment clears the upload dialog box after clicking upload
+    # clear uploader and session state so the dialog resets
     st.session_state.file_uploader_key += 1
+    if "uploaded_files" in st.session_state:
+        del st.session_state["uploaded_files"]
     clear(streamlit_object=status_info, seconds=2)
 
 
@@ -253,10 +270,12 @@ def add_upload_files_widget(data_dir):
         accept_multiple_files=True,
         key=f"file_uploader_{st.session_state.file_uploader_key}",
     )
+    if files:
+        st.session_state.uploaded_files = files
     st.button(
         "Upload files",
         on_click=save_files_to_disk,
-        kwargs={"files": files, "data_dir": data_dir},
+        kwargs={"data_dir": data_dir},
     )
 
 
@@ -742,7 +761,14 @@ def add_spending_over_time(df):
     else:
         group = "D"
 
-    group_selection = st.select_slider("Time bin", list(grouping))
+    if "time_bin" not in st.session_state:
+        st.session_state.time_bin = "month"
+    group_selection = st.select_slider(
+        "Time bin",
+        options=list(grouping),
+        value=st.session_state.time_bin,
+        key="time_bin",
+    )
     group = group if group_selection == "auto" else grouping[group_selection]
 
     group_titles = {
@@ -844,7 +870,7 @@ def main(user):
 
     # init session state
     if "expand" not in st.session_state:
-        st.session_state.expand = False
+        st.session_state.expand = True
     if "delete_files" not in st.session_state:
         st.session_state.delete_files = set()
     if "file_uploader_key" not in st.session_state:
@@ -882,8 +908,100 @@ def main(user):
     if len(df.index) == 0:
         st.warning("Current selection is empty.")
     else:
-        add_spending_by_category(df)
-        add_spending_over_time(df)
+        # Exclude Payment and Income from spending charts
+        df_spending = df[~df["category"].isin(["Payment", "Income"])]
+        add_spending_by_category(df_spending)
+        add_spending_over_time(df_spending)
+
+        # Analysis section
+        with st.expander("Analysis"):
+            dining_threshold = st.number_input(
+                "Dining threshold",
+                value=100,
+                min_value=1,
+                key="analysis_dining_threshold",
+            )
+            recurring_min = st.number_input(
+                "Min occurrences for recurring",
+                value=2,
+                min_value=2,
+                key="analysis_recurring_min",
+            )
+            high_dining = flag_high_dining(df_spending, threshold=dining_threshold)
+            if not high_dining.empty:
+                st.subheader("High dining (over threshold)")
+                st.dataframe(high_dining, hide_index=True)
+            else:
+                st.caption("No dining over threshold.")
+
+            recurring = identify_recurring(
+                df_spending,
+                min_occurrences=recurring_min,
+            )
+            if not recurring.empty:
+                st.subheader("Recurring expenses / subscriptions (same amount most of the time)")
+                st.dataframe(recurring, hide_index=True)
+            else:
+                st.caption("No recurring expenses identified.")
+
+            frequent = identify_frequent_merchants(
+                df_spending,
+                min_occurrences=recurring_min,
+                exclude_recurring=True,
+            )
+            if not frequent.empty:
+                st.subheader("Frequent merchants (similar schedule, varying amounts)")
+                st.dataframe(frequent, hide_index=True)
+            else:
+                st.caption("No frequent merchants identified.")
+
+            catchall = flag_recurring_in_catchall(
+                df_spending,
+                min_occurrences=recurring_min,
+            )
+            if not catchall.empty:
+                st.subheader("Recurring merchants in Other / Transfer")
+                st.dataframe(catchall, hide_index=True)
+            else:
+                st.caption("No recurring merchants in Other/Transfer.")
+
+            # Use same Time bin as Spending over time for outlier detection
+            time_bin = st.session_state.get("time_bin", "month")
+            resample_codes = {"year": "YS", "month": "MS", "week": "W", "day": "D"}
+            period_codes = {"YS": "Y", "MS": "M", "W": "W", "D": "D"}
+            if time_bin == "auto":
+                max_date = dateutil.parser.parse(str(df_spending["date"].max()))
+                min_date = dateutil.parser.parse(str(df_spending["date"].min()))
+                n_days = (max_date - min_date).days
+                if n_days >= 730:
+                    resample = "YS"
+                elif n_days > 91:
+                    resample = "MS"
+                elif n_days > 31:
+                    resample = "W"
+                else:
+                    resample = "D"
+            else:
+                resample = resample_codes.get(time_bin, "MS")
+            outlier_freq = period_codes.get(resample, "M")
+
+            st.subheader("Outliers by category (time bin: " + time_bin + ")")
+            out_cat = monthly_outliers(
+                df_spending, group_by="category", freq=outlier_freq
+            )
+            if not out_cat.empty:
+                st.dataframe(out_cat, hide_index=True)
+            else:
+                st.caption("No category outliers.")
+
+            st.subheader("Outliers by merchant (time bin: " + time_bin + ")")
+            out_merch = monthly_outliers(
+                df_spending, group_by="merchant", freq=outlier_freq
+            )
+            if not out_merch.empty:
+                st.dataframe(out_merch, hide_index=True)
+            else:
+                st.caption("No merchant outliers.")
 
     if not user:
         try:

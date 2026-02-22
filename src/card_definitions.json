@@ -18,6 +18,27 @@
     "Amount": "amount",
     "Category": "category"
   },
+  "amex_groceries_ext": {
+    "schema": [
+      "Date",
+      "Description",
+      "Card Member",
+      "Account #",
+      "Amount",
+      "Extended Details",
+      "Appears On Your Statement As",
+      "Address",
+      "City/State",
+      "Zip Code",
+      "Country",
+      "Reference",
+      "Category"
+    ],
+    "Date": "date",
+    "Description": "description",
+    "Amount": "amount",
+    "Category": "category"
+  },
   "svb": {
     "schema": [
       "Date",
@@ -110,6 +131,53 @@
     "Description": "description",
     "Amount": "-amount",
     "Category": "category"
+  },
+  "chase-bank": {
+    "schema": [
+      "Details",
+      "Posting Date",
+      "Description",
+      "Amount",
+      "Type",
+      "Balance",
+      "Check or Slip #",
+      "Unknown"
+    ],
+    "Posting Date": "date",
+    "Description": "description",
+    "Amount": "amount",
+    "Type": "category"
+  },
+  "chase-bank-7": {
+    "schema": [
+      "Details",
+      "Posting Date",
+      "Description",
+      "Amount",
+      "Type",
+      "Balance",
+      "Check or Slip #"
+    ],
+    "Posting Date": "date",
+    "Description": "description",
+    "Amount": "amount",
+    "Type": "category"
+  },
+  "chase-bank-8": {
+    "schema": [
+      "Details",
+      "Posting Date",
+      "Description",
+      "Amount",
+      "Type",
+      "Balance",
+      "Check or Slip #",
+      ""
+    ],
+    "Posting Date": "date",
+    "Description": "description",
+    "Amount": "-amount",
+    "Type": "category"
   },
   "plaid": {
     "schema": [

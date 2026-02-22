@@ -61,12 +61,14 @@ class Card(object):
 
     @property
     def record_is_payment(self):
-        """Mask for payments (as opposed to expenses)."""
-        return (
+        """Mask for payments and income (excluded from spending charts)."""
+        description_match = (
             self.records["description"]
             .str.lower()
             .str.contains("autopay|thank you|payment")
         )
+        category_excluded = self.records["category"].isin(["Payment", "Income"])
+        return description_match | category_excluded
 
     @property
     def monthly_spending(self):

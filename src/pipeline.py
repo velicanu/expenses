@@ -1,12 +1,28 @@
 import multiprocessing as mp
 import os
+import sys
 import tempfile
+
+# Ensure this package's directory is on path so "parse" resolves to local parse.py
+_script_dir = os.path.dirname(os.path.abspath(__file__))
+if _script_dir not in sys.path:
+    sys.path.insert(0, _script_dir)
 
 from common import get_files, get_log
 from detect import identify_file
 from extract import extract
 from ingest import ingest
-from parse import parse
+
+try:
+    from parse import parse
+except ModuleNotFoundError as e:
+    if e.name == "parse":
+        raise ModuleNotFoundError(
+            "Local module 'parse' not found. Run from repo root with: "
+            "streamlit run src/main.py (or set PYTHONPATH=src)"
+        ) from e
+    raise
+
 from standardize import standardize
 from utils import make_dirs
 
@@ -23,7 +39,7 @@ def get_pipeline_files(raw_dir, extracted_dir, parsed_dir, standardized_dir):
     intermediate steps pf the pipeline
     """
     suffix = ".json"
-    for raw_file in [f for f in get_files(raw_dir) if identify_file(f)]:
+    for raw_file in [f for f in get_files(raw_dir) if identify_file(f)[0]]:
         filestem = get_filename_without_extension(raw_file)
         extracted_file = os.path.join(extracted_dir, filestem + suffix)
         parsed_file = os.path.join(parsed_dir, filestem + suffix)
