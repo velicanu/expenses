@@ -82,6 +82,9 @@ def test_get_default_categories():
         "Dining",
         "Services",
         "Payment",
+        "Transfer",
+        "Income",
+        "Taxes",
     }
 
     assert actual == expected

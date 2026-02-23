@@ -1,5 +1,4 @@
-from detect import get_schemaless_card_defs
-from detect import identify_card
+from detect import get_schemaless_card_defs, identify_card
 
 CARD_DEFS = get_schemaless_card_defs()
 
@@ -47,7 +46,9 @@ def test_detect_capital_one():
         "Credit": None,
     }
     card, card_def, info = identify_card(input_)
-    assert card == "capital_one" and card_def == CARD_DEFS["capital_one"] and info is None
+    assert (
+        card == "capital_one" and card_def == CARD_DEFS["capital_one"] and info is None
+    )
 
 
 def test_detect_usbank():

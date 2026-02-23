@@ -1,14 +1,8 @@
 import json
 import os
-import sys
 import sqlite3
 import webbrowser
 from datetime import date, datetime, timedelta
-
-# Ensure src is on path so local modules (parse, pipeline, etc.) resolve when run via streamlit
-_src_dir = os.path.dirname(os.path.abspath(__file__))
-if _src_dir not in sys.path:
-    sys.path.insert(0, _src_dir)
 
 import dateutil.parser
 import pandas as pd
@@ -939,7 +933,9 @@ def main(user):
                 min_occurrences=recurring_min,
             )
             if not recurring.empty:
-                st.subheader("Recurring expenses / subscriptions (same amount most of the time)")
+                st.subheader(
+                    "Recurring expenses / subscriptions (same amount most of the time)"
+                )
                 st.dataframe(recurring, hide_index=True)
             else:
                 st.caption("No recurring expenses identified.")

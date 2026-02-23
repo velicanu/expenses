@@ -122,7 +122,7 @@ default_description_map = {
     "payment - web": "Payment",
     "AMERICAN EXPRESS ACH PMT": "Payment",
     "Payment to Chase card": "Payment",
-    "CRCARDPMT": "Payment"
+    "CRCARDPMT": "Payment",
 }
 
 

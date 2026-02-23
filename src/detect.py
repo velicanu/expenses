@@ -73,7 +73,9 @@ def save_file_if_valid(file_, data_dir):
             os.replace(tempfilename, os.path.join(upload_dir, file_name))
             return "success", f"{file_name}: {card}"
         else:
-            columns_msg = f" (columns: {info['columns']})" if info and "columns" in info else ""
+            columns_msg = (
+                f" (columns: {info['columns']})" if info and "columns" in info else ""
+            )
             return "failed", f"{file_name}{columns_msg}"
 
 
@@ -84,7 +86,9 @@ def _detect(infile):
     if card:
         click.echo(card)
     else:
-        click.echo(f"No matching card. Columns: {info['columns'] if info else 'unknown'}")
+        click.echo(
+            f"No matching card. Columns: {info['columns'] if info else 'unknown'}"
+        )
 
 
 if __name__ == "__main__":

@@ -1,28 +1,12 @@
 import multiprocessing as mp
 import os
-import sys
 import tempfile
-
-# Ensure this package's directory is on path so "parse" resolves to local parse.py
-_script_dir = os.path.dirname(os.path.abspath(__file__))
-if _script_dir not in sys.path:
-    sys.path.insert(0, _script_dir)
 
 from common import get_files, get_log
 from detect import identify_file
 from extract import extract
 from ingest import ingest
-
-try:
-    from parse import parse
-except ModuleNotFoundError as e:
-    if e.name == "parse":
-        raise ModuleNotFoundError(
-            "Local module 'parse' not found. Run from repo root with: "
-            "streamlit run src/main.py (or set PYTHONPATH=src)"
-        ) from e
-    raise
-
+from parse import parse
 from standardize import standardize
 from utils import make_dirs
 

@@ -11,6 +11,7 @@ import pandas as pd
 
 def normalize_merchant(description_series: pd.Series, max_words: int = 4) -> pd.Series:
     """Normalize description to a stable merchant key for grouping."""
+
     def _norm(s):
         if pd.isna(s) or not isinstance(s, str):
             return ""
@@ -59,14 +60,16 @@ def _merchant_groups_with_schedule(
         if abs(mean_interval - 30) <= interval_tolerance_days or (
             mean_interval >= 25 and mean_interval <= 35
         ):
-            out.append({
-                "merchant": merchant,
-                "transaction_count": len(grp),
-                "mean_interval_days": round(mean_interval, 1),
-                "last_date": dates.max().isoformat()[:10],
-                "total_amount": round(grp["amount"].sum(), 2),
-                "mean_amount": round(grp["amount"].mean(), 2),
-            })
+            out.append(
+                {
+                    "merchant": merchant,
+                    "transaction_count": len(grp),
+                    "mean_interval_days": round(mean_interval, 1),
+                    "last_date": dates.max().isoformat()[:10],
+                    "total_amount": round(grp["amount"].sum(), 2),
+                    "mean_amount": round(grp["amount"].mean(), 2),
+                }
+            )
     if not out:
         return pd.DataFrame()
     return pd.DataFrame(out)
@@ -126,7 +129,9 @@ def identify_frequent_merchants(
         return pd.DataFrame()
 
     if not exclude_recurring:
-        return scheduled.sort_values("total_amount", ascending=False).reset_index(drop=True)
+        return scheduled.sort_values("total_amount", ascending=False).reset_index(
+            drop=True
+        )
 
     df = df.copy()
     if normalize_description:
@@ -178,12 +183,16 @@ def flag_recurring_in_catchall(
     subset["merchant"] = normalize_merchant(subset["description"])
     subset = subset[subset["merchant"] != ""]
 
-    grp = subset.groupby(["merchant", "category"]).agg(
-        transaction_count=("amount", "count"),
-        total_amount=("amount", "sum"),
-        date_min=("date", "min"),
-        date_max=("date", "max"),
-    ).reset_index()
+    grp = (
+        subset.groupby(["merchant", "category"])
+        .agg(
+            transaction_count=("amount", "count"),
+            total_amount=("amount", "sum"),
+            date_min=("date", "min"),
+            date_max=("date", "max"),
+        )
+        .reset_index()
+    )
 
     grp = grp[grp["transaction_count"] >= min_occurrences]
     grp["total_amount"] = grp["total_amount"].round(2)
@@ -251,12 +260,14 @@ def monthly_outliers(
         for _, row in grp.iterrows():
             amt = row["period_amount"]
             if amt < lo or amt > hi:
-                out.append({
-                    "period": row["period"],
-                    name_col: key,
-                    "period_amount": round(amt, 2),
-                    "is_high_outlier": amt > hi,
-                })
+                out.append(
+                    {
+                        "period": row["period"],
+                        name_col: key,
+                        "period_amount": round(amt, 2),
+                        "is_high_outlier": amt > hi,
+                    }
+                )
 
     if not out:
         return pd.DataFrame()
