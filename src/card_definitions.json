@@ -141,37 +141,6 @@
       "Type",
       "Balance",
       "Check or Slip #",
-      "Unknown"
-    ],
-    "Posting Date": "date",
-    "Description": "description",
-    "Amount": "amount",
-    "Type": "category"
-  },
-  "chase-bank-7": {
-    "schema": [
-      "Details",
-      "Posting Date",
-      "Description",
-      "Amount",
-      "Type",
-      "Balance",
-      "Check or Slip #"
-    ],
-    "Posting Date": "date",
-    "Description": "description",
-    "Amount": "amount",
-    "Type": "category"
-  },
-  "chase-bank-8": {
-    "schema": [
-      "Details",
-      "Posting Date",
-      "Description",
-      "Amount",
-      "Type",
-      "Balance",
-      "Check or Slip #",
       ""
     ],
     "Posting Date": "date",
