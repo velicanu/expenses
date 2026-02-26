@@ -65,7 +65,7 @@ plotly==6.5.2
     # via expenses (pyproject.toml)
 pluggy==1.6.0
     # via pytest
-protobuf==6.33.4
+protobuf==6.33.5
     # via streamlit
 pyarrow==23.0.0
     # via streamlit
