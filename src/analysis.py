@@ -17,8 +17,8 @@ def normalize_merchant(description_series: pd.Series, max_words: int = 4) -> pd.
             return ""
         s = s.lower().strip()
         s = re.sub(r"\s+", " ", s)
-        # Drop trailing alphanumeric IDs (e.g. "NETFLIX 12345" -> "netflix")
-        s = re.sub(r"\s*[\dA-Za-z]{6,}\s*$", "", s)
+        # Drop trailing ID-like tokens (start with digit, 6+ chars); avoid stripping words like "foods"
+        s = re.sub(r"\s+\d[\dA-Za-z]{5,}\s*$", "", s)
         # Drop trailing space + digits so "netflix 1" / "netflix 2" -> "netflix"
         s = re.sub(r"\s+\d+$", "", s)
         # Drop trailing space + short alphanumeric so "coffee a" / "coffee b" -> "coffee"
@@ -272,5 +272,4 @@ def monthly_outliers(
     if not out:
         return pd.DataFrame()
     result = pd.DataFrame(out)
-    result = result.sort_values(["period", "period_amount"], ascending=[True, False])
-    return result.rename(columns={"period_amount": "monthly_amount", "period": "month"})
+    return result.sort_values(["period", "period_amount"], ascending=[True, False])

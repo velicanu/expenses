@@ -2,6 +2,7 @@ import copy
 import json
 import os
 import tempfile
+from functools import lru_cache
 
 import click
 
@@ -10,6 +11,7 @@ from common import records_from_file
 script_dir = os.path.dirname(os.path.realpath(__file__))
 
 
+@lru_cache(maxsize=1)
 def _load_card_definitions():
     with open(os.path.join(script_dir, "card_definitions.json")) as f:
         definitions = json.load(f)

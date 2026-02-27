@@ -96,4 +96,4 @@ def test_monthly_outliers_by_category():
     assert not out.empty
     high = out[out["is_high_outlier"]]
     assert len(high) >= 1
-    assert high.iloc[0]["monthly_amount"] == 500.0
+    assert high.iloc[0]["period_amount"] == 500.0

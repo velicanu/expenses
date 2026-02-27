@@ -4,7 +4,6 @@ import sqlite3
 import webbrowser
 from datetime import date, datetime, timedelta
 
-import dateutil.parser
 import pandas as pd
 import plotly.express as px
 import streamlit as st
@@ -66,18 +65,18 @@ def extend_sql_statement(statement):
 
 
 def add_date_range_widget(df, input_form):
-    min_value = dateutil.parser.parse(df["date"].min())
-    max_value = dateutil.parser.parse(df["date"].max())
+    min_value = parse(df["date"].min())
+    max_value = parse(df["date"].max())
 
     # Initialize from config only if not already in session state
     if "date_range" not in st.session_state:
         min_default = (
-            dateutil.parser.parse(st.session_state.config.get("min_date"))
+            parse(st.session_state.config.get("min_date"))
             if st.session_state.config.get("min_date")
             else min_value
         )
         max_default = (
-            dateutil.parser.parse(st.session_state.config.get("max_date"))
+            parse(st.session_state.config.get("max_date"))
             if st.session_state.config.get("max_date")
             else max_value
         )
@@ -742,8 +741,8 @@ def add_spending_over_time(df):
         return
 
     df = df.set_index(pd.DatetimeIndex(df["date"]))
-    max_date = dateutil.parser.parse(df["date"].max())
-    min_date = dateutil.parser.parse(df["date"].min())
+    max_date = parse(df["date"].max())
+    min_date = parse(df["date"].min())
     n_days = (max_date - min_date).days
     grouping = {"auto": "", "year": "YS", "month": "MS", "week": "W", "day": "D"}
     if n_days >= 730:  # 2+ years
@@ -966,8 +965,8 @@ def main(user):
             resample_codes = {"year": "YS", "month": "MS", "week": "W", "day": "D"}
             period_codes = {"YS": "Y", "MS": "M", "W": "W", "D": "D"}
             if time_bin == "auto":
-                max_date = dateutil.parser.parse(str(df_spending["date"].max()))
-                min_date = dateutil.parser.parse(str(df_spending["date"].min()))
+                max_date = parse(str(df_spending["date"].max()))
+                min_date = parse(str(df_spending["date"].min()))
                 n_days = (max_date - min_date).days
                 if n_days >= 730:
                     resample = "YS"

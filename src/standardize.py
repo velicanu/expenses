@@ -71,9 +71,6 @@ default_category_map = {
 }
 
 
-# Credit card payment patterns (applied last so they are not overwritten by other rules)
-PAYMENT_DESCRIPTION_PATTERNS = ("payment thank you", "autopay payment", "payment - web")
-
 default_description_map = {
     "LYFT": "Rideshare",
     "UBER": "Rideshare",
@@ -125,6 +122,11 @@ default_description_map = {
     "CRCARDPMT": "Payment",
 }
 
+# Keys in default_description_map that map to Payment; re-applied last so user rules cannot override.
+PAYMENT_DESCRIPTION_PATTERNS = tuple(
+    k for k, v in default_description_map.items() if v == "Payment"
+)
+
 
 def get_default_categories():
     return set(default_description_map.values()) | set(default_category_map.values())
@@ -155,7 +157,7 @@ def standardizer(record, rules):
     ):
         record["new_category"] = "Transfer"
 
-    # Credit card payments: ensure they are never overwritten by Other
+    # Credit card payments: user description rules run after defaults, so re-apply so they always win.
     if any(p in description_lower for p in PAYMENT_DESCRIPTION_PATTERNS):
         record["new_category"] = "Payment"
 
