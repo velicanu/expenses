@@ -66,6 +66,8 @@ default_category_map = {
     "Home": "Shopping",
     # Examples: tj, whole foods
     "Groceries": "Groceries",
+    # Bank transaction types
+    "ACCT_XFER": "Transfer",
 }
 
 
@@ -82,7 +84,48 @@ default_description_map = {
     "Sanador": "Health",
     "CAPEAIR": "Travel",
     "EATS": "Dining",
+    "HBO": "Entertainment",
+    "Max": "Entertainment",
+    "IRS": "Taxes",
+    "CITY OF MEDFORD": "Taxes",
+    "COMM OF MASS": "Taxes",
+    "zelle payment from": "Income",
+    "real time payment credit recd": "Income",
+    "remote online deposit": "Income",
+    "ppd id": "Income",
+    "payroll": "Income",
+    "zelle payment": "Transfer",
+    "edi pymnts": "Transfer",
+    "venmo": "Transfer",
+    "online transfer": "Transfer",
+    # Bills
+    "mtg": "Bills",
+    "mortgage": "Bills",
+    "grid": "Bills",
+    "paymentrec": "Bills",
+    # Car
+    "ach rtl": "Car",
+    # Services
+    "barber": "Services",
+    "haircut": "Services",
+    # Health / Travel / Shopping
+    "animal hosp": "Health",
+    "vfs": "Travel",
+    "namecheap": "Bills",
+    "ebay": "Shopping",
+    # Credit card payments last so they always win
+    "payment thank you": "Payment",
+    "autopay payment": "Payment",
+    "payment - web": "Payment",
+    "AMERICAN EXPRESS ACH PMT": "Payment",
+    "Payment to Chase card": "Payment",
+    "CRCARDPMT": "Payment",
 }
+
+# Keys in default_description_map that map to Payment; re-applied last so user rules cannot override.
+PAYMENT_DESCRIPTION_PATTERNS = tuple(
+    k for k, v in default_description_map.items() if v == "Payment"
+)
 
 
 def get_default_categories():
@@ -93,23 +136,31 @@ def standardizer(record, rules):
     record["date"] = parse(record["date"]).isoformat()
     record["new_category"] = "Other"
 
+    raw_category = record.get("category") or ""
+    raw_category_lower = raw_category.lower() if isinstance(raw_category, str) else ""
     for rule, new_category in list(default_category_map.items()) + list(
         rules.get("category", {}).items()
     ):
-        if rule.lower() in record["category"].lower():
+        if rule.lower() in raw_category_lower:
             record["new_category"] = new_category
 
+    description_lower = (record.get("description") or "").lower()
     for rule, new_category in list(default_description_map.items()) + list(
         rules.get("description", {}).items()
     ):
-        if rule.lower() in record["description"].lower():
+        if rule.lower() in description_lower:
             record["new_category"] = new_category
 
     if (
-        "venmo" in record["description"].lower()
-        and "mitfcu" in record["source_file"].lower()
+        "venmo" in description_lower
+        and "mitfcu" in (record.get("source_file") or "").lower()
     ):
         record["new_category"] = "Transfer"
+
+    # Credit card payments: user description rules run after defaults, so re-apply so they always win.
+    if any(p in description_lower for p in PAYMENT_DESCRIPTION_PATTERNS):
+        record["new_category"] = "Payment"
+
     record["old_category"] = record["category"]
     record["category"] = record["new_category"]
     record.pop("new_category")

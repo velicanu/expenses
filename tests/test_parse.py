@@ -25,7 +25,7 @@ def test_parse():
         "source": "amex",
         "source_file": "amex.csv",
     }
-    card, card_def = identify_card(input_)
+    card, card_def, _ = identify_card(input_)
     assert parse_record(input_, card, card_def) == expected
 
     input_ = {
@@ -46,7 +46,7 @@ def test_parse():
         "source": "capital_one",
         "source_file": "capital_one.csv",
     }
-    card, card_def = identify_card(input_)
+    card, card_def, _ = identify_card(input_)
     assert parse_record(input_, card, card_def) == expected
 
     input_ = {
@@ -67,7 +67,7 @@ def test_parse():
         "source": "chase",
         "source_file": "chase.csv",
     }
-    card, card_def = identify_card(input_)
+    card, card_def, _ = identify_card(input_)
     assert parse_record(input_, card, card_def) == expected
 
     input_ = {
@@ -86,5 +86,5 @@ def test_parse():
         "source": "usbank",
         "source_file": "usbank.csv",
     }
-    card, card_def = identify_card(input_)
+    card, card_def, _ = identify_card(input_)
     assert parse_record(input_, card, card_def) == expected

@@ -4,9 +4,32 @@ import click
 from smart_open import open
 
 from common import get_log
-from detect import identify_card
+from detect import get_schemaless_card_defs, identify_card
 
 log = get_log(__file__)
+
+
+def get_card_from_filename(filename):
+    """Determine card name from a parsed/extracted JSON file (first record)."""
+    with open(filename, "r") as f:
+        first_line = f.readline()
+    record = json.loads(first_line)
+    card, _card_def, info = identify_card(record)
+    if card is None:
+        columns = info.get("columns", []) if info else []
+        raise ValueError(f"No card definition matches {filename}. Columns: {columns}")
+    return card
+
+
+def get_parser(card):
+    """Return a function that parses a record for the given card."""
+    card_defs = get_schemaless_card_defs()
+    card_def = card_defs[card]
+
+    def parser(record):
+        return parse_record(record, card, card_def)
+
+    return parser
 
 
 def parse_record(record, card, card_def):
@@ -46,7 +69,10 @@ def parse(infile, outfile):
 
     log.info(f"Parsing {infile} into {outfile}")
 
-    card, card_def = identify_card(json.loads(open(infile).readline()))
+    card, card_def, no_match_info = identify_card(json.loads(open(infile).readline()))
+    if no_match_info is not None:
+        columns = no_match_info.get("columns", [])
+        raise ValueError(f"No card definition matches this file. Columns: {columns}")
 
     with open(infile, "r") as inf, open(outfile, "w") as outf:
         for line in inf:

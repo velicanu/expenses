@@ -106,9 +106,10 @@ def test_save_file_if_valid_invalid():
             _f.write(unknown_string)
         file_object = open(input_, "rb")
 
-        expected = "failed", f"{filename}"
-        actual = save_file_if_valid(file_object, data_dir)
-        assert actual == expected
+        status, msg = save_file_if_valid(file_object, data_dir)
+        assert status == "failed"
+        assert filename in msg
+        assert "columns:" in msg
 
         with pytest.raises(FileNotFoundError):
             open(os.path.join(data_dir, "raw", filename), "r")

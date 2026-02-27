@@ -1,5 +1,6 @@
-from detect import SCHEMALESS_CARD_DEFS as CARD_DEFINITIONS
-from detect import identify_card
+from detect import get_schemaless_card_defs, identify_card
+
+CARD_DEFS = get_schemaless_card_defs()
 
 
 def test_detect_amex():
@@ -16,8 +17,8 @@ def test_detect_amex():
         "Reference": "'123'",
         "Category": "Merchandise & Supplies-Groceries",
     }
-    expected = "amex", CARD_DEFINITIONS["amex"]
-    assert identify_card(input_) == expected
+    card, card_def, info = identify_card(input_)
+    assert card == "amex" and card_def == CARD_DEFS["amex"] and info is None
 
 
 def test_detect_chase():
@@ -30,8 +31,8 @@ def test_detect_chase():
         "Amount": -123,
         "Memo": "",
     }
-    expected = "chase", CARD_DEFINITIONS["chase"]
-    assert identify_card(input_) == expected
+    card, card_def, info = identify_card(input_)
+    assert card == "chase" and card_def == CARD_DEFS["chase"] and info is None
 
 
 def test_detect_capital_one():
@@ -44,8 +45,10 @@ def test_detect_capital_one():
         "Debit": 123,
         "Credit": None,
     }
-    expected = "capital_one", CARD_DEFINITIONS["capital_one"]
-    assert identify_card(input_) == expected
+    card, card_def, info = identify_card(input_)
+    assert (
+        card == "capital_one" and card_def == CARD_DEFS["capital_one"] and info is None
+    )
 
 
 def test_detect_usbank():
@@ -56,5 +59,12 @@ def test_detect_usbank():
         "Memo": "WEB AUTOMTC; ; ; ; ; ",
         "Amount": 123.45,
     }
-    expected = "usbank", CARD_DEFINITIONS["usbank"]
-    assert identify_card(input_) == expected
+    card, card_def, info = identify_card(input_)
+    assert card == "usbank" and card_def == CARD_DEFS["usbank"] and info is None
+
+
+def test_detect_no_match_returns_columns():
+    input_ = {"Foo": 1, "Bar": 2}
+    card, card_def, info = identify_card(input_)
+    assert card is None and card_def is None
+    assert info is not None and info.get("columns") == ["Foo", "Bar"]
