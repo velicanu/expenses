@@ -57,7 +57,7 @@ pandas==2.3.3
     # via
     #   expenses (pyproject.toml)
     #   streamlit
-pillow==12.1.0
+pillow==12.2.0
     # via streamlit
 plaid-python==38.0.0
     # via expenses (pyproject.toml)
