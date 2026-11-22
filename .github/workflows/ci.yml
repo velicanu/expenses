@@ -57,5 +57,5 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install pykeepass pyotp pytest
-      - name: Fetcher tests (no browser, no network: pages are classified from recorded facts, the vault is a throwaway file)
+      - name: Fetcher tests (no browser or network needed)
         run: python -m pytest -q fetcher/tests
