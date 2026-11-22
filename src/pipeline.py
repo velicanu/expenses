@@ -1,14 +1,13 @@
-import multiprocessing as mp
 import os
 import tempfile
 
 from common import get_files, get_log
 from detect import identify_file
 from extract import extract
+from fsutil import make_dirs
 from ingest import ingest
 from parse import parse
 from standardize import standardize
-from utils import make_dirs
 
 log = get_log(__file__)
 
@@ -50,10 +49,6 @@ def run(data_dir, standardize_only=False, config=None):
     if not config:
         config = {}
 
-    cores = mp.cpu_count()
-    pool = mp.Pool(cores)
-    jobs = []
-
     raw_dir = os.path.join(data_dir, "raw")
     extracted_dir = os.path.join(data_dir, "extracted")
     parsed_dir = os.path.join(data_dir, "parsed")
@@ -64,17 +59,16 @@ def run(data_dir, standardize_only=False, config=None):
         return False
 
     with tempfile.TemporaryDirectory() as tmp_standardized_dir:
-        for raw, extracted, parsed, standardized in get_pipeline_files(
-            raw_dir, extracted_dir, parsed_dir, tmp_standardized_dir
-        ):
-            jobs.append(
-                pool.apply_async(
-                    _etl,
-                    (raw, extracted, parsed, standardized, standardize_only, config),
-                )
-            )
+        # Serial on purpose: a few dozen small files, and a multiprocessing pool forked from the
+        # API's threaded server can deadlock in the child.
+        pipeline_files = list(
+            get_pipeline_files(raw_dir, extracted_dir, parsed_dir, tmp_standardized_dir)
+        )
+        if not pipeline_files:
+            return False
+        for raw, extracted, parsed, standardized in pipeline_files:
+            _etl(raw, extracted, parsed, standardized, standardize_only, config)
 
-        [job.get() for job in jobs]
         # TODO: hardcoded expenses tablename and expenses.db
         ingest(
             get_files(tmp_standardized_dir),

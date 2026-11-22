@@ -15,14 +15,24 @@ def ingest(infiles, table, outfile):
 
     log.info(f"Ingesting {infiles} into {outfile}:{table}")
 
-    if os.path.exists(outfile):
-        os.remove(outfile)
+    # Build next to the target and rename into place, so a reader (the API, or Syncthing) sees either
+    # the old database or the new one, never a missing or half-written file.
+    tmpfile = outfile + ".tmp"
+    if os.path.exists(tmpfile):
+        os.remove(tmpfile)
 
-    con = sqlite3.connect(outfile)
-    df = pd.concat([pd.read_json(f, lines=True) for f in infiles])
-
-    df.to_sql(table, con, index=False)
-    add_pk_to_sqlite_table(tablename="expenses", index_column="pk", connection=con)
+    con = sqlite3.connect(tmpfile)
+    try:
+        df = pd.concat([pd.read_json(f, lines=True) for f in infiles])
+        df.to_sql(table, con, index=False)
+        add_pk_to_sqlite_table(tablename="expenses", index_column="pk", connection=con)
+    except BaseException:
+        con.close()
+        if os.path.exists(tmpfile):
+            os.remove(tmpfile)
+        raise
+    con.close()
+    os.replace(tmpfile, outfile)
 
 
 @click.command()
