@@ -1,4 +1,2 @@
 playwright==1.55.0
-pykeepass
-pyotp
 pytest
