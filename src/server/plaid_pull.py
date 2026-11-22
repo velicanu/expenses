@@ -13,6 +13,8 @@ from datetime import date, datetime, timedelta
 from cardstore import dump_csv, merge_tx
 from fsutil import make_dirs
 
+from .plaid_link import RECONNECT_CODES
+
 log = logging.getLogger("expenses.plaid")
 PAGE = 500
 
@@ -66,8 +68,20 @@ def _plaid_error(exc) -> str:
         return type(exc).__name__
 
 
+def _error_code(exc) -> str | None:
+    try:
+        return json.loads(exc.body)["error_code"]
+    except Exception:
+        return None
+
+
 def pull_all(store, keys, client_factory=make_client, today=date.today) -> dict:
-    """keys: bao.PlaidKeys. Raises PlaidUnavailable if the keys cannot be had."""
+    """keys: bao.PlaidKeys. Raises PlaidUnavailable if the keys cannot be had, PipelineBusy if a pull is running."""
+    with store.exclusive("pull"):
+        return _pull_all(store, keys, client_factory, today)
+
+
+def _pull_all(store, keys, client_factory, today) -> dict:
     accounts = (store.config().get("linked_accounts") or {}).items()
     if not accounts:
         return {"accounts": [], "pipeline": None}
@@ -82,7 +96,15 @@ def pull_all(store, keys, client_factory=make_client, today=date.today) -> dict:
             )
         except Exception as e:
             log.warning("pull failed for %s: %s", alias, type(e).__name__)
-            results.append({"alias": alias, "error": _plaid_error(e)})
+            code = _error_code(e)
+            results.append(
+                {
+                    "alias": alias,
+                    "error": _plaid_error(e),
+                    "code": code,
+                    "needs_reconnect": code in RECONNECT_CODES,
+                }
+            )
             continue
         # the card file is replaced whole, like before; merge_tx then adds only unseen transaction ids
         with open(store.cards_dir / f"{alias}.json", "w") as outfile:

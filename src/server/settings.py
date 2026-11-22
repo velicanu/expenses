@@ -5,6 +5,7 @@ USERS_FILE       JSON object: login email -> user name (the directory under DATA
 TRUSTED_PROXIES  comma-separated addresses of the reverse proxy; X-Email is believed only from these
 BAO_ADDR / BAO_ROLE_ID / BAO_SECRET_ID / BAO_KV_PATH   where the Plaid keys live (optional)
 STATIC_DIR       the built web app, served at / (optional)
+PLAID_REDIRECT_URI  the https address Plaid returns to after a bank's OAuth login (must be registered at Plaid)
 DEV_USER         local development only: skip the login and act as this user
 """
 
@@ -35,6 +36,9 @@ class Settings:
     bao: BaoSettings | None = None
     static_dir: Path | None = None
     max_upload_bytes: int = 25 * 1024 * 1024
+    plaid_redirect_uri: str | None = (
+        None  # where a bank's OAuth login sends the browser back; registered at Plaid
+    )
 
     def __post_init__(self):
         for user in [*self.users.values(), *([self.dev_user] if self.dev_user else [])]:
@@ -69,4 +73,5 @@ class Settings:
             dev_user=env.get("DEV_USER") or None,
             bao=bao,
             static_dir=Path(env["STATIC_DIR"]) if env.get("STATIC_DIR") else None,
+            plaid_redirect_uri=env.get("PLAID_REDIRECT_URI") or None,
         )

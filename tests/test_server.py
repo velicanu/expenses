@@ -608,7 +608,14 @@ def test_one_failing_account_does_not_stop_the_others(client, root):
         client_factory=lambda k: Broken(),
         today=lambda: date(2024, 6, 1),
     )
-    assert out["accounts"] == [{"alias": "card", "error": "RuntimeError"}]
+    assert out["accounts"] == [
+        {
+            "alias": "card",
+            "error": "RuntimeError",
+            "code": None,
+            "needs_reconnect": False,
+        }
+    ]
     assert out["pipeline"] is None and "ACCESS-SECRET" not in json.dumps(out)
 
 

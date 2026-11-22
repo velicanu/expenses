@@ -11,15 +11,15 @@ from typing import Literal
 from urllib.parse import urlparse
 
 from fastapi import Depends, FastAPI, File, HTTPException, Query, Request, UploadFile
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from . import figures, queries, sqlview
+from . import figures, plaid_link, queries, sqlview
 from .auth import User, current_user
 from .bao import PlaidKeys, PlaidUnavailable
 from .palette import COLORS
-from .plaid_pull import pull_all
+from .plaid_pull import make_client, pull_all
 from .settings import Settings
 from .store import NoData, PipelineBusy, Stores, UserStore
 
@@ -117,6 +117,21 @@ class FiguresRequest(BaseModel):
     group: Literal["auto", "year", "month", "week", "day"] = "auto"
 
 
+class LinkTokenRequest(BaseModel):
+    """No alias: link a new bank. An alias of a linked account: reconnect it (Plaid's update mode)."""
+
+    model_config = ConfigDict(extra="forbid")
+    # any existing alias can be reconnected (older configs may hold one the stricter new-link rule would refuse)
+    alias: str | None = Field(None, min_length=1, max_length=64)
+
+
+class ExchangeRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    public_token: str = Field(min_length=10, max_length=200)
+    alias: str = Field(pattern=plaid_link.ALIAS_RE.pattern)
+    start_date: dt.date | None = None
+
+
 class PipelineRun(BaseModel):
     model_config = ConfigDict(extra="forbid")
     rules_only: bool = False
@@ -125,7 +140,9 @@ class PipelineRun(BaseModel):
 # --- app ---------------------------------------------------------------------------------------------
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+def create_app(
+    settings: Settings | None = None, plaid_client_factory=make_client
+) -> FastAPI:
     settings = settings or Settings.from_env()
     app = FastAPI(
         title="expenses",
@@ -134,6 +151,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         redoc_url=None,
     )
     app.state.settings = settings
+    app.state.plaid_client_factory = plaid_client_factory
     app.state.stores = Stores(settings.data_root)
     app.state.plaid = PlaidKeys(settings.bao)
 
@@ -151,7 +169,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         response.headers.setdefault("Referrer-Policy", "same-origin")
         response.headers.setdefault(
             "Content-Security-Policy",
-            "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'none'",
+            "default-src 'self'; script-src 'self' https://cdn.plaid.com; frame-src https://cdn.plaid.com; "
+            "style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'none'",
         )
         if request.url.path.startswith("/api/"):
             response.headers.setdefault("Cache-Control", "no-store")
@@ -179,6 +198,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def _plaid(request, exc):
         return JSONResponse({"detail": f"Plaid is unavailable: {exc}"}, status_code=503)
 
+    @app.exception_handler(plaid_link.PlaidError)
+    async def _plaid_api(request, exc):
+        return JSONResponse(
+            {"detail": f"Plaid: {exc}", "code": exc.code}, status_code=502
+        )
+
     @app.exception_handler(ValueError)
     async def _bad_value(request, exc):
         return JSONResponse({"detail": str(exc)}, status_code=422)
@@ -204,6 +229,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         out = store.meta()
         out["colors"] = {**COLORS, **out.pop("new_category_colors")}
         out["plaid_configured"] = request.app.state.plaid.configured
+        out["plaid_oauth_ready"] = bool(request.app.state.settings.plaid_redirect_uri)
         return out
 
     # --- transactions ----------------------------------------------------------------------------
@@ -378,11 +404,87 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.post("/api/accounts/pull")
     def pull(request: Request, store: UserStore = Depends(store_for)):
-        return pull_all(store, request.app.state.plaid)
+        return pull_all(
+            store,
+            request.app.state.plaid,
+            client_factory=request.app.state.plaid_client_factory,
+        )
+
+    @app.post("/api/accounts/status")
+    def accounts_status(request: Request, store: UserStore = Depends(store_for)):
+        """Is each linked connection healthy, or does it need a reconnect (an expired bank login)?"""
+        accounts = store.accounts()
+        if not accounts:
+            return []
+        client = request.app.state.plaid_client_factory(request.app.state.plaid.get())
+        out = []
+        for a in accounts:
+            token = store.account_token(a["alias"])
+            status = (
+                plaid_link.item_status(client, token)
+                if token
+                else {
+                    "ok": False,
+                    "error_code": "NO_TOKEN",
+                    "needs_reconnect": False,
+                    "consent_expires": None,
+                }
+            )
+            out.append({**a, **status})
+        return out
+
+    @app.post("/api/plaid/link-token")
+    def plaid_link_token(
+        body: LinkTokenRequest,
+        request: Request,
+        user: User = Depends(current_user),
+        store: UserStore = Depends(store_for),
+    ):
+        token = None
+        if body.alias:
+            token = store.account_token(body.alias)
+            if not token:
+                raise HTTPException(404, "no such linked account")
+        client = request.app.state.plaid_client_factory(request.app.state.plaid.get())
+        link_token = plaid_link.create_link_token(
+            client,
+            user.name,
+            request.app.state.settings.plaid_redirect_uri,
+            access_token=token,
+        )
+        return {"link_token": link_token, "mode": "update" if token else "new"}
+
+    @app.post("/api/plaid/exchange", status_code=201)
+    def plaid_exchange(
+        body: ExchangeRequest, request: Request, store: UserStore = Depends(store_for)
+    ):
+        if store.has_account(body.alias):
+            raise HTTPException(
+                409,
+                f"'{body.alias}' is already linked: use Reconnect, or pick another alias",
+            )
+        client = request.app.state.plaid_client_factory(request.app.state.plaid.get())
+        access_token = plaid_link.exchange_public_token(client, body.public_token)
+        try:
+            institution = plaid_link.institution_name(client, access_token)
+        except plaid_link.PlaidError:
+            institution = None  # the link worked; the name is only a label
+        start = (
+            body.start_date.isoformat()
+            if body.start_date
+            else plaid_link.default_start_date()
+        )
+        store.add_account(body.alias, institution, start, access_token)
+        return {"alias": body.alias, "institution": institution, "start_date": start}
 
     # --- the web app -----------------------------------------------------------------------------
 
     static = settings.static_dir
     if static and Path(static).is_dir():
+
+        @app.get("/plaid-oauth", include_in_schema=False)
+        def plaid_oauth_return():
+            return FileResponse(Path(static) / "index.html")
+
         app.mount("/", StaticFiles(directory=static, html=True), name="web")
     return app
