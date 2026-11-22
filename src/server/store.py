@@ -157,6 +157,7 @@ class UserStore:
             "max_date": valid.max().date().isoformat() if not valid.empty else None,
             "count": int(len(df)),
             "categories": sorted(categories),
+            "data_categories": sorted(df["category"].dropna().unique()),
             "sources": sorted(df["source_file"].dropna().unique()),
             "new_category_colors": rules["new_categories"],
         }
@@ -239,6 +240,11 @@ class UserStore:
             self._write_change(row)
             return row
 
+    def sql_frame(self) -> pd.DataFrame:
+        """What the old app ran its queries over: every transaction with the user's edits applied and zero
+        amounts left out, with the table's own columns (no parsed date, no `edited`)."""
+        return self.expenses().drop(columns=["ts", "edited"]).reset_index(drop=True)
+
     # --- config and rules ----------------------------------------------------------------------------
 
     def config(self) -> dict:
@@ -261,6 +267,36 @@ class UserStore:
 
     def set_rules(self, rules: dict):
         self.update_config(lambda cfg: cfg.__setitem__("rules", rules))
+
+    # The old app kept the sidebar's state in config.json under these keys and applied it on every load
+    # (shared by every device, since it lives with the data). Same keys, so both UIs read each other's.
+    STATE_KEYS = {
+        "min_date": "min_date",
+        "max_date": "max_date",
+        "categories_in": "categories in",
+        "categories_not_in": "categories not in",
+        "show_sql": "show_sql",
+        "rules_button": "rules_button",
+    }
+
+    def state(self) -> dict:
+        cfg = self.config()
+        return {
+            "min_date": cfg.get("min_date"),
+            "max_date": cfg.get("max_date"),
+            "categories_in": list(cfg.get("categories in") or []),
+            "categories_not_in": list(cfg.get("categories not in") or []),
+            "show_sql": bool(cfg.get("show_sql", False)),
+            "rules_button": bool(cfg.get("rules_button", False)),
+        }
+
+    def update_state(self, updates: dict) -> dict:
+        def apply(cfg):
+            for key, value in updates.items():
+                cfg[self.STATE_KEYS[key]] = value
+
+        self.update_config(apply)
+        return self.state()
 
     def accounts(self) -> list:
         """Linked Plaid accounts, without their access tokens (those never leave this process)."""

@@ -40,15 +40,32 @@ The demo video below shows the previous (Streamlit) interface; the workflow is t
 
 ## Usage
 
-The first step to using this tool is obtaining the credit card transaction data.
-You can usually download a full year's worth of data at a time from each account.
+The page is the old Streamlit page, rebuilt: a **sidebar** with the filters, and the **charts** in the main area.
 
-1. **Data** tab: upload the CSVs. Files that match a known card layout are saved and the pipeline runs.
-2. **Dashboard**: spending by category and over time, with the shared filter bar (dates, categories, source,
-   and a description box: `a+b` is or, `a^b` is and, `!a` is not, `*` is a wildcard).
-3. **Transactions**: edit a category, amount, description or date inline, add a transaction, or delete one.
-   Edits live in `changes.db`, so re-running the pipeline never loses them. Delete hides a row (amount 0).
-4. **Rules**: map descriptions or card categories to your own categories, then *Save and apply*.
+- **Sidebar form** (applies on **Submit**): date range, *Categories in*, *Categories not in*, *Description*
+  (`a+b` is or, `a^b` is and, `!a` is not, `*` is a wildcard) and *Source file*. Your selections are saved with the
+  data (`config.json`), so every device opens with the same filters, as the old app did.
+- **Inputs**: upload CSVs (a recognised card layout is saved and the pipeline runs), *Run pipeline*,
+  *Refresh data* (Plaid, for already linked accounts), delete raw files.
+- **Rules**: map descriptions or card categories to your own categories (and colors), then *Apply rules*.
+- **Show data**: the SQL the filters build (editable; it runs over table `expenses`) and the data, editable in place,
+  with *Save Changes*, and a **+** to add a row. Edits live in `changes.db`, so re-running the pipeline never loses them.
+- **Charts**: spending by category (table and pie) and spending over time with a *Time bin* slider.
+
+Numbers and colors are identical to the old app, and keeping them that way:
+
+- the charts are built **on the server with the same Plotly Express code** (`src/server/figures.py`) and the
+  SQL box text by the same rules (`src/server/sqlview.py`), then drawn by plotly.js;
+- Streamlit's browser code also themed every chart (its palette for categories with no color of their own, bold
+  titles, light/dark); `web/src/streamlitTheme.ts` does the same, from templates captured from the old app in a real
+  browser;
+- `tests/golden/old_ui.json` was captured from the real old app (`python tests/golden/make_golden.py`), and
+  `tests/test_parity.py` requires the same figures and SQL, scenario by scenario, so it stays true after
+  `src/main.py` is gone.
+
+Kept on purpose, because they are the old numbers: the end date of the range is compared as text, so rows **on** the
+last day are left out; and a lone `!term` in the description box is not negated (only `a+!b` or `a^!b` are).
+Different from the old app: the SQL box is read-only (SELECT only, 10 s, 50,000 rows).
 
 ### Plaid integration
 

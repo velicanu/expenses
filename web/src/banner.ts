@@ -28,7 +28,7 @@ export function useBanner(): string | null {
 /** The API's own message, plus what to do about the cases a person can fix. */
 export function friendly(err: unknown): string {
   if (err instanceof ApiError) {
-    if (err.status === 409 && /no data/i.test(err.message)) return "There is no data yet. Upload a CSV in the Data tab first.";
+    if (err.status === 409 && /no data/i.test(err.message)) return "There is no data yet. Upload a CSV first (Inputs, then upload data).";
     return err.message;
   }
   return err instanceof Error ? err.message : "Something went wrong.";

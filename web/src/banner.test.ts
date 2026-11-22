@@ -4,7 +4,7 @@ import { friendly } from "./banner";
 
 describe("friendly", () => {
   it("tells the user what to do when there is no data yet", () => {
-    expect(friendly(new ApiError(409, "no data yet: upload a CSV first"))).toMatch(/Upload a CSV in the Data tab/);
+    expect(friendly(new ApiError(409, "no data yet: upload a CSV first"))).toMatch(/Upload a CSV first/);
   });
   it("shows other API messages as they are, including a busy pipeline", () => {
     expect(friendly(new ApiError(409, "the pipeline is already running"))).toBe("the pipeline is already running");

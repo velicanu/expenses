@@ -1,7 +1,6 @@
-import { QueryClient, useQuery, useQueryClient } from "@tanstack/react-query";
+import { QueryClient, keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, ApiError } from "./api";
-import type { Filters } from "./filters";
-import type { Bin, Order, SortKey } from "./types";
+import type { Group, SqlFilters } from "./types";
 
 export function makeQueryClient(): QueryClient {
   return new QueryClient({
@@ -18,22 +17,35 @@ export function makeQueryClient(): QueryClient {
 
 export const useMe = () => useQuery({ queryKey: ["me"], queryFn: api.me, staleTime: Infinity });
 export const useMeta = () => useQuery({ queryKey: ["meta"], queryFn: api.meta });
-export const useByCategory = (f: Filters) => useQuery({ queryKey: ["summary", "category", f], queryFn: () => api.byCategory(f) });
-export const useOverTime = (f: Filters, bin: Bin) =>
-  useQuery({ queryKey: ["summary", "time", f, bin], queryFn: () => api.overTime(f, bin) });
-export const useTransactions = (f: Filters, sort: SortKey, order: Order, page: number, limit: number) =>
-  useQuery({
-    queryKey: ["transactions", f, sort, order, page, limit],
-    queryFn: () => api.transactions(f, sort, order, page * limit, limit),
-    placeholderData: (previous) => previous,
-  });
+export const useAppState = () => useQuery({ queryKey: ["state"], queryFn: api.state, staleTime: Infinity });
 export const useRules = () => useQuery({ queryKey: ["rules"], queryFn: api.rules });
 export const useFiles = () => useQuery({ queryKey: ["files"], queryFn: api.files });
 export const useAccounts = () => useQuery({ queryKey: ["accounts"], queryFn: api.accounts });
 
-/** After anything that changes the data: every view that shows transactions or totals refetches. */
-export function useRefreshData() {
+/** The old SQL text built from the sidebar form; also says when the description box is invalid. */
+export const useSqlDefault = (filters: SqlFilters) =>
+  useQuery({ queryKey: ["sqlDefault", filters], queryFn: () => api.sqlDefault(filters) });
+
+/** The rows of the query (only needed while "Show data" is open). */
+export const useSqlRun = (query: string | undefined, enabled: boolean) =>
+  useQuery({
+    queryKey: ["sqlRun", query],
+    queryFn: () => api.sqlRun(query as string),
+    enabled: enabled && !!query,
+    placeholderData: keepPreviousData,
+  });
+
+/** Both charts, built by the server from the query. */
+export const useFigures = (query: string | undefined, group: Group) =>
+  useQuery({
+    queryKey: ["figures", query, group],
+    queryFn: () => api.figures(query as string, group),
+    enabled: !!query,
+    placeholderData: keepPreviousData,
+  });
+
+/** After anything that changes the data, the rules or the files: every view refetches (the old app reran the page). */
+export function useRefreshAll() {
   const client = useQueryClient();
-  return () =>
-    Promise.all(["transactions", "summary", "meta", "files", "accounts"].map((key) => client.invalidateQueries({ queryKey: [key] })));
+  return () => client.invalidateQueries();
 }
