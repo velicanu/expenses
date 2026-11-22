@@ -13,7 +13,8 @@ export interface Meta {
   data_categories: string[]; // categories present in the data, sorted
   sources: string[];
   colors?: Record<string, string>; // ignored: the server colors the charts
-  plaid_configured: boolean;
+  plaid_configured: boolean; // the server can read its Plaid keys (bao)
+  plaid_oauth_ready: boolean; // the OAuth return address (/plaid-oauth) is configured on the server
 }
 
 /** The saved filters (config.json min_date / max_date / "categories in" / "categories not in" / show_sql / rules_button). */
@@ -115,7 +116,46 @@ export interface Account {
   start_date: string | null;
 }
 
+/** One account in a pull: how many transactions came, or why not (and whether a reconnect would fix it). */
+export type PullAccount =
+  | { alias: string; pulled: number }
+  | { alias: string; error: string; code?: string | null; needs_reconnect?: boolean };
+
 export interface PullResult {
-  accounts: ({ alias: string; pulled: number } | { alias: string; error: string })[];
+  accounts: PullAccount[];
   pipeline: PipelineResult | null;
+}
+
+/** Is a linked connection healthy? (POST /api/accounts/status; the access token is never part of it.) */
+export interface AccountStatus extends Account {
+  ok: boolean;
+  error_code: string | null;
+  needs_reconnect: boolean; // an expired bank login: Plaid's update mode fixes it
+  consent_expires: string | null;
+}
+
+export interface LinkToken {
+  link_token: string;
+  mode: "new" | "update";
+}
+
+export interface ExchangeRequest {
+  public_token: string;
+  alias: string;
+  start_date?: string;
+}
+
+export interface ExchangeResult {
+  alias: string;
+  institution: string | null;
+  start_date: string;
+}
+
+/** What the page remembers across the trip to a bank's OAuth login and back (localStorage, plaid-link-pending). */
+export interface PendingLink {
+  link_token: string;
+  mode: "new" | "update";
+  alias: string;
+  start_date: string | null;
+  savedAt: number; // ms since the epoch; a link token lives 4 hours
 }

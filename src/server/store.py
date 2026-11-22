@@ -6,10 +6,13 @@ from the pipeline, which swaps it into place atomically. Every query is paramete
 come from the table, never from a request.
 """
 
+import contextlib
+import fcntl
 import math
 import os
 import re
 import sqlite3
+import tempfile
 import threading
 import time
 from datetime import date
@@ -309,6 +312,49 @@ class UserStore:
             for k, a in (self.config().get("linked_accounts") or {}).items()
         ]
 
+    def account_token(self, alias: str) -> str | None:
+        """The Plaid access token for an account. Only ever used inside this process, never returned."""
+        for key, acct in (self.config().get("linked_accounts") or {}).items():
+            if acct.get("alias", key) == alias or key == alias:
+                return acct.get("token")
+        return None
+
+    def has_account(self, alias: str) -> bool:
+        accounts = self.config().get("linked_accounts") or {}
+        return any(
+            a.get("alias", k) == alias or k == alias for k, a in accounts.items()
+        )
+
+    def add_account(
+        self, alias: str, institution: str | None, start_date: str, token: str
+    ):
+        def apply(cfg):
+            cfg.setdefault("linked_accounts", {})[alias] = {
+                "alias": alias,
+                "institution": institution,
+                "start_date": start_date,
+                "token": token,
+            }
+
+        self.update_config(apply)
+
+    @contextlib.contextmanager
+    def exclusive(self, name: str):
+        """One at a time across processes (the web app, and `docker exec` for the nightly pull): an flock on a file
+        in the container's /tmp, which every process in the container shares. Raises PipelineBusy if it is held."""
+        path = os.path.join(
+            tempfile.gettempdir(), f"expenses-{self.dir.name}-{name}.lock"
+        )
+        fd = os.open(path, os.O_CREAT | os.O_RDWR, 0o600)
+        try:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                raise PipelineBusy() from None
+            yield
+        finally:
+            os.close(fd)  # closing releases the lock
+
     # --- raw files and the pipeline ------------------------------------------------------------------
 
     def raw_files(self) -> list:
@@ -361,16 +407,17 @@ class UserStore:
         if not self._pipeline_lock.acquire(blocking=False):
             raise PipelineBusy()
         try:
-            make_dirs([self.dir])
-            start = time.monotonic()
-            ran = run_pipeline(
-                str(self.dir), standardize_only=rules_only, config=self.config()
-            )
-            return {
-                "ran": bool(ran),
-                "seconds": round(time.monotonic() - start, 1),
-                "count": int(len(self.expenses())),
-            }
+            with self.exclusive("pipeline"):
+                make_dirs([self.dir])
+                start = time.monotonic()
+                ran = run_pipeline(
+                    str(self.dir), standardize_only=rules_only, config=self.config()
+                )
+                return {
+                    "ran": bool(ran),
+                    "seconds": round(time.monotonic() - start, 1),
+                    "count": int(len(self.expenses())),
+                }
         finally:
             self._pipeline_lock.release()
 

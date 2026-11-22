@@ -2,6 +2,8 @@ import { QueryClient, keepPreviousData, useQuery, useQueryClient } from "@tansta
 import { api, ApiError } from "./api";
 import type { Group, SqlFilters } from "./types";
 
+const STATUS_KEY = "accountsStatus";
+
 export function makeQueryClient(): QueryClient {
   return new QueryClient({
     defaultOptions: {
@@ -21,6 +23,13 @@ export const useAppState = () => useQuery({ queryKey: ["state"], queryFn: api.st
 export const useRules = () => useQuery({ queryKey: ["rules"], queryFn: api.rules });
 export const useFiles = () => useQuery({ queryKey: ["files"], queryFn: api.files });
 export const useAccounts = () => useQuery({ queryKey: ["accounts"], queryFn: api.accounts });
+
+/**
+ * Plaid's view of each linked connection. It is a call to Plaid per account, so it runs when the Inputs panel
+ * opens and after a link, reconnect or refresh (useRefreshStatus), not on every refetch of the page.
+ */
+export const useAccountStatus = () =>
+  useQuery({ queryKey: [STATUS_KEY], queryFn: api.accountsStatus, staleTime: Infinity, refetchOnMount: "always", retry: false });
 
 /** The old SQL text built from the sidebar form; also says when the description box is invalid. */
 export const useSqlDefault = (filters: SqlFilters) =>
@@ -47,5 +56,10 @@ export const useFigures = (query: string | undefined, group: Group) =>
 /** After anything that changes the data, the rules or the files: every view refetches (the old app reran the page). */
 export function useRefreshAll() {
   const client = useQueryClient();
-  return () => client.invalidateQueries();
+  return () => client.invalidateQueries({ predicate: (q) => q.queryKey[0] !== STATUS_KEY });
+}
+
+export function useRefreshStatus() {
+  const client = useQueryClient();
+  return () => client.invalidateQueries({ queryKey: [STATUS_KEY] });
 }

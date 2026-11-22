@@ -30,6 +30,7 @@ browser --https--> nginx (pi5) --auth_request--> oauth2-proxy (Google login)
 | `TRUSTED_PROXIES` | addresses allowed to send `X-Email` (pi5's). Anything else gets 403. |
 | `BAO_ADDR`, `BAO_ROLE_ID`, `BAO_SECRET_ID`, `BAO_KV_PATH` | where the Plaid keys are; optional, Plaid is off without them |
 | `STATIC_DIR` | the built web app (set by the Dockerfile) |
+| `PLAID_REDIRECT_URI` | where a bank's OAuth login returns to; must be registered at Plaid (optional; OAuth banks need it) |
 | `LISTEN_HOST`, `PORT` | where to listen (tess's LAN address, 8094) |
 
 Run it as **one process** (the pipeline lock and the data cache are in memory) and with
@@ -41,6 +42,25 @@ Run it as **one process** (the pipeline lock and the data cache are in memory) a
 `expenses.db` is not synced (it is rebuilt from `raw/`; ignore patterns live in the server repo's
 `iac/syncthing/desired.json`), `changes.db` is. The pipeline builds `expenses.db.tmp` next to the target
 and renames it into place.
+
+## Plaid
+
+- **Keys**: the Plaid client id and *production* secret are in bao (`kv/expenses/plaid`), written from the server repo's
+  `secrets-expenses.enc.env`. A secret is specific to a Plaid environment; the old Development environment is gone, and
+  keys from a different environment answer `INVALID_API_KEYS`.
+- **Linking** (Inputs → Link account): Plaid Link opens in the page. Banks that use OAuth (Capital One, Chase,
+  Wealthfront ...) send the browser to the bank and back to `PLAID_REDIRECT_URI`
+  (`https://expense.velicanu.com/plaid-oauth`), which **must be registered** in the Plaid dashboard under Developers →
+  API → *Allowed redirect URIs*; until it is, Plaid answers `INVALID_FIELD: OAuth redirect URI must be configured`.
+  A new link asks Plaid for 730 days of history (its default is 90). Pick a start date that does not overlap CSVs you
+  already uploaded: a new link is a new Plaid connection with new transaction ids, so overlap duplicates rows.
+- **Reconnect**: when a bank login expires the Linked cards table shows *Needs reconnect*. Reconnect uses Plaid's update
+  mode with the stored token (same token, only the bank login is asked again), then pulls.
+- **Tokens** live in `data/<user>/config.json` (as the old app kept them), are used only inside the server and are never
+  returned by the API.
+- **Nightly pull**: the server repo's cron runs `docker exec expenses python -m server.cli pull` at 04:47 and appends one
+  line per account to `~/expenses/pull.log` on tess (exit status 1 if any account failed, e.g. a login to reconnect).
+  Only one pull or rebuild runs at a time, across the web app and the cron (a file lock in the container's /tmp).
 
 ## First deploy over existing data: re-key `changes.db` once
 
