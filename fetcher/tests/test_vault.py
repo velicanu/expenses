@@ -1,182 +1,297 @@
+import io
+import json
+import os
 import subprocess
 import sys
+import urllib.error
 
-import pyotp
 import pytest
 from fetcher import vault as v
-from pykeepass import create_database
 
-SEED = "JBSWY3DPEHPK3PXP"
 PASSWORD = "hunter2-the-venmo-password"
-MASTER = "correct horse battery staple"
+SEED = "JBSWY3DPEHPK3PXP"
+WRITER = "s.writer-token"
+ADDR = "http://bao.test"
+
+
+class FakeBao:
+    """Just enough of OpenBao's HTTP API; records every request so tests can see what was sent and with which token."""
+
+    def __init__(self):
+        self.kv = {
+            "venmo": {"username": "someone@example.com", "password": PASSWORD},
+            "citi": {"username": "u"},
+        }
+        self.totp = {"venmo"}
+        self.requests = []
+        self.login_status = 200
+
+    def __call__(self, req, timeout=None):
+        path = req.full_url.removeprefix(ADDR)
+        token = req.get_header("X-vault-token")
+        body = json.loads(req.data) if req.data else None
+        self.requests.append((req.get_method(), path, token, body))
+        if path == "/v1/auth/approle/login":
+            return self._reply(
+                self.login_status, {"auth": {"client_token": "s.reader"}}
+            )
+        if token not in ("s.reader", WRITER):
+            return self._reply(403, {"errors": ["permission denied"]})
+        kind, _, rest = path.removeprefix("/v1/").partition("/")
+        if kind == "kv":
+            name = rest.removeprefix("data/fetcher/")
+            if body is not None:  # a write needs the writer, as the real policies say
+                if token != WRITER:
+                    return self._reply(403, {})
+                self.kv[name] = body["data"]
+                return self._reply(200, {"data": {"version": 2}})
+            return (
+                self._reply(200, {"data": {"data": self.kv[name]}})
+                if name in self.kv
+                else self._reply(404, {})
+            )
+        if kind == "totp":
+            what, _, name = rest.partition("/")
+            if what == "keys" and body is not None:
+                if token != WRITER:
+                    return self._reply(403, {})
+                if body.get("key", "x") == "ABC":
+                    return self._reply(
+                        400, {"errors": ["invalid key value: illegal base32 data"]}
+                    )
+                self.totp.add(name)
+                return self._reply(204, None)
+            if name not in self.totp:
+                return self._reply(
+                    404 if what == "keys" else 400, {"errors": ["unknown key"]}
+                )
+            if what == "keys":
+                return self._reply(
+                    200, {"data": {"period": 30}}
+                )  # settings only, never the seed
+            return self._reply(200, {"data": {"code": "166971"}})
+        return self._reply(404, {})
+
+    @staticmethod
+    def _reply(status, payload):
+        raw = b"" if payload is None else json.dumps(payload).encode()
+        if status >= 400:
+            raise urllib.error.HTTPError("u", status, "err", {}, io.BytesIO(raw))
+        return _Resp(raw)
+
+
+class _Resp:
+    def __init__(self, raw):
+        self._raw = raw
+
+    def read(self):
+        return self._raw
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
 
 
 @pytest.fixture
-def db(tmp_path):
-    path = tmp_path / "fetcher.kdbx"
-    kp = create_database(str(path), password=MASTER)
-    group = kp.root_group
-    full = kp.add_entry(group, "Venmo", "someone@example.com", PASSWORD)
-    # as KeePassXC stores it: the reserved `otp` attribute holding an otpauth:// URI
-    full.otp = f"otpauth://totp/Venmo:someone@example.com?secret={SEED}&issuer=Venmo"
-    plain = kp.add_entry(group, "Citi", "citiuser", "citipass")
-    plain.set_custom_property(
-        "TOTP Seed", "JBSW Y3DP EHPK 3PXP"
-    )  # a spaced base32 seed, as some sites display it
-    kp.add_entry(group, "NoOtp", "u", "p")
-    kp.add_entry(group, "NoPassword", "u", "")
-    kp.save()
-    return str(path)
+def bao():
+    return FakeBao()
 
 
-def test_it_reads_credentials_and_a_keepassxc_otp_attribute(db):
-    vault = v.Vault(db, password=MASTER)
-    creds = vault.credentials("Venmo")
+def make(bao):
+    return v.Vault(ADDR, "role", "secret", bao)
+
+
+def test_it_reads_credentials_and_whether_a_totp_key_exists(bao):
+    vault = make(bao)
+    creds = vault.credentials("venmo")
     assert (creds.username, creds.password, creds.has_totp) == (
         "someone@example.com",
         PASSWORD,
         True,
     )
-    assert vault.password("Venmo") == PASSWORD
+    assert vault.password("venmo") == PASSWORD
+    assert vault.credentials("citi").has_totp is False
 
 
-def test_the_totp_code_is_the_current_code_for_the_seed(db):
-    vault = v.Vault(db, password=MASTER)
-    totp = v._Totp(SEED)
-    before = totp.now()
-    code = vault.totp_code("Venmo")
-    after = totp.now()
-    assert code in (before, after) and len(code) == 6 and code.isdigit()
+def test_the_totp_code_comes_from_the_engine_and_the_seed_is_never_requested(bao):
+    assert make(bao).totp_code("venmo") == "166971"
+    paths = [p for _, p, _, _ in bao.requests]
+    assert "/v1/totp/code/venmo" in paths
+    assert not any("seed" in p for p in paths)
 
 
-def test_a_plain_base32_seed_property_works_too(db):
-    totp = v._Totp(SEED)
-    before = totp.now()
-    code = v.Vault(db, password=MASTER).totp_code("Citi")
-    assert code in (before, totp.now())
+def test_it_logs_in_once_and_uses_the_token_it_got(bao):
+    vault = make(bao)
+    vault.credentials("venmo")
+    vault.totp_code("venmo")
+    assert sum(1 for _, p, _, _ in bao.requests if p.endswith("/login")) == 1
+    assert all(
+        t == "s.reader" for _, p, t, _ in bao.requests if not p.endswith("/login")
+    )
 
 
-def test_missing_things_are_clear_errors(db):
-    vault = v.Vault(db, password=MASTER)
-    with pytest.raises(v.VaultError, match="no TOTP"):
-        vault.totp_code("NoOtp")
+def test_missing_things_are_clear_errors(bao):
+    vault = make(bao)
     with pytest.raises(v.VaultError, match="no entry"):
-        vault.credentials("Nope")
+        vault.credentials("nope")
+    with pytest.raises(v.VaultError, match="no TOTP"):
+        vault.totp_code("citi")
     with pytest.raises(v.VaultError, match="no password"):
-        vault.password("NoPassword")
-    assert vault.credentials("NoOtp").has_totp is False
+        vault.password("citi")
 
 
-def test_a_wrong_master_password_or_file_never_echoes_secrets(db, tmp_path):
+def test_a_refused_login_or_unreachable_bao_never_echoes_secrets(bao):
+    bao.login_status = 403
     with pytest.raises(v.VaultError) as e:
-        v.Vault(db, password="not the password")
-    assert "not the password" not in str(e.value) and MASTER not in str(e.value)
-    with pytest.raises(v.VaultError):
-        v.Vault(str(tmp_path / "missing.kdbx"), password=MASTER)
-
-
-def test_the_master_password_comes_from_a_file_before_the_environment(tmp_path):
-    f = tmp_path / "master"
-    f.write_text(MASTER + "\n")
+        make(bao).credentials("venmo")
     assert (
-        v.master_password_from_env(
-            {"FETCHER_VAULT_PASSWORD_FILE": str(f), "FETCHER_VAULT_PASSWORD": "other"}
-        )
-        == MASTER
+        "HTTP 403" in str(e.value)
+        and "secret" not in str(e.value)
+        and "role" not in str(e.value)
     )
-    assert (
-        v.master_password_from_env({"FETCHER_VAULT_PASSWORD": "from-env"}) == "from-env"
-    )
-    with pytest.raises(v.VaultError, match="no master password"):
-        v.master_password_from_env({})
-    with pytest.raises(v.VaultError, match="cannot read"):
-        v.master_password_from_env(
-            {"FETCHER_VAULT_PASSWORD_FILE": str(tmp_path / "nope")}
-        )
+
+    def down(req, timeout=None):
+        raise urllib.error.URLError("connection refused for secret")
+
+    with pytest.raises(v.VaultError) as e:
+        v.Vault(ADDR, "role", "secret", down).credentials("venmo")
+    assert "URLError" in str(e.value) and "secret" not in str(e.value)
 
 
-def test_describe_reports_what_an_entry_has_and_none_of_its_values(
-    db, monkeypatch, tmp_path
-):
-    f = tmp_path / "master"
-    f.write_text(MASTER)
-    monkeypatch.setenv("FETCHER_VAULT_PASSWORD_FILE", str(f))
-    text = v.describe(db, "Venmo")
+@pytest.mark.parametrize("name", ["../x", "Venmo", "a/b", "", "x" * 40, "-a", "a b"])
+def test_institution_names_cannot_reach_other_paths(bao, name):
+    with pytest.raises(v.VaultError, match="not an institution name"):
+        make(bao).credentials(name)
+    assert bao.requests == []
+
+
+def test_describe_reports_what_there_is_and_none_of_its_values(bao):
+    text = make(bao).describe("venmo")
     assert (
-        "password present" in text
+        "username present" in text
+        and "password present" in text
         and "TOTP present" in text
-        and "username present" in text
     )
-    for secret in (PASSWORD, SEED, MASTER, "someone@example.com"):
+    for secret in (PASSWORD, SEED, "someone@example.com", "166971"):
         assert secret not in text
-    assert "TOTP missing" in v.describe(db, "NoOtp")
+    assert "password MISSING" in make(bao).describe("citi") and "TOTP missing" in make(
+        bao
+    ).describe("citi")
 
 
-def test_the_cli_vault_check_prints_no_values_and_exit_codes_are_right(db, tmp_path):
-    f = tmp_path / "master"
-    f.write_text(MASTER)
-    env = {
-        "FETCHER_VAULT": db,
-        "FETCHER_VAULT_PASSWORD_FILE": str(f),
-        "PATH": "/usr/bin:/bin",
+def test_from_env_names_the_missing_variable():
+    with pytest.raises(v.VaultError, match="BAO_ROLE_ID"):
+        v.Vault.from_env({"BAO_ADDR": ADDR})
+    assert v.Vault.from_env(
+        {"BAO_ADDR": ADDR, "BAO_ROLE_ID": "r", "BAO_SECRET_ID": "s"}
+    )
+
+
+def test_set_credentials_writes_with_the_writer_token_and_a_bare_seed(bao):
+    v.set_credentials(
+        ADDR, WRITER, "wealthfront", "me", "pw", "JBSW Y3DP EHPK 3PXP", opener=bao
+    )
+    assert bao.kv["wealthfront"] == {"username": "me", "password": "pw"}
+    (_, _, token, body) = [
+        r for r in bao.requests if r[1] == "/v1/totp/keys/wealthfront"
+    ][0]
+    assert token == WRITER and body == {
+        "key": "JBSWY3DPEHPK3PXP",
+        "issuer": "wealthfront",
     }
-    ok = subprocess.run(
-        [sys.executable, "-m", "fetcher", "vault-check", "Venmo"],
-        env=env,
-        capture_output=True,
-        text=True,
-    )
+    assert make(bao).credentials("wealthfront").has_totp is True
+
+
+def test_set_credentials_takes_an_otpauth_uri_and_makes_the_seed_optional(bao):
+    uri = f"otpauth://totp/Citi:me?secret={SEED}&issuer=Citi"
+    v.set_credentials(ADDR, WRITER, "citi2", "me", "pw", uri, opener=bao)
+    assert [r[3] for r in bao.requests if r[1] == "/v1/totp/keys/citi2"] == [
+        {"url": uri}
+    ]
+    v.set_credentials(ADDR, WRITER, "fidelity", "me", "pw", None, opener=bao)
+    assert not any(r[1] == "/v1/totp/keys/fidelity" for r in bao.requests)
+
+
+def test_set_credentials_failures_never_echo_what_was_typed(bao):
+    with pytest.raises(v.VaultError) as e:
+        v.set_credentials(ADDR, WRITER, "x1", "me", "pw", "ABC", opener=bao)
     assert (
-        ok.returncode == 0
-        and PASSWORD not in ok.stdout + ok.stderr
-        and SEED not in ok.stdout + ok.stderr
+        "HTTP 400" in str(e.value)
+        and "ABC" not in str(e.value)
+        and "pw" not in str(e.value)
     )
-    bad = subprocess.run(
-        [sys.executable, "-m", "fetcher", "vault-check", "Nope"],
-        env=env,
-        capture_output=True,
-        text=True,
-    )
-    assert bad.returncode == 1 and "no entry" in bad.stderr
-    usage = subprocess.run(
-        [sys.executable, "-m", "fetcher"], env=env, capture_output=True, text=True
-    )
-    assert usage.returncode == 2 and "python -m fetcher" in usage.stderr
+    with pytest.raises(v.VaultError, match="HTTP 403"):
+        v.set_credentials(ADDR, "s.reader", "x1", "me", "pw", None, opener=bao)
+    with pytest.raises(v.VaultError, match="both needed"):
+        v.set_credentials(ADDR, WRITER, "x1", "", "pw", None, opener=bao)
 
 
-def test_short_real_world_seeds_are_accepted_and_uri_options_are_honoured():
-    """16-character (80-bit) seeds are what many sites issue; pyotp 2.12's default 112-bit minimum would refuse them."""
-    short = "JBSWY3DPEHPK3PXP"
-    assert len(short) * 5 == 80
-    plain = v.totp_from_uri(f"otpauth://totp/Venmo:me?secret={short}&issuer=Venmo")
-    assert (
-        plain.now() == v._Totp(short).now()
-        and plain.interval == 30
-        and plain.digits == 6
-    )
-    custom = v.totp_from_uri(
-        f"otpauth://totp/Bank:me?secret={short}&digits=8&period=60&algorithm=SHA256"
-    )
-    assert custom.digits == 8 and custom.interval == 60 and len(custom.now()) == 8
-    # a 160-bit seed (what RFC-conformant sites issue) works the same way
-    long_seed = "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP"
-    assert (
-        v.totp_from_uri(f"otpauth://totp/x?secret={long_seed}").now()
-        == pyotp.TOTP(long_seed).now()
-    )
+def test_the_cli_usage_and_missing_configuration_exit_codes(tmp_path):
+    env = {"PATH": "/usr/bin:/bin"}
+
+    def run(*a):
+        return subprocess.run(
+            [sys.executable, "-m", "fetcher", *a],
+            env=env,
+            capture_output=True,
+            text=True,
+        )
+
+    assert run().returncode == 2
+    bad = run("vault-check", "venmo")
+    assert bad.returncode == 1 and "BAO_ADDR" in bad.stderr
 
 
-@pytest.mark.parametrize(
-    "uri",
-    [
-        "https://example.com/?secret=JBSWY3DPEHPK3PXP",  # not otpauth
-        "otpauth://hotp/x?secret=JBSWY3DPEHPK3PXP",  # counter-based, not time-based
-        "otpauth://totp/x",  # no secret
-        "otpauth://totp/x?secret=JBSWY3DPEHPK3PXP&algorithm=MD5",
-        "otpauth://totp/x?secret=!!notbase32!!",
-        "otpauth://totp/x?secret=ABC",  # far too short to be a real seed
-    ],
+@pytest.mark.skipif(
+    not os.environ.get("BAO_TEST_ADDR"),
+    reason="needs a real (dev-mode) OpenBao: BAO_TEST_ADDR/BAO_TEST_TOKEN",
 )
-def test_bad_otp_values_are_vault_errors_not_crashes(uri):
-    with pytest.raises(v.VaultError):
-        v.totp_from_uri(uri).now()
+def test_against_a_real_openbao():
+    """Run by hand against `bao server -dev` with the kv and totp engines and the fetcher policies; see docs/deploy.md."""
+    addr, root = os.environ["BAO_TEST_ADDR"], os.environ["BAO_TEST_TOKEN"]
+    v.set_credentials(addr, root, "realtest", "me", PASSWORD, SEED)
+    # the reader role is set up by the harness script; here the root token stands in only for the write side
+    reader = v.Vault(
+        addr, os.environ["BAO_TEST_ROLE_ID"], os.environ["BAO_TEST_SECRET_ID"]
+    )
+    assert (
+        reader.describe("realtest")
+        == "realtest: username present, password present, TOTP present"
+    )
+    code = reader.totp_code("realtest")
+    assert len(code) == 6 and code.isdigit()
+    # the policies, not the code, are what keep secrets one-way: the reader cannot write, the writer cannot read
+    writer = v.Vault(addr, "", "")
+    for method_path, body, token, what in [
+        (
+            "/v1/totp/keys/realtest",
+            {"key": SEED},
+            reader._auth(),
+            "reader writing a TOTP key",
+        ),
+        (
+            "/v1/kv/data/fetcher/realtest",
+            {"data": {"password": "x"}},
+            reader._auth(),
+            "reader writing kv",
+        ),
+        ("/v1/kv/data/fetcher/realtest", None, root, "writer reading kv"),
+    ]:
+        with pytest.raises(v._Http) as e:
+            writer._call(method_path, body, token=token)
+        assert e.value.status == 403, what
+    # a seed can never be read back: the key's settings carry no secret
+    settings = reader._call("/v1/totp/keys/realtest", token=reader._auth())
+    assert SEED not in json.dumps(settings)
+    # what a missing key looks like (the statuses the code relies on)
+    for path in ("/v1/totp/keys/nobody", "/v1/totp/code/nobody"):
+        with pytest.raises(v._Http) as e:
+            reader._call(path, token=reader._auth())
+        assert e.value.status in (400, 404), path
+    with pytest.raises(v.VaultError, match="no TOTP"):
+        reader.totp_code("nobody")
+    with pytest.raises(v.VaultError, match="no entry"):
+        reader.credentials("nobody")
+    assert reader.describe("realtest").endswith("TOTP present")
