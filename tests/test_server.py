@@ -1,4 +1,5 @@
 import json
+import shutil
 import sqlite3
 import threading
 from pathlib import Path
@@ -389,6 +390,8 @@ def test_upload_keeps_known_cards_and_reports_the_rest(client, root):
     wrong = ("files", ("evil.txt", b"x", "text/plain"))
     r = client.post("/api/files", files=[good, junk, wrong], headers=ME).json()
     assert len(r["saved"]) == 1 and len(r["failed"]) == 2
+    assert any(f.startswith("notes.csv") and "known card" in f for f in r["failed"])
+    assert any(f.startswith("evil.txt") and ".csv" in f for f in r["failed"])
     assert r["pipeline"]["ran"] is True
     assert [f["name"] for f in client.get("/api/files", headers=ME).json()] == [
         "chase.csv"
@@ -485,6 +488,10 @@ def test_the_web_app_is_served_from_static_dir(root, tmp_path):
     c = TestClient(create_app(make_settings(root, static_dir=web)))
     assert "<h1>hi</h1>" in c.get("/").text
     assert c.get("/api/me").status_code == 401  # the API is still behind the login
+    (web / "assets").mkdir()
+    (web / "assets" / "app-abc123.js").write_text("x")
+    assert "immutable" in c.get("/assets/app-abc123.js").headers["cache-control"]
+    assert "immutable" not in c.get("/").headers.get("cache-control", "")
 
 
 # --- Plaid -------------------------------------------------------------------------------------------
@@ -695,3 +702,38 @@ def test_amounts_survive_a_roundtrip_to_the_cent(loaded):
     pk = rows(loaded)["rows"][0]["pk"]
     loaded.patch(f"/api/transactions/{pk}", json={"amount": 1234.56}, headers=ME)
     assert [r["amount"] for r in rows(loaded)["rows"] if r["pk"] == pk] == [1234.56]
+
+
+def _other_filesystem(like: Path):
+    """A directory on a different filesystem from `like` (a container's /tmp tmpfs vs the data volume),
+    or None where there is no such thing (then the test is skipped)."""
+    for candidate in ("/dev/shm", "/run/user", "/tmp"):
+        p = Path(candidate)
+        if p.is_dir() and p.stat().st_dev != like.stat().st_dev:
+            return p
+    return None
+
+
+def test_upload_and_pipeline_work_when_the_temp_dir_is_on_another_filesystem(
+    root, tmp_path, monkeypatch
+):
+    """In the container /tmp is a tmpfs and the data is a bind mount: os.replace between them is EXDEV."""
+    root.mkdir()
+    other = _other_filesystem(root)
+    if other is None:
+        pytest.skip("no second filesystem to test with")
+    scratch = other / f"expenses-test-{tmp_path.name}"
+    scratch.mkdir()
+    try:
+        monkeypatch.setattr("tempfile.tempdir", str(scratch))
+        c = TestClient(create_app(make_settings(root)))
+        files = [
+            ("files", (p.name, p.read_bytes(), "text/csv"))
+            for p in sorted(SAMPLES.glob("*.csv"))
+        ]
+        r = c.post("/api/files", files=files, headers=ME)
+        assert r.status_code == 200 and not r.json()["failed"], r.text
+        assert r.json()["pipeline"]["count"] == 9
+        assert c.post("/api/pipeline/run", json={}, headers=ME).json()["ran"] is True
+    finally:
+        shutil.rmtree(scratch, ignore_errors=True)

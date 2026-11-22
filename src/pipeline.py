@@ -1,4 +1,5 @@
 import os
+import shutil
 import tempfile
 
 from common import get_files, get_log
@@ -76,7 +77,8 @@ def run(data_dir, standardize_only=False, config=None):
             os.path.join(data_dir, "expenses.db"),
         )
         for file_ in os.listdir(tmp_standardized_dir):
-            os.replace(
+            # not os.replace: the temp dir can be on another filesystem (a container's tmpfs)
+            shutil.move(
                 os.path.join(tmp_standardized_dir, file_),
                 os.path.join(standardized_dir, file_),
             )

@@ -305,8 +305,12 @@ class UserStore:
             except (
                 Exception
             ) as e:  # a CSV nobody has seen before can fail in any parser step
-                status, msg = "failed", f"{name}: {type(e).__name__}"
-            (saved if status == "success" else failed).append(msg)
+                failed.append(f"{name}: could not be read ({type(e).__name__})")
+                continue
+            if status == "success":
+                saved.append(msg)
+            else:
+                failed.append(f"{msg}: not a layout of any known card")
         return {"saved": saved, "failed": failed}
 
     def delete_raw(self, name: str):

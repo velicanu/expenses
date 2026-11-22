@@ -114,6 +114,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
         if request.url.path.startswith("/api/"):
             response.headers.setdefault("Cache-Control", "no-store")
+        elif request.url.path.startswith("/assets/"):
+            # Vite names these by content hash, so they never change under the same name
+            response.headers.setdefault(
+                "Cache-Control", "public, max-age=31536000, immutable"
+            )
         return response
 
     def store_for(request: Request, user: User = Depends(current_user)) -> UserStore:
