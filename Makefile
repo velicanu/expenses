@@ -27,3 +27,16 @@ format: ## Format code with ruff
 .PHONY: test
 test: ## Run tests
 	pytest
+
+.PHONY: web
+web: ## Build the web app into web/dist
+	cd web && npm ci && npm run build
+
+.PHONY: web-checks
+web-checks: ## Typecheck, lint and test the web app
+	cd web && npm run typecheck && npm run lint && npm test
+
+.PHONY: dev
+dev: ## Run the API on :8094 as DEV_USER=dragos on ./data (run `npm run dev` in web/ for the UI)
+	mkdir -p data/dragos
+	DATA_ROOT=data DEV_USER=dragos PYTHONPATH=src uvicorn server.app:create_app --factory --reload --no-proxy-headers --port 8094

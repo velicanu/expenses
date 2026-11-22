@@ -1,71 +1,51 @@
-# Development Tips
+# Deployment
 
-This doc is a dump of configs and commands to get streamlit deployed behind a nginx
-server.
+The app is deployed by the `velicanu/server` repo, not from here. This is how the pieces fit, so the two
+repos stay in step.
 
-## nginx config
-
-This conifg will run streamlit through nginx. Streamlit can either be accessible on the
-LAN or on the same machine as nginx, just adjust the `192.168.1.123` ip appropriately.
 ```
-        location /apps {
-            proxy_pass http://192.168.1.123:8501/apps;
-        }
-        location ^~ /static {
-            proxy_pass http://192.168.1.123:8501/apps/static;
-        }
-        location ^~ /healthz {
-            proxy_pass http://192.168.1.123:8501/apps/healthz;
-        }
-        location ^~ /vendor {
-            proxy_pass http://192.168.1.123:8501/apps/vendor;
-        }
-        location /apps/stream {
-            proxy_pass http://192.168.1.123:8501/apps/stream;
-            proxy_http_version 1.1;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header Host $host;
-            proxy_set_header Upgrade $http_upgrade;
-            proxy_set_header Connection "upgrade";
-            proxy_read_timeout 86400;
-        }
+browser --https--> nginx (pi5) --auth_request--> oauth2-proxy (Google login)
+                       |
+                       +--X-Email set by nginx--> this app on tess, 192.168.1.154:8094 (Docker, host network)
+                                                     |
+                                                     +--> ~/aa-viral-dragos-shared/data/<user>/   (Syncthing folder)
+                                                     +--> OpenBao on pi5 (Plaid keys, read-only AppRole)
 ```
 
-## Streamlit run command
+## What the server repo sets up (`iac/expense.tf`)
 
-Run streamlit via a command like the following:
+- DNS, the nginx site and `oauth2-proxy-expense` (only the emails in `local.expense_users`).
+- On tess: `~/iac/expenses/compose.yaml`, `deploy.sh`, `users.json` (login email -> user) and a nightly
+  `changes.db` backup. `ssh tess ~/iac/expenses/deploy.sh` checks out the branch in
+  `local.expenses_branch`, builds the Dockerfile and starts it.
+- Bao: `kv/expenses/plaid` (client id and secret), a read-only `expenses` policy and AppRole. The
+  role id and secret id reach the container in `~/expenses/bao.env`.
 
-```bash
-streamlit run src/Home.py  --server.enableCORS false --server.enableXsrfProtection false --server.baseUrlPath /apps/
-```
+## What the app expects (`src/server/settings.py`)
 
-Note `/apps/` in the run command matches `/apps` in the nginx configuration above.
+| Variable | Meaning |
+|---|---|
+| `DATA_ROOT` | directory with one subdirectory per user |
+| `USERS_FILE` | JSON, login email -> user (the subdirectory name) |
+| `TRUSTED_PROXIES` | addresses allowed to send `X-Email` (pi5's). Anything else gets 403. |
+| `BAO_ADDR`, `BAO_ROLE_ID`, `BAO_SECRET_ID`, `BAO_KV_PATH` | where the Plaid keys are; optional, Plaid is off without them |
+| `STATIC_DIR` | the built web app (set by the Dockerfile) |
+| `LISTEN_HOST`, `PORT` | where to listen (tess's LAN address, 8094) |
 
-## Auth config
+Run it as **one process** (the pipeline lock and the data cache are in memory) and with
+`--no-proxy-headers`, so the trusted-proxy check sees the real TCP peer. The Dockerfile does both.
 
-For auth to work you will need a `auth.yaml` file in the repo root directory. Don't
-check this into github! It will look something like this:
+## Data and Syncthing
 
-```yaml
-cookie:
-  expiry_days: 30
-  key: <key - random string>
-  name: expense_app_cookie
-credentials:
-  usernames:
-    user1:
-      email: user1@example.com
-      name: "user one"
-      password: password_hash
-preauthorized:
-  emails:
-  - user2@example.com
-  - user3@example.com
-```
+`data/<user>/` is a Syncthing folder shared with other devices; tess is its only writer.
+`expenses.db` is not synced (it is rebuilt from `raw/`; ignore patterns live in the server repo's
+`iac/syncthing/desired.json`), `changes.db` is. The pipeline builds `expenses.db.tmp` next to the target
+and renames it into place.
 
-Note: the emails field is only used to allow users to register, no confirmation or
-password reset emails are sent.
+## Gotchas found the hard way
 
-The easiest way to get started is to start with a dummy credential, add the user you
-want to create in preauthorized emails, and register the new user through the app and
-let the app update the auth.yaml config file.
+- `/tmp` in the container is a tmpfs and `/data` is a bind mount, so `os.replace` between them fails
+  with `EXDEV`. Move across with `shutil.move`, or write the temp file next to the target.
+- Don't split react and recharts into separate chunks (`manualChunks`): they import each other in a
+  cycle and the page comes up blank.
+- nginx's default read timeout is 60s; a Plaid pull or a large upload can take longer.
