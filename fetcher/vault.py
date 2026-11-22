@@ -42,12 +42,17 @@ def _check_name(name: str) -> str:
 
 class Vault:
     def __init__(
-        self, addr: str, role_id: str, secret_id: str, opener=urllib.request.urlopen
+        self,
+        addr: str,
+        role_id: str,
+        secret_id: str,
+        opener=urllib.request.urlopen,
+        token: str | None = None,
     ):
         self._addr = addr.rstrip("/")
         self._login_with = {"role_id": role_id, "secret_id": secret_id}
         self._open = opener
-        self._token: str | None = None
+        self._token = token  # a ready-made token (the CLI's); otherwise the AppRole login makes one
 
     @classmethod
     def from_env(cls, env=None, opener=urllib.request.urlopen) -> "Vault":
@@ -144,6 +149,50 @@ class Vault:
                 f"cannot get a TOTP code for {name!r} (HTTP {e.status})"
             ) from None
 
+    def status(self, name: str) -> dict:
+        """What is stored, as booleans and a date, never a value. Works with the write-only role: it reads the kv entry's
+        metadata (versions and times), not its data, and a TOTP key's settings, which hold no seed."""
+        try:
+            meta = self._call(
+                f"/v1/{KV}/metadata/fetcher/{_check_name(name)}", token=self._auth()
+            )["data"]
+            stored, saved = True, meta.get("updated_time")
+        except _Http as e:
+            if e.status != 404:
+                raise VaultError(
+                    f"cannot read the status of {name!r} (HTTP {e.status})"
+                ) from None
+            stored, saved = False, None
+        return {"stored": stored, "saved_at": saved, "totp": self._has_totp(name)}
+
+    def store(
+        self, name: str, username: str, password: str, totp_seed: str | None = None
+    ) -> None:
+        """Write (replace) an institution's credentials. A TOTP seed may be a base32 secret or an otpauth:// URI. The kv
+        entry is replaced as a whole, so username and password go together."""
+        name = _check_name(name)
+        if not username or not password:
+            raise VaultError("a username and a password are both needed")
+        try:
+            token = self._auth()
+            self._call(
+                f"/v1/{KV}/data/fetcher/{name}",
+                {"data": {"username": username, "password": password}},
+                token=token,
+            )
+            if totp_seed and totp_seed.strip():
+                seed = totp_seed.strip()
+                body = (
+                    {"url": seed}
+                    if seed.startswith("otpauth://")
+                    else {"key": seed.replace(" ", ""), "issuer": name}
+                )
+                self._call(f"/v1/{TOTP}/keys/{name}", body, token=token)
+        except _Http as e:
+            raise VaultError(
+                f"bao refused the write (HTTP {e.status}); a bad TOTP seed is HTTP 400"
+            ) from None
+
     def describe(self, name: str) -> str:
         """What bao holds for an institution, without any value: for checking the setup."""
         c = self.credentials(name)
@@ -167,27 +216,5 @@ def set_credentials(
     totp_seed: str | None = None,
     opener=urllib.request.urlopen,
 ) -> None:
-    """Write (replace) an institution's credentials with a short-lived `fetcher-writer` token. A TOTP seed may be a
-    base32 secret or an otpauth:// URI. The kv entry is replaced as a whole, so username and password go together."""
-    name = _check_name(name)
-    if not username or not password:
-        raise VaultError("a username and a password are both needed")
-    v = Vault(addr, "", "", opener)
-    try:
-        v._call(
-            f"/v1/{KV}/data/fetcher/{name}",
-            {"data": {"username": username, "password": password}},
-            token=token,
-        )
-        if totp_seed:
-            seed = totp_seed.strip()
-            body = (
-                {"url": seed}
-                if seed.startswith("otpauth://")
-                else {"key": seed.replace(" ", ""), "issuer": name}
-            )
-            v._call(f"/v1/{TOTP}/keys/{name}", body, token=token)
-    except _Http as e:
-        raise VaultError(
-            f"bao refused the write (HTTP {e.status}); a bad TOTP seed is HTTP 400"
-        ) from None
+    """The CLI's break-glass path: write with a short-lived `fetcher-writer` token a person supplies."""
+    Vault(addr, "", "", opener, token=token).store(name, username, password, totp_seed)

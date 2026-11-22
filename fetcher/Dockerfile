@@ -11,7 +11,9 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends x11vnc novnc websockify fluxbox \
  && rm -rf /var/lib/apt/lists/*
 
-RUN pip install --no-cache-dir playwright==1.55.0
+# fastapi + uvicorn serve the credentials page. typing_extensions comes from Debian (no pip RECORD file), so pip cannot
+# uninstall it to upgrade: install over it.
+RUN pip install --no-cache-dir --ignore-installed typing_extensions playwright==1.55.0 fastapi uvicorn
 
 WORKDIR /app
 COPY . /app/fetcher/
