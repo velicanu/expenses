@@ -1,8 +1,12 @@
 import type {
   Account,
+  AccountStatus,
   AppState,
+  ExchangeRequest,
+  ExchangeResult,
   FiguresResponse,
   Group,
+  LinkToken,
   Me,
   Meta,
   PipelineResult,
@@ -112,4 +116,9 @@ export const api = {
 
   accounts: () => request<Account[]>("/api/accounts"),
   pull: () => request<PullResult>("/api/accounts/pull", { method: "POST" }),
+  accountsStatus: () => request<AccountStatus[]>("/api/accounts/status", { method: "POST" }),
+
+  /** No alias: link a new bank. An alias of a linked account: reconnect it (Plaid's update mode). */
+  linkToken: (alias?: string) => request<LinkToken>("/api/plaid/link-token", json("POST", alias ? { alias } : {})),
+  exchange: (body: ExchangeRequest) => request<ExchangeResult>("/api/plaid/exchange", json("POST", body)),
 };

@@ -57,11 +57,11 @@ describe("Inputs", () => {
     expect(await screen.findByText("Plaid is unavailable: cannot read the Plaid keys")).toBeInTheDocument();
   });
 
-  it("Link account is there but disabled, with the reason", async () => {
+  it("Link account is disabled, with the reason, when the server has no Plaid keys", async () => {
     await inputs();
     const button = screen.getByRole("button", { name: "Link account" });
     expect(button).toBeDisabled();
-    expect(button).toHaveAttribute("title", "Linking a new Plaid account is not available in the new app yet");
+    expect(button).toHaveAttribute("title", "Plaid is not set up on the server (it cannot read its Plaid keys)");
   });
 
   it("uploads the chosen CSVs as `files` and shows what was saved and what failed", async () => {

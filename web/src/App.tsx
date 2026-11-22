@@ -1,17 +1,32 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api } from "./api";
 import { clearError, friendly, showError, useBanner } from "./banner";
 import { Charts } from "./components/Charts";
 import { DataPanel } from "./components/DataPanel";
 import { InputsPanel } from "./components/InputsPanel";
+import { OAuthReturn } from "./components/OAuthReturn";
 import { RulesPanel } from "./components/RulesPanel";
 import { Sidebar } from "./components/Sidebar";
 import { useAppState, useFigures, useMe, useMeta, useSqlDefault, useSqlRun } from "./hooks";
 import { initialFilters, savedFilters } from "./model";
+import { OAUTH_PATH, type Outcome } from "./plaidLink";
 import type { AppState, Group, Meta, SqlFilters } from "./types";
 
 export function App() {
+  // Plaid sends the browser back to /plaid-oauth after a bank's OAuth login: finish the link there, then show the app
+  const [returning, setReturning] = useState(() => window.location.pathname === OAUTH_PATH);
+  const [notice, setNotice] = useState<Outcome | null>(null);
+  const done = useCallback((outcome: Outcome | null) => {
+    window.history.replaceState(null, "", "/");
+    if (outcome) setNotice(outcome);
+    setReturning(false);
+  }, []);
+  if (returning) return <OAuthReturn onDone={done} />;
+  return <Loaded notice={notice} onDismissNotice={() => setNotice(null)} />;
+}
+
+function Loaded({ notice, onDismissNotice }: { notice: Outcome | null; onDismissNotice: () => void }) {
   const meta = useMeta();
   const state = useAppState();
   if (meta.isError || state.isError) {
@@ -22,10 +37,20 @@ export function App() {
     );
   }
   if (!meta.data || !state.data) return <p className="muted loading">Loading…</p>;
-  return <Page meta={meta.data} state={state.data} />;
+  return <Page meta={meta.data} state={state.data} notice={notice} onDismissNotice={onDismissNotice} />;
 }
 
-function Page({ meta, state }: { meta: Meta; state: AppState }) {
+function Page({
+  meta,
+  state,
+  notice,
+  onDismissNotice,
+}: {
+  meta: Meta;
+  state: AppState;
+  notice: Outcome | null;
+  onDismissNotice: () => void;
+}) {
   const client = useQueryClient();
   const me = useMe();
   const banner = useBanner();
@@ -99,6 +124,14 @@ function Page({ meta, state }: { meta: Meta; state: AppState }) {
       </aside>
       <div className="scrim" onClick={() => setDrawer(false)} />
       <main className="main">
+        {notice && (
+          <p className={`alert ${notice.kind} banner`} role={notice.kind === "error" ? "alert" : "status"}>
+            <span>{notice.text}</span>
+            <button type="button" onClick={onDismissNotice} aria-label="Dismiss message">
+              ×
+            </button>
+          </p>
+        )}
         {banner && (
           <div className="alert error banner" role="alert">
             <span>{banner}</span>
@@ -107,7 +140,7 @@ function Page({ meta, state }: { meta: Meta; state: AppState }) {
             </button>
           </div>
         )}
-        {inputsOpen && <InputsPanel />}
+        {inputsOpen && <InputsPanel plaidConfigured={meta.plaid_configured} oauthReady={meta.plaid_oauth_ready} />}
         {state.rules_button && <RulesPanel dataCategories={meta.data_categories} />}
         {state.show_sql && (
           <DataPanel

@@ -52,6 +52,7 @@ export const META = {
   data_categories: ["Bills", "Dining", "Income", "Payment", "Rent", "Taxes", "Transfer"],
   sources: ["amex.csv", "citi.csv"],
   plaid_configured: false,
+  plaid_oauth_ready: false,
 };
 
 export const STATE = {
@@ -120,6 +121,7 @@ export function appRoutes(over: Record<string, Handler | unknown> = {}): Record<
     "PUT /api/rules": (c: Call) => jsonResponse(c.body),
     "GET /api/files": [{ name: "amex.csv", size: 10, modified: 0 }, { name: "citi.csv", size: 10, modified: 0 }],
     "GET /api/accounts": [],
+    "POST /api/accounts/status": [],
     "POST /api/pipeline/run": { ran: true, seconds: 1.5, count: 11034 },
     "POST /api/accounts/pull": { accounts: [], pipeline: null },
     "POST /api/files": { saved: ["amex.csv: amex"], failed: [], pipeline: { ran: true, seconds: 1, count: 3 } },
