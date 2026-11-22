@@ -7,6 +7,7 @@ import datetime as dt
 import logging
 import re
 from pathlib import Path
+from typing import Literal
 from urllib.parse import urlparse
 
 from fastapi import Depends, FastAPI, File, HTTPException, Query, Request, UploadFile
@@ -14,7 +15,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from . import queries
+from . import figures, queries, sqlview
 from .auth import User, current_user
 from .bao import PlaidKeys, PlaidUnavailable
 from .palette import COLORS
@@ -74,6 +75,46 @@ class Rules(BaseModel):
             if not HEX_COLOR.match(color):
                 raise ValueError(f"{name}: color must look like #1a2b3c")
         return v
+
+
+class StateUpdate(BaseModel):
+    """The sidebar's saved state: any subset of these."""
+
+    model_config = ConfigDict(extra="forbid")
+    min_date: dt.date | None = None
+    max_date: dt.date | None = None
+    categories_in: list[str] | None = Field(None, max_length=200)
+    categories_not_in: list[str] | None = Field(None, max_length=200)
+    show_sql: bool | None = None
+    rules_button: bool | None = None
+
+    @field_validator("categories_in", "categories_not_in")
+    @classmethod
+    def names(cls, v):
+        if v is not None and any(not 1 <= len(c) <= 64 for c in v):
+            raise ValueError("category name has a bad length")
+        return v
+
+
+class DefaultQuery(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    start: dt.date | None = None
+    end: dt.date | None = None
+    category_in: list[str] = Field([], max_length=200)
+    category_not_in: list[str] = Field([], max_length=200)
+    description: str = Field("", max_length=200)
+    sources: list[str] = Field([], max_length=200)
+
+
+class SqlRun(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    query: str = Field(max_length=5000)
+
+
+class FiguresRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    query: str = Field(max_length=5000)
+    group: Literal["auto", "year", "month", "week", "day"] = "auto"
 
 
 class PipelineRun(BaseModel):
@@ -228,6 +269,57 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             store.delete_transaction(pk)
         except KeyError:
             raise HTTPException(404, "no such transaction") from None
+
+    # --- the old sidebar's saved state, its SQL box, and its two charts ---------------------------
+
+    @app.get("/api/state")
+    def get_state(store: UserStore = Depends(store_for)):
+        return store.state()
+
+    @app.put("/api/state")
+    def put_state(body: StateUpdate, store: UserStore = Depends(store_for)):
+        updates = {}
+        for key in body.model_fields_set:
+            value = getattr(body, key)
+            if key in ("min_date", "max_date"):
+                updates[key] = value.isoformat() if value else None
+            elif value is not None:
+                updates[key] = value
+        return store.update_state(updates)
+
+    @app.post("/api/sql/default")
+    def sql_default(body: DefaultQuery, store: UserStore = Depends(store_for)):
+        query, warning = sqlview.default_query(
+            store.sql_frame(),
+            body.start,
+            body.end,
+            body.category_in,
+            body.category_not_in,
+            body.description,
+            body.sources,
+        )
+        return {"query": query, "description_warning": warning}
+
+    @app.post("/api/sql/run")
+    def sql_run(body: SqlRun, store: UserStore = Depends(store_for)):
+        return sqlview.rows_for_json(sqlview.run_query(store.sql_frame(), body.query))
+
+    @app.post("/api/figures")
+    def get_figures(body: FiguresRequest, store: UserStore = Depends(store_for)):
+        df = sqlview.run_query(store.sql_frame(), body.query)
+        if df.empty:
+            empty = {"message": None, "figure": None}
+            return {
+                "rows": 0,
+                "category": {**empty, "total": None, "table": []},
+                "over_time": {**empty, "group": body.group},
+            }
+        new_categories = store.rules()["new_categories"]
+        return {
+            "rows": int(len(df)),
+            "category": figures.category_chart(df, new_categories),
+            "over_time": figures.over_time_chart(df, new_categories, body.group),
+        }
 
     # --- rules -----------------------------------------------------------------------------------
 

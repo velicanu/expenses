@@ -737,3 +737,232 @@ def test_upload_and_pipeline_work_when_the_temp_dir_is_on_another_filesystem(
         assert c.post("/api/pipeline/run", json={}, headers=ME).json()["ran"] is True
     finally:
         shutil.rmtree(scratch, ignore_errors=True)
+
+
+# --- the old sidebar's saved state, its SQL box, and its charts ---------------------------------------
+
+
+def test_state_roundtrip_uses_the_old_config_keys_and_keeps_the_rest(client, root):
+    (root / "me").mkdir()
+    (root / "me" / "config.json").write_text(
+        json.dumps(
+            {
+                "linked_accounts": {"c": {"token": "t"}},
+                "show_sql": True,
+                "min_date": "2026-01-01",
+            }
+        )
+    )
+    assert client.get("/api/state", headers=ME).json() == {
+        "min_date": "2026-01-01",
+        "max_date": None,
+        "categories_in": [],
+        "categories_not_in": [],
+        "show_sql": True,
+        "rules_button": False,
+    }
+    body = {
+        "max_date": "2026-06-26",
+        "categories_not_in": ["Transfer", "Income"],
+        "rules_button": True,
+    }
+    out = client.put("/api/state", json=body, headers=ME).json()
+    assert out["max_date"] == "2026-06-26" and out["categories_not_in"] == [
+        "Transfer",
+        "Income",
+    ]
+    assert (
+        out["show_sql"] is True and out["min_date"] == "2026-01-01"
+    )  # untouched keys stay
+    cfg = json.loads((root / "me" / "config.json").read_text())
+    # the keys the Streamlit app used, so both UIs read each other's state
+    assert (
+        cfg["categories not in"] == ["Transfer", "Income"]
+        and cfg["max_date"] == "2026-06-26"
+    )
+    assert cfg["rules_button"] is True and cfg["linked_accounts"] == {
+        "c": {"token": "t"}
+    }
+    cleared = client.put("/api/state", json={"min_date": None}, headers=ME).json()
+    assert cleared["min_date"] is None
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        {"min_date": "soon"},
+        {"bogus": 1},
+        {"categories_in": [""]},
+        {"show_sql": "maybe"},
+    ],
+)
+def test_bad_state_is_422(client, bad):
+    assert client.put("/api/state", json=bad, headers=ME).status_code == 422
+
+
+def test_meta_lists_the_categories_present_in_the_data(loaded):
+    meta = loaded.get("/api/meta", headers=ME).json()
+    assert meta["data_categories"] == sorted(meta["data_categories"])
+    assert set(meta["data_categories"]) <= set(meta["categories"])
+    assert (
+        "Rent" in meta["categories"] and "Rent" not in meta["data_categories"]
+    )  # a default, not in this data
+
+
+def test_default_sql_is_what_the_old_sidebar_built(loaded):
+    body = {
+        "start": "2019-06-16",
+        "end": "2020-06-18",
+        "category_not_in": ["Dining"],
+        "description": "kohl*",
+    }
+    out = loaded.post("/api/sql/default", json=body, headers=ME).json()
+    assert out == {
+        "query": (
+            'SELECT * FROM expenses WHERE date >= "2019-06-16" AND date <= "2020-06-18" '
+            "AND category not in ('Dining') AND description LIKE '%kohl%%'"
+        ),
+        "description_warning": None,
+    }
+    assert (
+        loaded.post("/api/sql/default", json={}, headers=ME).json()["query"]
+        == "SELECT * FROM expenses"
+    )
+    warn = loaded.post(
+        "/api/sql/default", json={"description": "a+b^c"}, headers=ME
+    ).json()
+    assert "only one of + or ^" in warn["description_warning"]
+
+
+def test_the_sql_box_runs_selects_over_the_data(loaded):
+    out = loaded.post(
+        "/api/sql/run",
+        json={"query": "SELECT date, amount, pk FROM expenses ORDER BY pk LIMIT 3"},
+        headers=ME,
+    ).json()
+    assert (
+        out["columns"] == ["date", "amount", "pk"]
+        and len(out["rows"]) == 3
+        and out["count"] == 3
+    )
+    total = loaded.post(
+        "/api/sql/run", json={"query": "SELECT * FROM expenses"}, headers=ME
+    ).json()
+    assert total["count"] == 9 and "pk" in total["columns"]
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "ATTACH DATABASE '/tmp/x.db' AS x",
+        "PRAGMA table_info(expenses)",
+        "DROP TABLE expenses",
+        "DELETE FROM expenses",
+        "INSERT INTO expenses(pk) VALUES ('x')",
+        "SELECT 1; DROP TABLE expenses",
+        "SELECT load_extension('x')",
+        "",
+        "SELEC nonsense",
+    ],
+)
+def test_the_sql_box_is_read_only_and_errors_are_422(loaded, query):
+    r = loaded.post("/api/sql/run", json={"query": query}, headers=ME)
+    assert r.status_code == 422 and r.json()["detail"], query
+    assert rows(loaded)["total"] == 9  # nothing happened to the data
+
+
+def test_the_sql_box_cannot_write_files(loaded, tmp_path):
+    target = tmp_path / "escaped.db"
+    loaded.post(
+        "/api/sql/run", json={"query": f"ATTACH DATABASE '{target}' AS x"}, headers=ME
+    )
+    assert not target.exists()
+
+
+def test_a_runaway_query_is_stopped(loaded, monkeypatch):
+    from server import sqlview
+
+    monkeypatch.setattr(sqlview, "MAX_SECONDS", 0.2)
+    slow = "WITH RECURSIVE c(x) AS (SELECT 1 UNION ALL SELECT x + 1 FROM c WHERE x < 100000000) SELECT count(*) FROM c"
+    r = loaded.post("/api/sql/run", json={"query": slow}, headers=ME)
+    assert r.status_code == 422 and "longer than" in r.json()["detail"]
+
+
+def test_figures_come_ready_made_for_a_query(loaded):
+    out = loaded.post(
+        "/api/figures",
+        json={"query": "SELECT * FROM expenses", "group": "auto"},
+        headers=ME,
+    ).json()
+    assert out["rows"] == 9
+    cat, time = out["category"], out["over_time"]
+    assert cat["message"] is None and cat["figure"]["data"][0]["type"] == "pie"
+    assert (
+        "Spending by category, total: 143.94"
+        in cat["figure"]["layout"]["title"]["text"]
+    )
+    assert [r["category"] for r in cat["table"]] == [
+        "Dining",
+        "Groceries",
+        "Other",
+        "Shopping",
+    ]
+    assert time["figure"]["data"][0]["type"] == "bar" and time["group"] == "auto"
+    yearly = loaded.post(
+        "/api/figures",
+        json={"query": "SELECT * FROM expenses", "group": "year"},
+        headers=ME,
+    ).json()
+    assert yearly["over_time"]["figure"]["layout"]["title"]["text"] == "Yearly spending"
+
+
+def test_figures_for_nothing_and_for_the_wrong_columns(loaded):
+    empty = loaded.post(
+        "/api/figures", json={"query": "SELECT * FROM expenses WHERE 1=0"}, headers=ME
+    ).json()
+    assert (
+        empty["rows"] == 0
+        and empty["category"]["figure"] is None
+        and empty["over_time"]["figure"] is None
+    )
+    missing = loaded.post(
+        "/api/figures", json={"query": "SELECT description FROM expenses"}, headers=ME
+    ).json()
+    assert missing["category"]["message"] == "Missing category or amount columns."
+    assert missing["over_time"]["message"] == "Missing date or amount columns."
+
+
+def test_figures_reject_unknown_bins_and_oversized_queries(loaded):
+    assert (
+        loaded.post(
+            "/api/figures",
+            json={"query": "SELECT * FROM expenses", "group": "decade"},
+            headers=ME,
+        ).status_code
+        == 422
+    )
+    assert (
+        loaded.post("/api/figures", json={"query": "x" * 6000}, headers=ME).status_code
+        == 422
+    )
+
+
+def test_new_endpoints_need_the_login(client):
+    for method, path, body in [
+        ("get", "/api/state", None),
+        ("put", "/api/state", {}),
+        ("post", "/api/sql/default", {}),
+        ("post", "/api/sql/run", {"query": "SELECT 1"}),
+        ("post", "/api/figures", {"query": "SELECT 1"}),
+    ]:
+        r = getattr(client, method)(
+            path, **({"json": body} if body is not None else {})
+        )
+        assert r.status_code == 401, path
+
+
+def test_users_cannot_query_each_others_data(loaded):
+    out = loaded.post(
+        "/api/sql/run", json={"query": "SELECT * FROM expenses"}, headers=OTHER
+    ).json()
+    assert out["count"] == 0
