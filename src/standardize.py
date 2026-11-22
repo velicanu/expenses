@@ -117,9 +117,27 @@ def standardizer(record, rules):
     return record
 
 
+def newest_first(dates):
+    """True if a file lists its rows newest first (most bank exports do; a few are oldest first).
+    `dates` are ISO strings in file order."""
+    ascending = sum(1 for a, b in zip(dates, dates[1:]) if b > a)  # noqa: B905  (strict zip is 3.10+)
+    descending = sum(1 for a, b in zip(dates, dates[1:]) if b < a)  # noqa: B905
+    return descending > ascending
+
+
 def ordered(records):
+    """Puts a file's records in order and gives them their pk, `<source_file>-<line>`.
+
+    A pk has to stay the same as new rows arrive, because the edits in changes.db are keyed by it.
+    Rows arrive at the end of an oldest-first file and at the top of a newest-first one, so a
+    newest-first file is turned around first: appended rows are then always last. The sort is stable,
+    so rows on the same date keep their order. (pandas' default sort is not stable: with hundreds
+    of rows sharing a date, adding rows reordered them, and every pk after them shifted.)
+    """
+    if newest_first([r["date"] for r in records]):
+        records = records[::-1]
     df = pd.DataFrame(records)
-    ordered_df = df.sort_values(by=["date"])
+    ordered_df = df.sort_values(by=["date"], kind="stable")
     ordered_records = ordered_df.to_dict(orient="records")
     for line, record in enumerate(ordered_records):
         record["pk"] = f"{record['source_file']}-{line}"
