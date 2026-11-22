@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Fetcher</title>
+<style>
+  :root { color-scheme: light dark; --bg:#fff; --fg:#1f2430; --muted:#6b7280; --card:#f5f6f8; --line:#d9dce3; --accent:#ff4b4b; --ok:#1a7f4b; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#0e1117; --fg:#fafafa; --muted:#9aa3b2; --card:#1a1f2b; --line:#2d3444; --ok:#4cc38a; } }
+  * { box-sizing: border-box; }
+  body { margin:0; font: 16px/1.4 "Source Sans Pro", system-ui, -apple-system, "Segoe UI", sans-serif; background:var(--bg); color:var(--fg);
+         padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  main { max-width: 640px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 1.5rem; margin: 8px 0 2px; }
+  .who { color: var(--muted); font-size: .9rem; margin-bottom: 16px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin-bottom: 12px; }
+  .row { display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; }
+  .name { font-weight: 600; font-size: 1.1rem; }
+  .chips { margin-top: 6px; display:flex; gap:6px; flex-wrap:wrap; }
+  .chip { font-size:.8rem; padding:2px 8px; border-radius:999px; border:1px solid var(--line); color:var(--muted); }
+  .chip.ok { color: var(--ok); border-color: var(--ok); }
+  button { font: inherit; min-height: 44px; padding: 0 16px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  button:disabled { opacity: .55; }
+  form { margin-top: 12px; display: none; }
+  form.open { display: block; }
+  label { display:block; font-size:.85rem; color:var(--muted); margin: 10px 0 4px; }
+  .field { display:flex; gap:8px; }
+  input { flex:1; min-width:0; min-height:44px; font: inherit; padding: 0 12px; border-radius:10px; border:1px solid var(--line); background:var(--bg); color:var(--fg); }
+  .hint { font-size:.8rem; color:var(--muted); margin-top:4px; }
+  .msg { margin-top:10px; font-size:.9rem; }
+  .msg.err { color: var(--accent); }
+  .msg.ok { color: var(--ok); }
+  .actions { margin-top: 14px; display:flex; gap:8px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Fetcher accounts</h1>
+  <div class="who" id="who">Loading…</div>
+  <div id="list"></div>
+</main>
+<script src="/app.js"></script>
+</body>
+</html>
