@@ -23,6 +23,19 @@ def parse_record(record, card, card_def):
         parsed_record["amount"] = -1 * float(parsed_record["-amount"])
     if "-amount" in parsed_record:
         parsed_record.pop("-amount")
+    if "credit" in parsed_record:
+        # A credit column is money back: negative in the output whichever sign the bank writes it with
+        # (Capital One writes credits as positive numbers, Citi as negative ones; "-amount" would turn
+        # Citi's refunds and payments into spending).
+        if parsed_record["credit"]:
+            credit = (
+                parsed_record["credit"]
+                .replace("$", "")
+                .replace(",", "")
+                .replace(" ", "")
+            )
+            parsed_record["amount"] = -abs(float(credit))
+        parsed_record.pop("credit")
     parsed_record["source"] = card
     if "category" not in parsed_record:
         parsed_record["category"] = ""
