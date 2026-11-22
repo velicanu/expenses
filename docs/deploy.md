@@ -42,6 +42,25 @@ Run it as **one process** (the pipeline lock and the data cache are in memory) a
 `iac/syncthing/desired.json`), `changes.db` is. The pipeline builds `expenses.db.tmp` next to the target
 and renames it into place.
 
+## First deploy over existing data: re-key `changes.db` once
+
+Rows used to be numbered with an unstable sort, so the pks inside same-date groups were arbitrary and an edit's pk
+could point at a different row after a rebuild. The numbering is stable now (`standardize.ordered`), which means the
+pks in an existing `changes.db` need re-keying **before the first pipeline run with this code**. Tested on a copy of
+the real `data/dragos` (10,475 rows, 594 edit rows): 159 edits move, 296 stay, none ends up on a different
+transaction, and the view before and after differs only by data that is new in `raw/`.
+
+```bash
+ssh tess 'cp -a ~/aa-viral-dragos-shared/data/dragos ~/dragos-before-pk-migration'   # a snapshot first
+ssh tess docker exec expenses python /app/src/migrate_pks.py /data/dragos             # dry run: reports, writes nothing
+ssh tess docker exec expenses python /app/src/migrate_pks.py /data/dragos --apply     # backs up changes.db, re-keys it
+# then Data -> Run pipeline in the web app
+```
+
+The tool refuses to write if any edit would not land on the same transaction, or if an edit for a row that is gone
+from `raw/` would attach to a different row. Edits that were already orphaned before (their rows had been removed
+from the raw files) are left as they are.
+
 ## Gotchas found the hard way
 
 - `/tmp` in the container is a tmpfs and `/data` is a bind mount, so `os.replace` between them fails
@@ -49,3 +68,8 @@ and renames it into place.
 - Don't split react and recharts into separate chunks (`manualChunks`): they import each other in a
   cycle and the page comes up blank.
 - nginx's default read timeout is 60s; a Plaid pull or a large upload can take longer.
+- `sort_values` is unstable by default: with hundreds of rows on one date, adding rows reordered them and
+  shifted pks. Use `kind="stable"`.
+- Citi writes credits as negative numbers, Capital One as positive ones: a `Credit` column mapped to
+  `-amount` is right for one and wrong for the other (`credit` in card_definitions.json means "always negative").
+- A Syncthing conflict file (`*.sync-conflict-*.csv`) in `raw/` is ingested as a source of its own.

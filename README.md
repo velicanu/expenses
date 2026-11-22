@@ -74,6 +74,19 @@ All intermediate data is available should you want it in the `data/` directory.
 - `data/config.json`
   - Rules, new categories and linked Plaid accounts (it contains Plaid access tokens: keep it private).
 
+## Row ids (pk)
+
+Every transaction has a pk, `<source_file>-<line>`, and your edits in `changes.db` are keyed by it. It stays
+the same as data arrives because rows are numbered in date order with a **stable** sort, after turning a
+newest-first file around (most banks list newest first), so rows appended at either end of a file always
+come last. It moves only if a row appears out of date order (a backdated transaction) or a row is removed
+from a raw file, which shifts every later pk in that file. An edit is a full copy of its row, so an edit
+whose pk now belongs to a different row replaces that row in the view: one transaction missing, another twice.
+Avoid removing rows from raw files; replace the whole file with a longer export instead.
+
+`src/migrate_pks.py` re-keys an existing `changes.db` once after the numbering changed (it did, in this
+version: the old sort was unstable). See `docs/deploy.md`.
+
 ## Deployment
 
 `expense.velicanu.com` runs on tess from the `velicanu/server` repo (`iac/expense.tf`): a Google login on pi5,
