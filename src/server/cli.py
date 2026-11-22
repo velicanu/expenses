@@ -5,8 +5,10 @@ schedule. One line per account on stdout; exits 1 if any account failed, so a cr
 """
 
 import argparse
+import logging
 import sys
 import time
+import warnings
 
 from .bao import PlaidKeys, PlaidUnavailable
 from .plaid_pull import make_client, pull_all
@@ -47,14 +49,21 @@ def pull(settings: Settings, client_factory=make_client) -> int:
     return 1 if failed else 0
 
 
+def quiet():
+    """A cron log should hold the result lines and nothing else. The pipeline logs every step at INFO (including the
+    whole rules dictionary) and pandas warns about deprecations: both are off here; warnings and errors still print."""
+    logging.disable(logging.INFO)
+    warnings.simplefilter("ignore", FutureWarning)
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     ap.add_argument("command", choices=["pull"])
-    ap.add_argument("--json", action="store_true", help=argparse.SUPPRESS)
     ap.parse_args(argv)
-    return pull(Settings.from_env())
+    quiet()
+    return pull(Settings.from_env(), client_factory=make_client)
 
 
 if __name__ == "__main__":

@@ -559,3 +559,59 @@ def test_the_nightly_pull_without_bao_fails_clearly_and_when_busy_skips(
             cli.pull(cli_settings(root), client_factory=lambda keys: FakePlaid()) == 0
         )
     assert "already running; skipped" in capsys.readouterr().out
+
+
+def test_the_nightly_log_holds_only_result_lines(tmp_path, capsys, monkeypatch):
+    """Run as cron runs it: the result lines on stdout, and no per-step INFO log lines (the pipeline logs every step,
+    including the whole rules dictionary) and no pandas FutureWarnings. A log sink and a warnings recorder of our own,
+    because the pipeline's own handler writes to a stream the test runner captures separately."""
+    import io
+    import logging
+    import warnings
+
+    root = tmp_path / "data"
+    link_account(root)
+    plaid = FakePlaid()
+    plaid.transactions_get = lambda req: {
+        "transactions": [FakeTx(0)],
+        "total_transactions": 1,
+    }
+    users = tmp_path / "users.json"
+    users.write_text(json.dumps({"me@example.com": "me"}))
+    env = {
+        "DATA_ROOT": str(root),
+        "USERS_FILE": str(users),
+        "BAO_ADDR": "http://bao",
+        "BAO_ROLE_ID": "r",
+        "BAO_SECRET_ID": "s",
+    }
+    for k, v in env.items():
+        monkeypatch.setenv(k, v)
+    monkeypatch.setattr(
+        "server.cli.PlaidKeys",
+        lambda bao: type(
+            "K", (), {"get": lambda self: {"client_id": "i", "secret": "s"}}
+        )(),
+    )
+    monkeypatch.setattr("server.cli.make_client", lambda keys: plaid)
+
+    sink = io.StringIO()
+    handler = logging.StreamHandler(sink)
+    logger = logging.getLogger()
+    old_level = logger.level
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
+    try:
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            assert cli.main(["pull"]) == 0
+    finally:
+        logger.removeHandler(handler)
+        logger.setLevel(old_level)
+        logging.disable(logging.NOTSET)
+    out = capsys.readouterr().out
+    assert "me/card: pulled 1" in out and "rebuilt" in out
+    assert (
+        sink.getvalue() == ""
+    )  # no extract / parse / standardize lines, no rules dump
+    assert not [w for w in caught if issubclass(w.category, FutureWarning)]
