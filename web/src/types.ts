@@ -1,4 +1,4 @@
-// Hand-written from ../openapi.json (the API is small; no codegen).
+// Hand-written against the server's API (see ../openapi.json for the older endpoints).
 
 export interface Me {
   user: string;
@@ -6,30 +6,69 @@ export interface Me {
 }
 
 export interface Meta {
-  min_date: string | null;
+  min_date: string | null; // the data's own range, YYYY-MM-DD
   max_date: string | null;
   count: number;
-  categories: string[];
+  categories: string[]; // data + defaults + new categories: what a transaction can be set to
+  data_categories: string[]; // categories present in the data, sorted
   sources: string[];
-  colors: Record<string, string>;
+  colors?: Record<string, string>; // ignored: the server colors the charts
   plaid_configured: boolean;
 }
 
-export interface Transaction {
-  pk: string;
-  date: string | null; // YYYY-MM-DD
-  description: string | null;
-  amount: number;
-  category: string | null;
-  source: string | null;
-  source_file: string | null;
-  edited: boolean;
+/** The saved filters (config.json min_date / max_date / "categories in" / "categories not in" / show_sql / rules_button). */
+export interface AppState {
+  min_date: string | null;
+  max_date: string | null;
+  categories_in: string[];
+  categories_not_in: string[];
+  show_sql: boolean;
+  rules_button: boolean;
 }
 
-export interface TransactionPage {
-  total: number;
-  sum: number;
-  rows: Transaction[];
+/** What the sidebar form holds: the old app's widgets. */
+export interface SqlFilters {
+  start: string | null;
+  end: string | null;
+  category_in: string[];
+  category_not_in: string[];
+  description: string;
+  sources: string[];
+}
+
+export interface SqlDefault {
+  query: string;
+  description_warning: string | null;
+}
+
+export type Cell = string | number | null;
+
+export interface SqlResult {
+  columns: string[];
+  rows: Cell[][];
+  count: number;
+}
+
+export interface Figure {
+  data: unknown[];
+  layout: Record<string, unknown>;
+}
+
+export type Group = "auto" | "year" | "month" | "week" | "day";
+
+export interface FiguresResponse {
+  rows: number;
+  category: {
+    message: string | null;
+    total: number;
+    table: { category: string; amount: number }[];
+    figure: Figure | null;
+  };
+  over_time: {
+    message: string | null;
+    group: string;
+    figure: Figure | null;
+  };
 }
 
 export interface TransactionUpdate {
@@ -45,19 +84,6 @@ export interface TransactionCreate {
   amount: number;
   category: string;
 }
-
-export interface ByCategory {
-  total: number;
-  categories: { category: string; amount: number }[];
-}
-
-export interface OverTime {
-  bin: "year" | "month" | "week" | "day";
-  categories: string[];
-  periods: { period: string; total: number; values: Record<string, number> }[];
-}
-
-export type Bin = "auto" | "year" | "month" | "week" | "day";
 
 export interface Rules {
   description: Record<string, string>;
@@ -93,6 +119,3 @@ export interface PullResult {
   accounts: ({ alias: string; pulled: number } | { alias: string; error: string })[];
   pipeline: PipelineResult | null;
 }
-
-export type SortKey = "date" | "amount" | "category" | "description" | "source";
-export type Order = "asc" | "desc";

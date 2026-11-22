@@ -10,9 +10,10 @@ export default defineConfig({
   build: {
     outDir: "dist",
     sourcemap: false,
-    // One bundle on purpose. A manualChunks split of react and recharts (tried first) made the chunks import
-    // each other in a cycle and the page came up blank: "reading '__SECRET_INTERNALS_DO_NOT_USE...'".
-    chunkSizeWarningLimit: 900,
+    // One bundle on purpose. A manualChunks split of react and the chart library (recharts, then) made the chunks
+    // import each other in a cycle and the page came up blank: "reading '__SECRET_INTERNALS_DO_NOT_USE...'".
+    // Plotly is most of the size.
+    chunkSizeWarningLimit: 1500,
   },
   test: {
     environment: "jsdom",

@@ -1,22 +1,21 @@
 import type {
   Account,
-  ByCategory,
-  Bin,
+  AppState,
+  FiguresResponse,
+  Group,
   Me,
   Meta,
-  Order,
-  OverTime,
   PipelineResult,
   PullResult,
   RawFile,
   Rules,
-  SortKey,
+  SqlDefault,
+  SqlFilters,
+  SqlResult,
   TransactionCreate,
-  TransactionPage,
   TransactionUpdate,
   UploadResult,
 } from "./types";
-import { filtersToParams, type Filters } from "./filters";
 
 export class ApiError extends Error {
   status: number;
@@ -51,18 +50,6 @@ export function detailMessage(body: unknown, fallback: string): string {
     if (parts.length) return parts.join("; ");
   }
   return fallback;
-}
-
-/** Repeats a key for arrays (`category_in=a&category_in=b`), skips empty values. */
-export function buildQuery(params: Record<string, string | number | undefined | string[]>): string {
-  const q = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) {
-    if (value === undefined || value === "") continue;
-    if (Array.isArray(value)) value.forEach((v) => q.append(key, v));
-    else q.append(key, String(value));
-  }
-  const s = q.toString();
-  return s ? `?${s}` : "";
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -100,17 +87,16 @@ export const api = {
   me: () => request<Me>("/api/me"),
   meta: () => request<Meta>("/api/meta"),
 
-  transactions: (f: Filters, sort: SortKey, order: Order, offset: number, limit = 100) =>
-    request<TransactionPage>(`/api/transactions${buildQuery({ ...filtersToParams(f), sort, order, offset, limit })}`),
-  byCategory: (f: Filters) => request<ByCategory>(`/api/summary/by-category${buildQuery(filtersToParams(f))}`),
-  overTime: (f: Filters, bin: Bin) =>
-    request<OverTime>(`/api/summary/over-time${buildQuery({ ...filtersToParams(f), bin })}`),
+  state: () => request<AppState>("/api/state"),
+  putState: (patch: Partial<AppState>) => request<AppState>("/api/state", json("PUT", patch)),
+
+  sqlDefault: (filters: SqlFilters) => request<SqlDefault>("/api/sql/default", json("POST", filters)),
+  sqlRun: (query: string) => request<SqlResult>("/api/sql/run", json("POST", { query })),
+  figures: (query: string, group: Group) => request<FiguresResponse>("/api/figures", json("POST", { query, group })),
 
   addTransaction: (body: TransactionCreate) => request<{ pk: string }>("/api/transactions", json("POST", body)),
   updateTransaction: (pk: string, body: TransactionUpdate) =>
     request<{ pk: string }>(`/api/transactions/${encodeURIComponent(pk)}`, json("PATCH", body)),
-  deleteTransaction: (pk: string) =>
-    request<void>(`/api/transactions/${encodeURIComponent(pk)}`, { method: "DELETE" }),
 
   rules: () => request<Rules>("/api/rules"),
   putRules: (rules: Rules) => request<Rules>("/api/rules", json("PUT", rules)),

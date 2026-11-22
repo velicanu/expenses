@@ -1,66 +1,134 @@
-import { useState } from "react";
-import { clearError, useBanner } from "./banner";
-import { Dashboard } from "./components/Dashboard";
-import { DataView } from "./components/DataView";
-import { FilterBar } from "./components/FilterBar";
-import { RulesView } from "./components/RulesView";
-import { Transactions } from "./components/Transactions";
-import { useFilters } from "./filters";
-import { useMe, useMeta } from "./hooks";
-
-const TABS = ["Dashboard", "Transactions", "Rules", "Data"] as const;
-type Tab = (typeof TABS)[number];
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { api } from "./api";
+import { clearError, friendly, showError, useBanner } from "./banner";
+import { Charts } from "./components/Charts";
+import { DataPanel } from "./components/DataPanel";
+import { InputsPanel } from "./components/InputsPanel";
+import { RulesPanel } from "./components/RulesPanel";
+import { Sidebar } from "./components/Sidebar";
+import { useAppState, useFigures, useMe, useMeta, useSqlDefault, useSqlRun } from "./hooks";
+import { initialFilters, savedFilters } from "./model";
+import type { AppState, Group, Meta, SqlFilters } from "./types";
 
 export function App() {
-  const [tab, setTab] = useState<Tab>("Dashboard");
-  const [filters, patch, reset] = useFilters();
-  const me = useMe();
   const meta = useMeta();
+  const state = useAppState();
+  if (meta.isError || state.isError) {
+    return (
+      <p className="alert error" role="alert">
+        Couldn't load the app: {friendly(meta.error ?? state.error)}
+      </p>
+    );
+  }
+  if (!meta.data || !state.data) return <p className="muted loading">Loading…</p>;
+  return <Page meta={meta.data} state={state.data} />;
+}
+
+function Page({ meta, state }: { meta: Meta; state: AppState }) {
+  const client = useQueryClient();
+  const me = useMe();
   const banner = useBanner();
-  const filtered = tab === "Dashboard" || tab === "Transactions";
+
+  // The submitted filters start from what was saved last time (on any device), clipped to the data.
+  const [filters, setFilters] = useState<SqlFilters>(() => initialFilters(state, meta));
+  const [inputsOpen, setInputsOpen] = useState(false); // session only, like the old `expand`
+  const [group, setGroup] = useState<Group>("auto");
+  const [drawer, setDrawer] = useState(false);
+
+  const saveState = useMutation({
+    mutationFn: (patch: Partial<AppState>) => api.putState(patch),
+    onMutate: (patch) => {
+      const before = client.getQueryData<AppState>(["state"]);
+      client.setQueryData<AppState>(["state"], (cur) => (cur ? { ...cur, ...patch } : cur));
+      return { before };
+    },
+    onSuccess: (saved) => client.setQueryData(["state"], saved),
+    onError: (e, _patch, ctx) => {
+      if (ctx?.before) client.setQueryData(["state"], ctx.before);
+      showError(e);
+    },
+  });
+
+  // The query behind everything: the SQL the form builds, or what the user typed over it in "Show data".
+  const sqlDefault = useSqlDefault(filters);
+  const defaultQuery = sqlDefault.data?.query;
+  const [typed, setTyped] = useState("");
+  const [committed, setCommitted] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    // like Streamlit's text_input: a new default, or the box being hidden and shown again, drops a hand edit
+    setTyped(defaultQuery ?? "");
+    setCommitted(defaultQuery);
+  }, [defaultQuery, state.show_sql]);
+  const query = (state.show_sql ? committed : undefined) ?? defaultQuery;
+
+  const rows = useSqlRun(query, state.show_sql);
+  const figures = useFigures(query, group);
+
+  const submit = (next: SqlFilters) => {
+    setFilters(next);
+    setDrawer(false);
+    saveState.mutate(savedFilters(next));
+  };
+  const runTyped = () => {
+    if (typed !== committed) setCommitted(typed);
+  };
 
   return (
-    <>
-      <header className="top">
-        <h1>Expenses</h1>
-        <nav aria-label="Sections">
-          <ul className="tabs">
-            {TABS.map((t) => (
-              <li key={t}>
-                <button type="button" aria-current={tab === t ? "page" : undefined} onClick={() => setTab(t)}>
-                  {t}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </nav>
-        <span className="who muted">{me.data?.user}</span>
-      </header>
-      {banner && (
-        <div className="banner" role="alert">
-          <span>{banner}</span>
-          <button type="button" onClick={clearError} aria-label="Dismiss message">
-            ×
-          </button>
-        </div>
-      )}
-      <main>
-        {filtered && <FilterBar filters={filters} meta={meta.data} onChange={patch} onReset={reset} />}
-        {meta.isError && (
-          <p className="error" role="alert">
-            Couldn't load the data summary: {meta.error.message}
-          </p>
+    <div className={drawer ? "app drawer-open" : "app"}>
+      <div className="topbar">
+        <button type="button" aria-label="Open filters" aria-expanded={drawer} onClick={() => setDrawer((d) => !d)}>
+          ☰
+        </button>
+        <span>Expense app</span>
+      </div>
+      <aside className="sidebar" aria-label="Sidebar">
+        <Sidebar
+          user={me.data?.user}
+          meta={meta}
+          filters={filters}
+          warning={sqlDefault.data?.description_warning ?? null}
+          inputsOpen={inputsOpen}
+          rulesOpen={state.rules_button}
+          sqlOpen={state.show_sql}
+          onSubmit={submit}
+          onToggleInputs={() => setInputsOpen((v) => !v)}
+          onToggleRules={() => saveState.mutate({ rules_button: !state.rules_button })}
+          onToggleSql={() => saveState.mutate({ show_sql: !state.show_sql })}
+        />
+      </aside>
+      <div className="scrim" onClick={() => setDrawer(false)} />
+      <main className="main">
+        {banner && (
+          <div className="alert error banner" role="alert">
+            <span>{banner}</span>
+            <button type="button" onClick={clearError} aria-label="Dismiss message">
+              ×
+            </button>
+          </div>
         )}
-        {meta.data?.count === 0 && filtered && (
-          <p className="notice">
-            There is no data yet. Upload a CSV export in the <button type="button" className="link" onClick={() => setTab("Data")}>Data</button> tab.
-          </p>
+        {inputsOpen && <InputsPanel />}
+        {state.rules_button && <RulesPanel dataCategories={meta.data_categories} />}
+        {state.show_sql && (
+          <DataPanel
+            typed={typed}
+            onTyped={setTyped}
+            onRun={runTyped}
+            error={rows.error ? friendly(rows.error) : null}
+            result={rows.data}
+            loading={rows.isPending}
+            meta={meta}
+          />
         )}
-        {tab === "Dashboard" && <Dashboard filters={filters} meta={meta.data} />}
-        {tab === "Transactions" && <Transactions filters={filters} meta={meta.data} />}
-        {tab === "Rules" && <RulesView meta={meta.data} />}
-        {tab === "Data" && <DataView meta={meta.data} />}
+        <Charts
+          figures={figures.data}
+          loading={figures.isFetching}
+          error={figures.error}
+          dataCount={meta.count}
+          group={group}
+          onGroup={setGroup}
+        />
       </main>
-    </>
+    </div>
   );
 }
