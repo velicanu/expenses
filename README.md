@@ -46,7 +46,8 @@ The page is the old Streamlit page, rebuilt: a **sidebar** with the filters, and
   (`a+b` is or, `a^b` is and, `!a` is not, `*` is a wildcard) and *Source file*. Your selections are saved with the
   data (`config.json`), so every device opens with the same filters, as the old app did.
 - **Inputs**: upload CSVs (a recognised card layout is saved and the pipeline runs), *Run pipeline*,
-  *Refresh data* (Plaid, for already linked accounts), delete raw files.
+  *Refresh data* (Plaid), *Link account* (Plaid Link; a bank whose login expired shows *Needs reconnect*), delete raw
+  files. Linked accounts are also pulled every night (`docs/deploy.md`).
 - **Rules**: map descriptions or card categories to your own categories (and colors), then *Apply rules*.
 - **Show data**: the SQL the filters build (editable; it runs over table `expenses`) and the data, editable in place,
   with *Save Changes*, and a **+** to add a row. Edits live in `changes.db`, so re-running the pipeline never loses them.
