@@ -88,3 +88,60 @@ def test_parse():
     }
     card, card_def = identify_card(input_)
     assert parse_record(input_, card, card_def) == expected
+
+
+def _parse(card_name, **row):
+    input_ = {"source_file": f"{card_name}.csv", **row}
+    card, card_def = identify_card(input_)
+    assert card == card_name
+    return parse_record(input_, card, card_def)["amount"]
+
+
+def test_citi_debit_is_positive_spending():
+    row = {
+        "Status": "Cleared",
+        "Date": "02/06/2026",
+        "Description": "SHOP",
+        "Debit": "109.06",
+        "Credit": "",
+    }
+    assert _parse("citi", **row) == 109.06
+
+
+def test_citi_credit_stays_negative():
+    """Citi writes credits (refunds, payments) as negative numbers; they must not be negated again."""
+    row = {
+        "Status": "Cleared",
+        "Date": "02/06/2026",
+        "Description": "PAYMENT",
+        "Debit": "",
+        "Credit": "-109.06",
+    }
+    assert _parse("citi", **row) == -109.06
+    row["Credit"] = "-1,109.06"
+    assert _parse("citi", **row) == -1109.06
+
+
+def test_a_credit_is_negative_whichever_sign_the_bank_writes():
+    row = {
+        "Status": "Cleared",
+        "Date": "02/06/2026",
+        "Description": "REFUND",
+        "Debit": "",
+        "Credit": "$12.50",
+    }
+    assert _parse("citi", **row) == -12.5
+
+
+def test_capital_one_credits_are_unchanged():
+    row = {
+        "Transaction Date": "2024-01-02",
+        "Posted Date": "2024-01-03",
+        "Card No.": "1234",
+        "Description": "PAYMENT",
+        "Category": "Payment/Credit",
+        "Debit": "",
+        "Credit": "50.00",
+    }
+    assert _parse("capital_one", **row) == -50.0
+    assert _parse("capital_one", **{**row, "Debit": "7.25", "Credit": ""}) == 7.25

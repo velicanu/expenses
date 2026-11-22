@@ -93,7 +93,7 @@
     "schema": ["Status", "Date", "Description", "Debit", "Credit"],
     "Date": "date",
     "Description": "description",
-    "Credit": "-amount",
+    "Credit": "credit",
     "Debit": "amount"
   },
   "chase": {

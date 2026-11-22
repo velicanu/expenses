@@ -1,6 +1,7 @@
 import copy
 import json
 import os
+import shutil
 import tempfile
 
 import click
@@ -57,7 +58,8 @@ def save_file_if_valid(file_, data_dir):
         if card:
             if not os.path.exists(upload_dir):
                 os.makedirs(upload_dir)
-            os.replace(tempfilename, os.path.join(upload_dir, file_name))
+            # not os.replace: the temp dir can be on another filesystem (a container's tmpfs)
+            shutil.move(tempfilename, os.path.join(upload_dir, file_name))
             return "success", f"{file_name}: {card}"
         else:
             return "failed", f"{file_name}"

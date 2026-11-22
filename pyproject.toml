@@ -9,6 +9,10 @@ dependencies = [
     "pandas",
     "plaid-python",
     "streamlit",
+    "fastapi",
+    "uvicorn",
+    "python-multipart",
+    "httpx",
     "plotly",
     "smart-open",
     "xlrd",
@@ -43,3 +47,7 @@ unfixable = ["F841"]
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI's dependency-injection idiom: Depends(...) / Query(...) / File(...) in argument defaults.
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.File"]
