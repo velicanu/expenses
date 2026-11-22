@@ -48,3 +48,14 @@ jobs:
       - uses: actions/checkout@v6
       - name: Build the image (the web build, the Python install and the server start)
         run: docker build -t expenses:ci .
+
+  fetcher:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pykeepass pyotp pytest
+      - name: Fetcher tests (no browser, no network: pages are classified from recorded facts, the vault is a throwaway file)
+        run: python -m pytest -q fetcher/tests
