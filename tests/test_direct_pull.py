@@ -249,6 +249,9 @@ def test_a_pull_keeps_every_existing_key_and_edit_and_adds_the_new_rows(store):
     ]
     (store.raw_dir / "venmo-dragos-2024.csv").write_text(raw_file(legacy))
     store.add_direct_account("venmo-dragos", "venmo")
+    store.mark_direct_session(
+        "venmo-dragos", NOW - 60
+    )  # its login was seen working a minute ago
     store.run_pipeline()
     before = pks(store)
     assert len(before) == 5
@@ -352,30 +355,124 @@ class Fake:
         return self.result
 
 
+LOGGED_IN = {"state": "logged_in", "files": []}
+
+
 def account(**kw):
-    return {"alias": "venmo-dragos", "institution": "venmo", **kw}
+    """A direct account whose login was seen working a moment ago, unless a test says otherwise."""
+    return {"alias": "venmo-dragos", "institution": "venmo", "last_ok": NOW - 30, **kw}
+
+
+def no_visit():
+    return Fake(error=AssertionError("must not visit the bank"))
+
+
+def registered(store, **kw):
+    store.add_direct_account("venmo-dragos", "venmo")
+    if "last_ok" in kw:
+        store.mark_direct_session("venmo-dragos", kw["last_ok"])
+    return store
 
 
 @pytest.mark.parametrize("state", ["login_required", "challenge", "unknown"])
-def test_a_lapsed_login_is_reported_with_the_link_and_does_not_start_the_clock(
+def test_a_lapsed_login_is_information_with_a_link_and_is_not_visited_again(
     store, state
 ):
-    store.add_direct_account("venmo-dragos", "venmo")
+    registered(store, last_ok=NOW - 30)
     r = dp.refresh_account(
         store, account(), Fake({"state": state, "files": []}), TODAY, NOW
     )
-    assert r["needs_login"] is True and r["state"] == state and "pulled" not in r
+    assert (
+        "error" not in r and "pulled" not in r
+    )  # not a failure: the accounts whose login persists are pulled
+    assert (
+        r["login_needed"].endswith("log in by hand to fetch it") and r["state"] == state
+    )
     assert r["login_url"] == "https://fetch.test/login?account=venmo-dragos"
-    assert store.direct_accounts()[0]["last_success"] is None
-    # the person fixes it and clicks again straight away: not blocked by the interval
+    assert (
+        store.direct_accounts()[0]["last_ok"] is None
+        and store.direct_accounts()[0]["last_success"] is None
+    )
+    # known to be logged out now: a plain refresh a moment later does not visit again...
+    again = dp.refresh_account(
+        store, store.direct_accounts()[0], no_visit(), TODAY, NOW + 60
+    )
+    assert "login_needed" in again
+    # ...but right after a person logs in (the fresh path) it fetches at once
     ok = dp.refresh_account(
-        store, account(), Fake({"state": "logged_in", "files": []}), TODAY, NOW + 5
+        store, store.direct_accounts()[0], Fake(LOGGED_IN), TODAY, NOW + 90, fresh=True
     )
     assert ok == {"alias": "venmo-dragos", "pulled": 0, "months": 0}
 
 
+def test_an_account_whose_login_is_not_believed_to_persist_is_not_visited(store):
+    registered(store)
+    for last_ok in (None, NOW - dp.SESSION_TRUST - 1, NOW - 3 * 3600):
+        r = dp.refresh_account(store, account(last_ok=last_ok), no_visit(), TODAY, NOW)
+        assert (
+            "login_needed" in r
+            and "error" not in r
+            and r["login_url"].endswith("account=venmo-dragos")
+        )
+    assert dp.refresh_account(
+        store, account(last_ok=NOW - 3 * 3600), no_visit(), TODAY, NOW
+    )["login_needed"].startswith(
+        "the saved login has probably expired (last seen logged in 3 h ago)"
+    )
+    # inside the window it is visited
+    fake = Fake(LOGGED_IN)
+    assert (
+        dp.refresh_account(
+            store, account(last_ok=NOW - dp.SESSION_TRUST), fake, TODAY, NOW
+        )["pulled"]
+        == 0
+    )
+    assert len(fake.asked) == 1
+
+
+def test_a_fresh_login_fetches_whatever_the_interval_or_the_window(store):
+    registered(store)
+    stale_and_recent = account(
+        last_ok=None, last_success=NOW - 5
+    )  # no login on record, fetched 5 s ago
+    r = dp.refresh_account(
+        store, stale_and_recent, Fake(LOGGED_IN), TODAY, NOW, fresh=True
+    )
+    assert r == {"alias": "venmo-dragos", "pulled": 0, "months": 0}
+    assert (
+        store.direct_accounts()[0]["last_ok"] == NOW
+    )  # and the login is now known good
+    # but a plain refresh of the same account is held to the interval and the window
+    assert "skipped" in dp.refresh_account(
+        store, store.direct_accounts()[0], no_visit(), TODAY, NOW + 5
+    )
+
+
+def test_a_fresh_login_that_was_not_completed_is_login_needed_not_an_error(store):
+    registered(store)
+    r = dp.refresh_account(
+        store,
+        account(last_ok=None),
+        Fake(
+            {
+                "state": "login_required",
+                "files": [],
+                "detail": "HTTP 200 at id.venmo.com/signin",
+            }
+        ),
+        TODAY,
+        NOW,
+        fresh=True,
+    )
+    assert (
+        r["login_needed"]
+        == "Venmo is asking for a login (HTTP 200 at id.venmo.com/signin); log in by hand to fetch it"
+    )
+    assert "error" not in r
+
+
 def test_a_success_starts_the_clock_and_a_failure_does_not(store):
-    store.add_direct_account("venmo-dragos", "venmo")
+    registered(store, last_ok=NOW - 30)
     bad = Fake(
         {
             "state": "logged_in",
@@ -384,30 +481,23 @@ def test_a_success_starts_the_clock_and_a_failure_does_not(store):
     )
     assert "error" in dp.refresh_account(store, account(), bad, TODAY, NOW)
     assert store.direct_accounts()[0]["last_success"] is None
-    good = Fake({"state": "logged_in", "files": []})
-    dp.refresh_account(store, account(), good, TODAY, NOW)
+    dp.refresh_account(store, account(), Fake(LOGGED_IN), TODAY, NOW)
     assert store.direct_accounts()[0]["last_success"] == NOW
     fresh = store.direct_accounts()[0]
-    skipped = dp.refresh_account(
-        store,
-        fresh,
-        Fake(error=AssertionError("no visit")),
-        TODAY,
-        NOW + dp.MIN_INTERVAL - 1,
+    assert fresh["last_ok"] == NOW  # a success also renews "its login is working"
+    assert "skipped" in dp.refresh_account(
+        store, fresh, no_visit(), TODAY, NOW + dp.MIN_INTERVAL - 1
     )
-    assert "skipped" in skipped
     again = dp.refresh_account(
-        store,
-        fresh,
-        Fake({"state": "logged_in", "files": []}),
-        TODAY,
-        NOW + dp.MIN_INTERVAL + 1,
+        store, fresh, Fake(LOGGED_IN), TODAY, NOW + dp.MIN_INTERVAL + 1
     )
-    assert "skipped" not in again
+    assert (
+        "skipped" not in again and "login_needed" not in again
+    )  # past the interval, still inside the window
 
 
 def test_service_problems_are_reported_per_account_without_secrets(store):
-    store.add_direct_account("venmo-dragos", "venmo")
+    registered(store, last_ok=NOW - 30)
     r = dp.refresh_account(
         store,
         account(),
@@ -423,6 +513,9 @@ def test_service_problems_are_reported_per_account_without_secrets(store):
         dp.refresh_account(store, account(), None, TODAY, NOW)["error"]
         == "the browser service is not configured"
     )
+    assert (
+        store.direct_accounts()[0]["last_ok"] == NOW - 30
+    )  # a service problem says nothing about the login
 
 
 # --- the client ---------------------------------------------------------------------------------------------------
@@ -508,6 +601,18 @@ def test_the_client_sends_the_token_and_never_echoes_it():
 # --- Refresh data with both kinds of account -------------------------------------------------------------------
 
 
+def keys_that_must_not_be_used():
+    return type(
+        "K",
+        (),
+        {
+            "get": lambda self: (_ for _ in ()).throw(
+                AssertionError("Plaid must not be touched")
+            )
+        },
+    )()
+
+
 def test_a_plaid_outage_does_not_stop_the_browser_accounts(store):
     store.update_config(
         lambda c: c.update(
@@ -523,19 +628,13 @@ def test_a_plaid_outage_does_not_stop_the_browser_accounts(store):
             }
         )
     )
-    store.add_direct_account("venmo-dragos", "venmo")
+    registered(store, last_ok=NOW - 30)
     keys = type(
         "K",
         (),
         {"get": lambda self: (_ for _ in ()).throw(PlaidUnavailable("bao is down"))},
     )()
-    out = pull_all(
-        store,
-        keys,
-        fetcher=Fake({"state": "logged_in", "files": []}),
-        today=lambda: TODAY,
-        now=NOW,
-    )
+    out = pull_all(store, keys, fetcher=Fake(LOGGED_IN), today=lambda: TODAY, now=NOW)
     by = {a["alias"]: a for a in out["accounts"]}
     assert by["card"]["error"] == "bao is down" and by["venmo-dragos"]["pulled"] == 0
     # with nothing else to pull, the outage is still an error, as before
@@ -544,38 +643,122 @@ def test_a_plaid_outage_does_not_stop_the_browser_accounts(store):
         pull_all(store, keys, today=lambda: TODAY)
 
 
-def test_the_refresh_endpoint_returns_direct_results(tmp_path):
-    root = tmp_path / "data"
-    (root / "me").mkdir(parents=True)
-    (root / "me" / "config.json").write_text(
-        json.dumps(
+def test_refreshing_one_account_touches_nothing_else(store):
+    store.update_config(
+        lambda c: c.update(
             {
-                "direct_accounts": {
-                    "venmo-dragos": {"alias": "venmo-dragos", "institution": "venmo"}
+                "linked_accounts": {
+                    "card": {
+                        "alias": "card",
+                        "institution": "B",
+                        "start_date": "2026-01-01",
+                        "token": "T",
+                    }
                 }
             }
         )
     )
-    settings = Settings(
+    store.add_direct_account("venmo-dragos", "venmo")
+    store.add_direct_account("venmo-viral", "venmo")
+    fake = Fake(LOGGED_IN)
+    out = pull_all(
+        store,
+        keys_that_must_not_be_used(),
+        fetcher=fake,
+        today=lambda: TODAY,
+        now=NOW,
+        only="venmo-dragos",
+        fresh_login=True,
+    )
+    assert out["accounts"] == [{"alias": "venmo-dragos", "pulled": 0, "months": 0}]
+    assert [a for a, _ in fake.asked] == [
+        "venmo-dragos"
+    ]  # not the other Venmo account, not Plaid
+    assert pull_all(
+        store,
+        keys_that_must_not_be_used(),
+        fetcher=fake,
+        today=lambda: TODAY,
+        now=NOW,
+        only="nobody",
+    )["accounts"] == [{"alias": "nobody", "error": "no such account to refresh"}]
+
+
+def test_fresh_login_means_nothing_without_naming_the_account(store):
+    store.add_direct_account("venmo-dragos", "venmo")  # no login on record
+    out = pull_all(
+        store,
+        keys_that_must_not_be_used(),
+        fetcher=no_visit(),
+        today=lambda: TODAY,
+        now=NOW,
+        fresh_login=True,
+    )
+    assert "login_needed" in out["accounts"][0] and out["pipeline"] is None
+
+
+def settings_for(root):
+    return Settings(
         data_root=root,
         users={"me@example.com": "me"},
         trusted_proxies=frozenset({"testclient"}),
         fetcher=FetcherSettings("http://127.0.0.1:1", "t" * 32, "https://fetch.test"),
     )
-    app = create_app(settings)
-    app.state.fetcher = Fake({"state": "login_required", "files": []})
-    r = TestClient(app).post("/api/accounts/pull", headers=ME)
+
+
+def endpoint_app(tmp_path, fake, last_ok=None):
+    root = tmp_path / "data"
+    (root / "me").mkdir(parents=True)
+    direct = {
+        "alias": "venmo-dragos",
+        "institution": "venmo",
+        **({"last_ok": last_ok} if last_ok else {}),
+    }
+    (root / "me" / "config.json").write_text(
+        json.dumps({"direct_accounts": {"venmo-dragos": direct}})
+    )
+    app = create_app(settings_for(root))
+    app.state.fetcher = fake
+    return TestClient(app)
+
+
+def test_the_refresh_endpoint_reports_a_lapsed_login_as_information(tmp_path):
+    c = endpoint_app(tmp_path, no_visit())  # no login on record: not visited
+    r = c.post("/api/accounts/pull", headers=ME)
     assert r.status_code == 200
-    assert r.json()["accounts"] == [
-        {
-            "alias": "venmo-dragos",
-            "needs_login": True,
-            "state": "login_required",
-            "login_url": "https://fetch.test/login?account=venmo-dragos",
-            "error": "Venmo is asking for a login",
-        }
-    ]
+    (acct,) = r.json()["accounts"]
+    assert acct["alias"] == "venmo-dragos" and "error" not in acct
+    assert acct[
+        "login_url"
+    ] == "https://fetch.test/login?account=venmo-dragos" and acct[
+        "login_needed"
+    ].startswith("the saved login has probably expired")
     assert r.json()["pipeline"] is None
+
+
+def test_after_login_only_counts_when_an_account_is_named(tmp_path):
+    fake = Fake(LOGGED_IN)
+    c = endpoint_app(tmp_path, fake)
+    plain = c.post(
+        "/api/accounts/pull", headers=ME, json={"after_login": True}
+    )  # no `only`: it cannot skip the checks
+    assert "login_needed" in plain.json()["accounts"][0] and fake.asked == []
+    done = c.post(
+        "/api/accounts/pull",
+        headers=ME,
+        json={"only": "venmo-dragos", "after_login": True},
+    )
+    assert done.json()["accounts"] == [
+        {"alias": "venmo-dragos", "pulled": 0, "months": 0}
+    ]
+    assert len(fake.asked) == 1
+    assert (
+        c.post("/api/accounts/pull", headers=ME, json={"only": "x" * 100}).status_code
+        == 422
+    )
+    assert (
+        c.post("/api/accounts/pull", headers=ME).status_code == 200
+    )  # no body at all still works, as before
 
 
 # --- the command line ---------------------------------------------------------------------------------------------
@@ -605,33 +788,37 @@ def test_add_direct_registers_an_account_once_and_refuses_unknown_ones(
 
 
 def test_the_pull_command_prints_a_line_for_each_kind_of_result(tmp_path, capsys):
+    import time
+
     from server import cli
 
     root = tmp_path / "data"
     store = UserStore(root / "me")
     store.add_direct_account("venmo-dragos", "venmo")
-    settings = Settings(
-        data_root=root,
-        users={"me@example.com": "me"},
-        trusted_proxies=frozenset(),
-        fetcher=FetcherSettings("http://127.0.0.1:1", "t" * 32, "https://fetch.test"),
+    settings = settings_for(root)
+    # no login on record: information, not a failure, and no visit
+    assert cli.pull(settings, fetcher=no_visit()) == 0
+    out = capsys.readouterr().out
+    assert (
+        "me/venmo-dragos: login needed, the saved login has probably expired" in out
+        and "https://fetch.test/login?account=venmo-dragos" in out
     )
-    # the browser service cannot be reached: a per-account error line, exit status 1, no crash
+    # a login seen working a moment ago but a browser service that cannot be reached: a failure
+    store.mark_direct_session("venmo-dragos", time.time())
     down = Fake(error=dp.FetcherError("cannot reach the browser service (URLError)"))
     assert cli.pull(settings, fetcher=down) == 1
     assert (
         "me/venmo-dragos: FAILED cannot reach the browser service (URLError)"
         in capsys.readouterr().out
     )
-    # a login that lapsed says where to fix it; a recent fetch is reported as skipped, not as a failure
-    lapsed = Fake({"state": "login_required", "files": []})
-    assert cli.pull(settings, fetcher=lapsed) == 1
+    # a login that lapsed meanwhile: information again
     assert (
-        "NEEDS LOGIN, fix it at https://fetch.test/login?account=venmo-dragos"
-        in capsys.readouterr().out
+        cli.pull(settings, fetcher=Fake({"state": "login_required", "files": []})) == 0
     )
-    store.mark_direct_success("venmo-dragos", __import__("time").time())
-    assert cli.pull(settings, fetcher=Fake(error=AssertionError("no visit"))) == 0
+    assert "login needed, Venmo is asking for a login" in capsys.readouterr().out
+    # a recent fetch is reported as skipped, not as a failure
+    store.mark_direct_success("venmo-dragos", time.time())
+    assert cli.pull(settings, fetcher=no_visit()) == 0
     assert "venmo-dragos: skipped, fetched moments ago" in capsys.readouterr().out
 
 
@@ -639,34 +826,34 @@ def test_the_pull_command_prints_a_line_for_each_kind_of_result(tmp_path, capsys
 
 
 def test_a_crashed_fetch_is_an_error_not_a_login_problem(store):
-    store.add_direct_account("venmo-dragos", "venmo")
+    registered(store, last_ok=NOW - 30)
     r = dp.refresh_account(
         store,
         account(),
         Fake(
-            {
-                "state": "error",
-                "message": "the month field is not on the page",
-                "files": [],
-            }
+            {"state": "error", "message": "the month field did not appear", "files": []}
         ),
         TODAY,
         NOW,
     )
     assert r == {
         "alias": "venmo-dragos",
-        "error": "the month field is not on the page",
-    }  # no needs_login, no login link
+        "error": "the month field did not appear",
+    }  # no login link, not login_needed
     assert (
         dp.refresh_account(
             store, account(), Fake({"state": "error", "files": []}), TODAY, NOW
         )["error"]
         == "the fetch failed"
     )
-    assert store.direct_accounts()[0]["last_success"] is None
+    assert (
+        store.direct_accounts()[0]["last_success"] is None
+        and store.direct_accounts()[0]["last_ok"] == NOW - 30
+    )
 
 
-def test_a_bot_challenge_is_named_as_one_with_where_it_happened(store):
+def test_a_bot_check_is_named_as_one_with_where_it_happened(store):
+    registered(store, last_ok=NOW - 30)
     r = dp.refresh_account(
         store,
         account(),
@@ -680,11 +867,12 @@ def test_a_bot_challenge_is_named_as_one_with_where_it_happened(store):
         TODAY,
         NOW,
     )
-    assert r["needs_login"] is True and r["state"] == "challenge"
+    assert r["state"] == "challenge" and "error" not in r
     assert (
-        r["error"]
-        == "Venmo challenged the automated browser (a bot check, not a login) (HTTP 403 at id.venmo.com/signin)"
+        r["login_needed"]
+        == "Venmo showed its bot check (HTTP 403 at id.venmo.com/signin); log in by hand to fetch it"
     )
+    registered(store, last_ok=NOW - 30)
     plain = dp.refresh_account(
         store,
         account(),
@@ -699,6 +887,6 @@ def test_a_bot_challenge_is_named_as_one_with_where_it_happened(store):
         NOW,
     )
     assert (
-        plain["error"]
-        == "Venmo is asking for a login (HTTP 200 at id.venmo.com/signin)"
+        plain["login_needed"]
+        == "Venmo is asking for a login (HTTP 200 at id.venmo.com/signin); log in by hand to fetch it"
     )

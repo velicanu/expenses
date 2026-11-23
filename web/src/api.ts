@@ -115,7 +115,9 @@ export const api = {
   runPipeline: (rulesOnly = false) => request<PipelineResult>("/api/pipeline/run", json("POST", { rules_only: rulesOnly })),
 
   accounts: () => request<Account[]>("/api/accounts"),
-  pull: () => request<PullResult>("/api/accounts/pull", { method: "POST" }),
+  /** Refresh data. With `only` it refreshes that one account; `after_login` says a person has just logged in to it. */
+  pull: (body?: { only?: string; after_login?: boolean }) =>
+    request<PullResult>("/api/accounts/pull", body ? json("POST", body) : { method: "POST" }),
   accountsStatus: () => request<AccountStatus[]>("/api/accounts/status", { method: "POST" }),
 
   /** No alias: link a new bank. An alias of a linked account: reconnect it (Plaid's update mode). */

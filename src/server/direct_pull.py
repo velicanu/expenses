@@ -11,9 +11,14 @@ Everything that decides what enters the data is here, so it can be tested withou
 - new transactions are only ever APPENDED to one file, `<account>-direct.csv`. Edits are keyed by position in a raw
   file (`<source_file>-<line>`), so a file that only grows keeps every earlier row where it was.
 
-A visit to a bank is rate limited: after a successful fetch the same account is left alone for MIN_INTERVAL, so a second
-click of Refresh data never means a second visit. (A fetch that found the login expired does not start the clock: the
-person fixes the login and clicks again.)
+A visit to a bank is rate limited and only made when it can work:
+- after a successful fetch the same account is left alone for MIN_INTERVAL, so a second click never means a second visit;
+- a saved web login does not last (Venmo's expired within about 40 minutes), so a plain Refresh only visits an account whose
+  login was seen working within SESSION_TRUST; otherwise it says the login is needed, with a link to the hand login, and
+  makes no visit. An account found logged out is not visited again until a person logs in;
+- finishing a hand login sends the person here with that one account and `fresh`: the login was seconds ago, so the
+  interval and the trust window do not apply, and the fetch runs straight away.
+A lapsed login is information, not an error: Refresh data picks up the accounts whose login persists.
 """
 
 import csv
@@ -28,6 +33,9 @@ from datetime import date
 from pathlib import Path
 
 MIN_INTERVAL = 600  # seconds between successful fetches of one account
+SESSION_TRUST = (
+    25 * 60
+)  # a login seen working this recently is believed to still work (Venmo's lasted 30-40 minutes)
 MAX_MONTHS = 24  # the most one pull will ask for
 FIRST_PULL_MONTHS = 12  # when an account has no data at all yet
 
@@ -217,17 +225,37 @@ class FetcherClient:
 # --- one account, then all ---------------------------------------------------------------------------------------
 
 
-def refresh_account(store, account: dict, client, today: date, now: float) -> dict:
+def _ago(seconds: float) -> str:
+    minutes = int(seconds // 60)
+    return f"{minutes} min" if minutes < 90 else f"{minutes // 60} h"
+
+
+def refresh_account(
+    store, account: dict, client, today: date, now: float, fresh: bool = False
+) -> dict:
     alias = account["alias"]
+    if client is None:
+        return {"alias": alias, "error": "the browser service is not configured"}
     last = account.get("last_success")
-    if last and now - last < MIN_INTERVAL:
+    if not fresh and last and now - last < MIN_INTERVAL:
         wait = int((MIN_INTERVAL - (now - last)) // 60) + 1
         return {
             "alias": alias,
             "skipped": f"fetched moments ago; it can be fetched again in about {wait} min",
         }
-    if client is None:
-        return {"alias": alias, "error": "the browser service is not configured"}
+    if not fresh:
+        seen = account.get("last_ok")
+        if not seen or now - seen > SESSION_TRUST:
+            how = (
+                f"last seen logged in {_ago(now - seen)} ago"
+                if seen
+                else "not logged in since it was last checked"
+            )
+            return {
+                "alias": alias,
+                "login_needed": f"the saved login has probably expired ({how}); log in by hand to fetch it",
+                "login_url": client.login_link(alias),
+            }
     ids, latest = known(store.raw_dir, alias)
     months = months_to_fetch(latest, today)
     try:
@@ -240,19 +268,23 @@ def refresh_account(store, account: dict, client, today: date, now: float) -> di
     ):  # the fetch itself broke: say so, do not call it a login problem
         return {"alias": alias, "error": result.get("message") or "the fetch failed"}
     if state != "logged_in":
+        store.mark_direct_session(
+            alias, None
+        )  # known logged out: no more visits until a person logs in
         reason = {
             "login_required": "Venmo is asking for a login",
-            "challenge": "Venmo challenged the automated browser (a bot check, not a login)",
+            "challenge": "Venmo showed its bot check",
         }.get(state, "could not tell whether the session is logged in")
         detail = result.get(
             "detail"
         )  # e.g. "HTTP 403 at id.venmo.com/signin": status and page, never page text
         return {
             "alias": alias,
-            "needs_login": True,
+            "login_needed": f"{reason} ({detail}); log in by hand to fetch it"
+            if detail
+            else f"{reason}; log in by hand to fetch it",
             "state": state,
             "login_url": client.login_link(alias),
-            "error": f"{reason} ({detail})" if detail else reason,
         }
     pulled, header = 0, None
     try:
@@ -268,8 +300,19 @@ def refresh_account(store, account: dict, client, today: date, now: float) -> di
     return {"alias": alias, "pulled": pulled, "months": len(parsed)}
 
 
-def refresh_direct(store, client, today: date, now: float | None = None) -> list[dict]:
+def refresh_direct(
+    store,
+    client,
+    today: date,
+    now: float | None = None,
+    only: str | None = None,
+    fresh: bool = False,
+) -> list[dict]:
+    """Every direct account (or just `only`). fresh: a person has just logged in to it, so fetch regardless of the
+    interval and the trust window."""
     now = time.time() if now is None else now
     return [
-        refresh_account(store, a, client, today, now) for a in store.direct_accounts()
+        refresh_account(store, a, client, today, now, fresh=fresh)
+        for a in store.direct_accounts()
+        if only is None or a["alias"] == only
     ]

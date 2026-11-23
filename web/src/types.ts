@@ -120,6 +120,7 @@ export interface Account {
 export type PullAccount =
   | { alias: string; pulled: number; months?: number }
   | { alias: string; skipped: string } // fetched moments ago: left alone on purpose, not a failure
+  | { alias: string; login_needed: string; login_url?: string | null; state?: string } // its saved login lapsed: information, not a failure
   | { alias: string; error: string; code?: string | null; needs_reconnect?: boolean; needs_login?: boolean; login_url?: string | null };
 
 export interface PullResult {

@@ -410,13 +410,25 @@ def create_app(
     def accounts(store: UserStore = Depends(store_for)):
         return store.accounts()
 
+    class PullIn(BaseModel):
+        only: str | None = Field(
+            default=None, max_length=64
+        )  # refresh just this account
+        after_login: bool = False  # a person has just logged in to it (the hand-login page's Done sends this)
+
     @app.post("/api/accounts/pull")
-    def pull(request: Request, store: UserStore = Depends(store_for)):
+    def pull(
+        request: Request,
+        body: PullIn | None = None,
+        store: UserStore = Depends(store_for),
+    ):
         return pull_all(
             store,
             request.app.state.plaid,
             client_factory=request.app.state.plaid_client_factory,
             fetcher=request.app.state.fetcher,
+            only=body.only if body else None,
+            fresh_login=bool(body and body.after_login),
         )
 
     @app.post("/api/accounts/status")

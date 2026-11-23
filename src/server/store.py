@@ -318,7 +318,12 @@ class UserStore:
             {
                 "alias": a.get("alias", k),
                 "institution": a.get("institution"),
-                "last_success": a.get("last_success"),
+                "last_success": a.get(
+                    "last_success"
+                ),  # the last finished fetch: the visit interval
+                "last_ok": a.get(
+                    "last_ok"
+                ),  # the last time its saved login was seen working
             }
             for k, a in (self.config().get("direct_accounts") or {}).items()
         ]
@@ -335,6 +340,16 @@ class UserStore:
         def apply(cfg):
             if alias in (cfg.get("direct_accounts") or {}):
                 cfg["direct_accounts"][alias]["last_success"] = when
+                cfg["direct_accounts"][alias]["last_ok"] = when
+
+        self.update_config(apply)
+
+    def mark_direct_session(self, alias: str, when: float | None):
+        """When the account's saved login was last seen working; None once it is known to be logged out."""
+
+        def apply(cfg):
+            if alias in (cfg.get("direct_accounts") or {}):
+                cfg["direct_accounts"][alias]["last_ok"] = when
 
         self.update_config(apply)
 

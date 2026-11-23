@@ -5,6 +5,7 @@ import { clearError, friendly, showError, useBanner } from "./banner";
 import { Charts } from "./components/Charts";
 import { DataPanel } from "./components/DataPanel";
 import { InputsPanel } from "./components/InputsPanel";
+import { LoginReturn } from "./components/LoginReturn";
 import { OAuthReturn } from "./components/OAuthReturn";
 import { RulesPanel } from "./components/RulesPanel";
 import { Sidebar } from "./components/Sidebar";
@@ -16,13 +17,17 @@ import type { AppState, Group, Meta, SqlFilters } from "./types";
 export function App() {
   // Plaid sends the browser back to /plaid-oauth after a bank's OAuth login: finish the link there, then show the app
   const [returning, setReturning] = useState(() => window.location.pathname === OAUTH_PATH);
+  // The hand-login page's Done sends the browser to /?refresh=<account>: fetch that account now, then show the app
+  const [fetching, setFetching] = useState(() => new URLSearchParams(window.location.search).get("refresh"));
   const [notice, setNotice] = useState<Outcome | null>(null);
   const done = useCallback((outcome: Outcome | null) => {
-    window.history.replaceState(null, "", "/");
+    window.history.replaceState(null, "", "/"); // also drops ?refresh, so a reload does not fetch again
     if (outcome) setNotice(outcome);
     setReturning(false);
+    setFetching(null);
   }, []);
   if (returning) return <OAuthReturn onDone={done} />;
+  if (fetching) return <LoginReturn alias={fetching} onDone={done} />;
   return <Loaded notice={notice} onDismissNotice={() => setNotice(null)} />;
 }
 
@@ -127,6 +132,11 @@ function Page({
         {notice && (
           <p className={`alert ${notice.kind} banner`} role={notice.kind === "error" ? "alert" : "status"}>
             <span>{notice.text}</span>
+            {(notice.login ?? []).map((target) => (
+              <a key={target.alias} className="inline" href={target.url} target="_blank" rel="noopener noreferrer">
+                Log in to {target.alias} by hand
+              </a>
+            ))}
             <button type="button" onClick={onDismissNotice} aria-label="Dismiss message">
               ×
             </button>
