@@ -23,11 +23,15 @@
   button { font: inherit; min-height: 44px; padding: 0 16px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); }
   button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
   button:disabled { opacity: .55; }
+  button.quiet { border-color: transparent; background: transparent; color: var(--muted); min-height: 44px; }
+  .btns { display:flex; gap:4px; flex-wrap:wrap; margin-top: 8px; }
+  select { width:100%; min-height:44px; font: inherit; padding: 0 12px; border-radius:10px; border:1px solid var(--line); background:var(--bg); color:var(--fg); }
   form { margin-top: 12px; display: none; }
   form.open { display: block; }
   label { display:block; font-size:.85rem; color:var(--muted); margin: 10px 0 4px; }
   .field { display:flex; gap:8px; }
   input { flex:1; min-width:0; min-height:44px; font: inherit; padding: 0 12px; border-radius:10px; border:1px solid var(--line); background:var(--bg); color:var(--fg); }
+  form > input, form > select { width: 100%; }
   .hint { font-size:.8rem; color:var(--muted); margin-top:4px; }
   .msg { margin-top:10px; font-size:.9rem; }
   .msg.err { color: var(--accent); }

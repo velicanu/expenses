@@ -212,3 +212,9 @@ def test_against_a_real_openbao():
     with pytest.raises(v.VaultError, match="no entry"):
         reader.credentials("nobody")
     assert reader.describe("realtest").endswith("TOTP present")
+    # the account list: the page's role writes it, the nightly job's role reads it, and neither is the other
+    page = v.Vault(addr, "", "", token=root)
+    page.save_registry([{"institution": "venmo", "owner": "viral"}])
+    assert reader.registry() == [{"institution": "venmo", "owner": "viral"}]
+    with pytest.raises(v.VaultError):
+        reader.save_registry([])
