@@ -11,8 +11,6 @@ The browser service (browserd.py) runs this and hands the JSON to the expense ap
 import json
 import sys
 
-from playwright.sync_api import sync_playwright
-
 from . import institutions, venmo
 from .session import facts_from, launch
 
@@ -25,6 +23,10 @@ STATES = {
 
 
 def fetch(account: str, months: list[str], profiles: str = "/profiles") -> dict:
+    from playwright.sync_api import (
+        sync_playwright,
+    )  # only when a fetch really runs: the tests need no browser
+
     inst = institutions.get(account)
     with sync_playwright() as p:
         ctx = launch(p, profiles, account)
