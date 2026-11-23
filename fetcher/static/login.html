@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="robots" content="noindex">
+<title>Log in by hand</title>
+<style>
+  :root { color-scheme: light dark; --bg:#fff; --fg:#1f2430; --muted:#6b7280; --card:#f5f6f8; --line:#d9dce3; --accent:#ff4b4b; --ok:#1a7f4b; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#0e1117; --fg:#fafafa; --muted:#9aa3b2; --card:#1a1f2b; --line:#2d3444; --ok:#4cc38a; } }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { font: 16px/1.4 "Source Sans Pro", system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--fg);
+         display: flex; flex-direction: column; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  header { display:flex; align-items:center; gap:8px; padding: 8px 12px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  header .title { font-weight: 600; flex: 1 1 auto; min-width: 0; }
+  header .timer { color: var(--muted); font-variant-numeric: tabular-nums; }
+  button, a.btn { font: inherit; min-height: 44px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); text-decoration: none; display: inline-flex; align-items: center; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  button:disabled { opacity: .55; }
+  #bar { display:none; gap:8px; padding: 6px 12px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  #bar.on { display:flex; }
+  #note { padding: 8px 12px; font-size: .9rem; color: var(--muted); }
+  #note.err { color: var(--accent); }
+  #note.ok { color: var(--ok); }
+  #intro { padding: 16px; max-width: 640px; margin: 0 auto; }
+  #intro p { margin: 0 0 12px; }
+  #screen { flex: 1 1 auto; min-height: 0; background: #000; display: none; touch-action: none; }
+  #screen.on { display: block; }
+  #paste { display:none; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+  #paste.on { display:block; }
+  #paste textarea { width: 100%; min-height: 64px; font: inherit; padding: 8px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); }
+  #paste .row { display:flex; gap:8px; margin-top: 8px; }
+  #kb { position: fixed; left: -1000px; top: 0; width: 1px; height: 1px; opacity: 0; }
+</style>
+</head>
+<body>
+<header>
+  <a class="btn" href="/" id="back" aria-label="Back to accounts">‹ Accounts</a>
+  <div class="title" id="title">Log in by hand</div>
+  <div class="timer" id="timer"></div>
+</header>
+<div id="bar">
+  <button type="button" id="keyboard">Keyboard</button>
+  <button type="button" id="pastebtn">Paste</button>
+  <button type="button" id="stop">Stop</button>
+</div>
+<div id="paste">
+  <textarea id="pastetext" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Paste text here, then tap Type it with the cursor in the right field"></textarea>
+  <div class="row"><button type="button" class="primary" id="typeit">Type it</button><button type="button" id="pasteclose">Close</button></div>
+</div>
+<div id="note" role="status"></div>
+<div id="intro">
+  <p id="what"></p>
+  <p>This opens a real browser on your server and shows it here. Solve any "confirm you're human" check, sign in, and approve any 2FA yourself. It closes by itself once it sees you're logged in, or after 15 minutes.</p>
+  <button type="button" class="primary" id="start">Start the browser</button>
+</div>
+<div id="screen"></div>
+<input id="kb" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="Keyboard input" tabindex="-1">
+<script type="module" src="/login.js"></script>
+</body>
+</html>

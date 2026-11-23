@@ -71,10 +71,15 @@ INSTITUTIONS = {
 }
 
 
-def get(name: str) -> Institution:
-    try:
-        return INSTITUTIONS[name]
-    except KeyError:
+def find(key: str) -> Institution | None:
+    """An account key like venmo-dragos names an institution (the part before the first dash) and its owner."""
+    return INSTITUTIONS.get(key.split("-", 1)[0])
+
+
+def get(key: str) -> Institution:
+    inst = find(key)
+    if inst is None:
         raise SystemExit(
-            f"unknown institution {name!r}; known: {', '.join(sorted(INSTITUTIONS))}"
-        ) from None
+            f"no sign-in flow for {key!r} yet; known: {', '.join(sorted(INSTITUTIONS))}"
+        )
+    return inst

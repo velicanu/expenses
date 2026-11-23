@@ -3,6 +3,7 @@ over an SSH tunnel): opens the institution's sign-in page in the persistent prof
 solves any human check, and does the 2FA. When the session looks logged in it keeps the window open briefly so the
 cookies are flushed to the profile, then closes. Nothing here types a password or clicks anything."""
 
+import os
 import sys
 import time
 
@@ -12,11 +13,21 @@ from . import institutions
 from .session import facts_from, launch
 
 
+def _screen() -> tuple[int, int] | None:
+    """FETCHER_SCREEN=540x960 sizes the window to the virtual display (the phone-sized one the credentials page uses)."""
+    raw = os.environ.get("FETCHER_SCREEN", "")
+    try:
+        w, h = raw.lower().split("x")[:2]
+        return int(w), int(h)
+    except ValueError:
+        return None
+
+
 def login(name: str, profile_root: str, minutes: int = 30) -> int:
     inst = institutions.get(name)
     deadline = time.time() + minutes * 60
     with sync_playwright() as p:
-        ctx = launch(p, profile_root, name)
+        ctx = launch(p, profile_root, name, screen=_screen())
         page = ctx.pages[0] if ctx.pages else ctx.new_page()
         closed = []
         ctx.on("close", lambda *_: closed.append(True))

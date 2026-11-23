@@ -4,6 +4,7 @@
   check INSTITUTION [SHOT]  is the saved session still logged in?  exit 0 logged in, 10 login needed, 11 human check,
                             12 unknown
   login INSTITUTION [MIN]   the one-time login by hand (run through remote-login.sh, a virtual display + noVNC)
+  browserd                  the browser side of the page's hand-login (own container; BROWSERD_TOKEN)
   serve                     the credentials page (web.py): LISTEN_HOST, PORT, TRUSTED_PROXIES, ALLOWED_EMAILS, PUBLIC_ORIGIN
   vault-check INSTITUTION   what bao holds for an institution (never any value)
   set-credentials INSTITUTION
@@ -36,6 +37,11 @@ def main(argv=None) -> int:
         from . import login
 
         return login.login(args[0], profiles, int(args[1]) if len(args) > 1 else 30)
+    if cmd == "browserd" and not args:
+        from . import browserd
+
+        browserd.serve()
+        return 0
     if cmd == "serve" and not args:
         from . import web
 

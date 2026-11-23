@@ -9,19 +9,23 @@ This process logs in with the write-only AppRole, so even a bug here cannot read
 never logged. Every write is audited (who, what, when; no values).
 """
 
+import asyncio
 import json
 import os
 import threading
 import time
+import urllib.error
+import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request, WebSocket
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field
 
 from . import accounts as acct
+from . import institutions
 from . import vault as vault_mod
 
 STATIC = Path(__file__).parent / "static"
@@ -33,6 +37,11 @@ class Settings:
     allowed_emails: frozenset[str] = frozenset()
     public_origin: str = ""  # e.g. https://fetch.velicanu.com; POSTs must come from it
     audit_log: str | None = None
+    browserd_url: str = "http://127.0.0.1:8097"
+    browserd_token: str = ""
+    vnc_host: str = "127.0.0.1"
+    vnc_port: int = 5900
+    novnc_dir: str = "/usr/share/novnc"
     dev_user: str | None = None  # tests and local runs only
     writes_per_minute: int = 20
     _writes: list = field(default_factory=list)
@@ -55,6 +64,8 @@ class Settings:
             allowed_emails=split("ALLOWED_EMAILS"),
             public_origin=env.get("PUBLIC_ORIGIN", ""),
             audit_log=env.get("AUDIT_LOG"),
+            browserd_url=env.get("BROWSERD_URL", "http://127.0.0.1:8097"),
+            browserd_token=env.get("BROWSERD_TOKEN", ""),
         )
 
 
@@ -64,9 +75,63 @@ class CredentialsIn(BaseModel):
     totp_seed: str | None = Field(default=None, max_length=512)
 
 
-def create_app(settings: Settings, bao: "vault_mod.Vault") -> FastAPI:
+class BrowserdError(Exception):
+    pass
+
+
+class Browserd:
+    """The browser container's control API (browserd.py) on 127.0.0.1, with the shared token. It reports its own refusals
+    in words (one session at a time, no flow for that bank); everything else is reduced to a status code."""
+
+    def __init__(self, url: str, token: str, opener=urllib.request.urlopen):
+        self._url, self._token, self._open = url.rstrip("/"), token, opener
+
+    def _call(self, method: str, path: str, body=None) -> dict:
+        req = urllib.request.Request(
+            self._url + path,
+            data=None if body is None else json.dumps(body).encode(),
+            method=method,
+            headers={
+                "Authorization": f"Bearer {self._token}",
+                "Content-Type": "application/json",
+            },
+        )
+        try:
+            with self._open(req, timeout=30) as r:
+                return json.load(r)
+        except urllib.error.HTTPError as e:
+            if e.code == 409:
+                try:
+                    raise BrowserdError(json.load(e)["detail"]) from None
+                except (ValueError, KeyError, TypeError):
+                    pass
+            raise BrowserdError(
+                f"the browser service refused (HTTP {e.code})"
+            ) from None
+        except (urllib.error.URLError, OSError, ValueError) as e:
+            raise BrowserdError(
+                f"cannot reach the browser service ({type(e).__name__})"
+            ) from None
+
+    def status(self) -> dict:
+        return self._call("GET", "/status")
+
+    def start(self, account: str) -> dict:
+        return self._call("POST", "/start", {"account": account})
+
+    def stop(self) -> dict:
+        return self._call("POST", "/stop", {})
+
+
+def create_app(
+    settings: Settings,
+    bao: "vault_mod.Vault",
+    browser: "Browserd | None" = None,
+    open_vnc=asyncio.open_connection,
+) -> FastAPI:
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
     app.state.settings = settings
+    browser = browser or Browserd(settings.browserd_url, settings.browserd_token)
     audit_lock = threading.Lock()
 
     def audit(email: str, action: str, name: str, ok: bool) -> None:
@@ -131,7 +196,8 @@ def create_app(settings: Settings, bao: "vault_mod.Vault") -> FastAPI:
         response = await call_next(request)
         response.headers["Cache-Control"] = "no-store"
         response.headers["Content-Security-Policy"] = (
-            "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; frame-ancestors 'none'; form-action 'self'"
+            "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; "
+            "img-src 'self' data: blob:; frame-ancestors 'none'; form-action 'self'"
         )
         response.headers["Referrer-Policy"] = "no-referrer"
         response.headers["X-Content-Type-Options"] = "nosniff"
@@ -178,9 +244,15 @@ def create_app(settings: Settings, bao: "vault_mod.Vault") -> FastAPI:
             return JSONResponse({"error": str(e)}, status_code=502)
         for a in listed:
             try:
-                out.append({**a, **bao.status(a["key"])})
+                out.append(
+                    {
+                        **a,
+                        **bao.status(a["key"]),
+                        "login": institutions.find(a["key"]) is not None,
+                    }
+                )
             except vault_mod.VaultError as e:
-                out.append({**a, "error": str(e)})
+                out.append({**a, "error": str(e), "login": False})
         return {
             "email": email,
             "institutions": [
@@ -248,6 +320,142 @@ def create_app(settings: Settings, bao: "vault_mod.Vault") -> FastAPI:
         audit(email, "save-credentials", name, True)
         return {"ok": True, **bao.status(name)}
 
+    # --- hand login: the remote browser, seen through noVNC -------------------------------------------------------
+
+    login_writes: list[float] = []
+
+    def browser_call(fn, *args):
+        try:
+            return fn(*args)
+        except BrowserdError as e:
+            raise HTTPException(502, str(e)) from None
+
+    @app.get("/login")
+    def login_page(email: str = Depends(current_email)):
+        return FileResponse(STATIC / "login.html")
+
+    @app.get("/login.js")
+    def login_script(email: str = Depends(current_email)):
+        return FileResponse(STATIC / "login.js", media_type="text/javascript")
+
+    @app.get("/novnc/{path:path}")
+    def novnc(path: str, email: str = Depends(current_email)):
+        """The noVNC client, from the image. Resolved inside its directory only."""
+        root = Path(settings.novnc_dir).resolve()
+        target = (root / path).resolve()
+        if root not in target.parents or not target.is_file():
+            raise HTTPException(404, "not found")
+        return FileResponse(target)
+
+    def public_status(st: dict) -> dict:
+        return {
+            k: v for k, v in st.items() if k != "vnc_password"
+        }  # the VNC password has its own route
+
+    @app.get("/api/login")
+    def login_status(email: str = Depends(current_email)):
+        return public_status(browser_call(browser.status))
+
+    @app.get("/api/login/session")
+    def login_session(email: str = Depends(current_email)):
+        """The one-time VNC password for the running session; only the logged-in person gets it, and only while it runs."""
+        st = browser_call(browser.status)
+        if st.get("state") != "running" or not st.get("vnc_password"):
+            raise HTTPException(404, "no login session is running")
+        return {"password": st["vnc_password"], "account": st["account"]}
+
+    @app.post("/api/login/stop")
+    def login_stop(email: str = Depends(json_guard)):
+        st = browser_call(browser.stop)
+        audit(email, "login-stop", st.get("account") or "-", True)
+        return public_status(st)
+
+    @app.post("/api/login/{name}/start")
+    def login_start(name: str, email: str = Depends(write_guard)):
+        if institutions.find(name) is None:
+            raise HTTPException(409, "there is no sign-in flow for this account yet")
+        now = time.time()
+        login_writes[:] = [t for t in login_writes if now - t < 60]
+        if len(login_writes) >= 6:
+            raise HTTPException(429, "slow down")
+        login_writes.append(now)
+        try:
+            st = browser.start(name)
+        except BrowserdError as e:
+            audit(email, "login-start", name, False)
+            return JSONResponse({"error": str(e)}, status_code=409)
+        audit(email, "login-start", name, True)
+        return public_status(st)
+
+    def ws_email(ws: WebSocket) -> str | None:
+        """Same trust as the HTTP routes, plus Origin: a page on another site could otherwise open this socket with the
+        person's cookies (browsers send them) and take over the remote browser."""
+        if ws.headers.get("origin") != settings.public_origin:
+            return None
+        if settings.dev_user:
+            return settings.dev_user
+        if (ws.client.host if ws.client else None) not in settings.trusted_proxies:
+            return None
+        email = ws.headers.get("x-email", "").strip().lower()
+        return email if email in settings.allowed_emails else None
+
+    bridge_open: list[bool] = [False]
+
+    @app.websocket("/ws/vnc")
+    async def vnc_bridge(ws: WebSocket):
+        email = ws_email(ws)
+        if email is None:
+            await ws.close(
+                code=1008
+            )  # before accept: the handshake is refused (HTTP 403)
+            return
+        try:
+            st = await asyncio.to_thread(browser.status)
+        except BrowserdError:
+            await ws.close(code=1011)
+            return
+        if st.get("state") != "running" or bridge_open[0]:
+            await ws.close(code=1008)
+            return
+        try:
+            reader, writer = await open_vnc(settings.vnc_host, settings.vnc_port)
+        except OSError:
+            await ws.close(code=1011)
+            return
+        bridge_open[0] = True
+        offered = ws.scope.get("subprotocols", [])
+        await ws.accept(subprotocol="binary" if "binary" in offered else None)
+
+        async def to_vnc():
+            while True:
+                msg = await ws.receive()
+                if msg["type"] == "websocket.disconnect":
+                    return
+                data = msg.get("bytes") or (msg.get("text") or "").encode()
+                if data:
+                    writer.write(data)
+                    await writer.drain()
+
+        async def to_browser():
+            while True:
+                data = await reader.read(65536)
+                if not data:
+                    return
+                await ws.send_bytes(data)
+
+        tasks = [asyncio.ensure_future(to_vnc()), asyncio.ensure_future(to_browser())]
+        try:
+            await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+        finally:
+            for t in tasks:
+                t.cancel()
+            writer.close()
+            bridge_open[0] = False
+            try:
+                await ws.close()
+            except RuntimeError:
+                pass  # already closed by the other side
+
     return app
 
 
@@ -261,6 +469,8 @@ def serve() -> None:
         or not settings.public_origin
     ):
         raise SystemExit("set TRUSTED_PROXIES, ALLOWED_EMAILS and PUBLIC_ORIGIN")
+    if len(settings.browserd_token) < 24:
+        raise SystemExit("set BROWSERD_TOKEN (the browser service's shared token)")
     app = create_app(settings, vault_mod.Vault.from_env())
     uvicorn.run(
         app,

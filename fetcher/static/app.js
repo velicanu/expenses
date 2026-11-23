@@ -86,7 +86,7 @@ function card(a) {
   });
 
   return el("div", { class: "card", id: `card-${name}` },
-    el("div", { class: "row" }, el("div", {}, el("div", { class: "name", text: a.label }), status), el("div", { class: "btns" }, open, remove)),
+    el("div", { class: "row" }, el("div", {}, el("div", { class: "name", text: a.label }), status), el("div", { class: "btns" }, open, ...(a.login ? [el("a", { class: "btn", href: `/login?account=${encodeURIComponent(name)}`, text: "Log in by hand" })] : []), remove)),
     a.error ? el("div", { class: "msg err", text: a.error }) : "",
     form);
 }
