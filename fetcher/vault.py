@@ -12,6 +12,7 @@ secret: errors carry an HTTP status or an exception type, never a response body.
 import json
 import os
 import re
+import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -48,11 +49,16 @@ class Vault:
         secret_id: str,
         opener=urllib.request.urlopen,
         token: str | None = None,
+        clock=time.monotonic,
     ):
         self._addr = addr.rstrip("/")
         self._login_with = {"role_id": role_id, "secret_id": secret_id}
         self._open = opener
         self._token = token  # a ready-made token (the CLI's); otherwise the AppRole login makes one
+        self._token_until: float | None = (
+            None  # when to log in again; None for a ready-made token, which is not ours to renew
+        )
+        self._clock = clock
 
     @classmethod
     def from_env(cls, env=None, opener=urllib.request.urlopen) -> "Vault":
@@ -88,17 +94,27 @@ class Vault:
             raise VaultError(f"cannot reach bao ({type(e).__name__})") from None
 
     def _auth(self) -> str:
-        if self._token is None:
+        """A live token. An AppRole token only lasts its lease (15 minutes here); a long-running service (the credentials
+        page) must log in again before then, or every call after that is refused with HTTP 403."""
+        if self._token is None or (
+            self._token_until is not None and self._clock() >= self._token_until
+        ):
             try:
-                self._token = self._call("/v1/auth/approle/login", self._login_with)[
-                    "auth"
-                ]["client_token"]
+                auth = self._call("/v1/auth/approle/login", self._login_with)["auth"]
+                token = auth["client_token"]
             except _Http as e:
+                self._token = None
                 raise VaultError(
                     f"bao refused the fetcher's login (HTTP {e.status})"
                 ) from None
             except KeyError:
+                self._token = None
                 raise VaultError("bao's login reply had no token") from None
+            self._token = token
+            # renew at three quarters of the lease; a reply without one is treated as short
+            self._token_until = self._clock() + 0.75 * (
+                auth.get("lease_duration") or 300
+            )
         return self._token
 
     def _kv(self, name: str) -> dict:
