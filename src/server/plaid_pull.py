@@ -78,18 +78,46 @@ def _error_code(exc) -> str | None:
 
 
 def pull_all(
-    store, keys, client_factory=make_client, today=date.today, fetcher=None, now=None
+    store,
+    keys,
+    client_factory=make_client,
+    today=date.today,
+    fetcher=None,
+    now=None,
+    only=None,
+    fresh_login=False,
 ) -> dict:
     """Refresh data: every linked Plaid account, then every direct (browser) account, then one pipeline run if anything
     new came in. keys: bao.PlaidKeys; fetcher: direct_pull.FetcherClient or None. Raises PlaidUnavailable if the keys
-    cannot be had and there is nothing else to pull, PipelineBusy if a pull is running."""
+    cannot be had and there is nothing else to pull, PipelineBusy if a pull is running.
+
+    only: pull just that account (what finishing a hand login asks for); fresh_login: a person has just logged in to it,
+    so a direct account is fetched without the usual interval and trust checks. fresh_login means nothing without only."""
     with store.exclusive("pull"):
-        return _pull_all(store, keys, client_factory, today, fetcher, now)
+        return _pull_all(
+            store,
+            keys,
+            client_factory,
+            today,
+            fetcher,
+            now,
+            only,
+            bool(only and fresh_login),
+        )
 
 
-def _pull_all(store, keys, client_factory, today, fetcher, now) -> dict:
-    linked = (store.config().get("linked_accounts") or {}).items()
-    direct = store.direct_accounts()
+def _pull_all(store, keys, client_factory, today, fetcher, now, only, fresh) -> dict:
+    linked = [
+        (k, c)
+        for k, c in (store.config().get("linked_accounts") or {}).items()
+        if only is None or c.get("alias", k) == only
+    ]
+    direct = [a for a in store.direct_accounts() if only is None or a["alias"] == only]
+    if only and not linked and not direct:
+        return {
+            "accounts": [{"alias": only, "error": "no such account to refresh"}],
+            "pipeline": None,
+        }
     if not linked and not direct:
         return {"accounts": [], "pipeline": None}
     results, new_starts = [], {}
@@ -145,7 +173,9 @@ def _pull_all(store, keys, client_factory, today, fetcher, now) -> dict:
     new_rows = bool(new_starts)
     if direct:
         make_dirs([store.raw_dir])
-        direct_results = refresh_direct(store, fetcher, today(), now)
+        direct_results = refresh_direct(
+            store, fetcher, today(), now, only=only, fresh=fresh
+        )
         results.extend(direct_results)
         new_rows = new_rows or any(r.get("pulled") for r in direct_results)
     pipeline = store.run_pipeline() if new_rows else None

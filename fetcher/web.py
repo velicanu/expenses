@@ -23,6 +23,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request, WebSocket
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field
+from starlette.websockets import WebSocketDisconnect
 
 from . import accounts as acct
 from . import institutions
@@ -42,6 +43,7 @@ class Settings:
     vnc_host: str = "127.0.0.1"
     vnc_port: int = 5900
     novnc_dir: str = "/usr/share/novnc"
+    expense_url: str = ""  # where Done sends the person to fetch the account they just logged in to (the expense app)
     dev_user: str | None = None  # tests and local runs only
     writes_per_minute: int = 20
     _writes: list = field(default_factory=list)
@@ -66,6 +68,7 @@ class Settings:
             audit_log=env.get("AUDIT_LOG"),
             browserd_url=env.get("BROWSERD_URL", "http://127.0.0.1:8097"),
             browserd_token=env.get("BROWSERD_TOKEN", ""),
+            expense_url=env.get("EXPENSE_URL", "").rstrip("/"),
         )
 
 
@@ -348,9 +351,11 @@ def create_app(
         return FileResponse(target)
 
     def public_status(st: dict) -> dict:
+        # the VNC password has its own route; expense_url is the site Done sends the person to (our own setting)
         return {
-            k: v for k, v in st.items() if k != "vnc_password"
-        }  # the VNC password has its own route
+            **{k: v for k, v in st.items() if k != "vnc_password"},
+            "expense_url": settings.expense_url,
+        }
 
     @app.get("/api/login")
     def login_status(email: str = Depends(current_email)):
@@ -451,10 +456,13 @@ def create_app(
                 t.cancel()
             writer.close()
             bridge_open[0] = False
+            # either side may be gone already (the phone navigated away, or Chrome was closed): that is the normal end of
+            # a session, not an error, so nothing here may raise or leave a task's exception unretrieved
+            await asyncio.gather(*tasks, return_exceptions=True)
             try:
                 await ws.close()
-            except RuntimeError:
-                pass  # already closed by the other side
+            except (RuntimeError, WebSocketDisconnect):
+                pass
 
     return app
 

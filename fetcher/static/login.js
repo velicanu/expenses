@@ -4,6 +4,9 @@ import RFB from "/novnc/core/rfb.js";
 const $ = (id) => document.getElementById(id);
 const account = new URLSearchParams(location.search).get("account") || "";
 let rfb = null;
+// True once THIS page has seen the session run. The service remembers how the last session ended, so a page opened later
+// finds an old result: that is not news and must not send anyone to the expense app (which would visit the bank).
+let watched = false;
 let remaining = 0;
 let ticking = null;
 
@@ -37,6 +40,14 @@ function finished(st) {
   clearInterval(ticking); remaining = 0; clock();
   if (rfb) { try { rfb.disconnect(); } catch (_) {} rfb = null; }
   show(false);
+  // Done (or closing Chrome yourself) means you have just logged in: go and fetch that account in the expense app, which
+  // does it with your login there and shows the result. A timeout means you walked away: nothing to fetch.
+  if ((st.result === "finished" || st.result === "closed") && st.expense_url && account) {
+    note("Chrome was closed so it keeps your login. Opening the expense app to fetch…", "ok");
+    $("start").textContent = "Start the browser";
+    setTimeout(() => location.assign(`${st.expense_url}/?refresh=${encodeURIComponent(account)}`), 800);
+    return;
+  }
   const msg = { finished: "Done. Chrome was closed so it keeps what it saved.", closed: "The browser was closed.", timed_out: "Time ran out, so the browser was closed." }[st.result];
   note(msg || "", st.result === "finished" ? "ok" : "");
   $("start").textContent = "Start the browser";
@@ -58,11 +69,12 @@ async function poll() {
   try {
     const st = await api("GET", "/api/login");
     if (st.state === "running" && st.account === account) {
+      watched = true;
       show(true); startClock(st.remaining);
       if (!rfb) await connect();
     } else if (st.state === "running") {
       show(false); note(`Another login (${st.account}) is running. Stop it first.`, "err");
-    } else if (st.result) finished(st);
+    } else if (st.result && watched) finished(st);
   } catch (e) { note(e.message, "err"); }
 }
 
@@ -70,6 +82,7 @@ $("start").addEventListener("click", async () => {
   $("start").disabled = true; note("Starting the browser…");
   try {
     const st = await api("POST", `/api/login/${encodeURIComponent(account)}/start`);
+    watched = true;
     show(true); startClock(st.remaining); await connect();
   } catch (e) { note(e.message, "err"); show(false); }
   finally { $("start").disabled = false; }

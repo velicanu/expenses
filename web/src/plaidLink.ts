@@ -127,20 +127,30 @@ export function pipelineLine(r: PullResult["pipeline"] | null): string | null {
 const failed = (a: PullAccount): a is Extract<PullAccount, { error: string }> => "error" in a;
 
 const skipped = (a: PullAccount): a is Extract<PullAccount, { skipped: string }> => "skipped" in a;
+const loginNeeded = (a: PullAccount): a is Extract<PullAccount, { login_needed: string }> => "login_needed" in a;
 
 export function pullLine(r: PullResult): string {
   if (r.accounts.length === 0) return "No linked accounts to pull.";
   return r.accounts
-    .map((a) => (failed(a) ? `${a.alias}: ${a.error}` : skipped(a) ? `${a.alias}: ${a.skipped}` : `${a.alias}: ${a.pulled} transactions`))
+    .map((a) =>
+      failed(a)
+        ? `${a.alias}: ${a.error}`
+        : skipped(a)
+          ? `${a.alias}: ${a.skipped}`
+          : loginNeeded(a)
+            ? `${a.alias}: ${a.login_needed}`
+            : `${a.alias}: ${a.pulled} transactions`,
+    )
     .join("; ");
 }
 
 /** What Refresh data says, including which accounts need a Reconnect. */
 export function pullOutcome(r: PullResult): Outcome {
   const bad = r.accounts.filter(failed);
-  const login = bad.flatMap((a) => (a.needs_login && a.login_url ? [{ alias: a.alias, url: a.login_url }] : []));
+  // an account whose saved login lapsed is information, not a failure: the accounts whose login persists were pulled
+  const login = r.accounts.flatMap((a) => (loginNeeded(a) && a.login_url ? [{ alias: a.alias, url: a.login_url }] : []));
   return {
-    kind: bad.length ? "error" : "success",
+    kind: bad.length ? "error" : login.length ? "info" : "success",
     text: [pullLine(r), pipelineLine(r.pipeline)].filter(Boolean).join(" "),
     reconnect: bad.filter((a) => a.needs_reconnect).map((a) => a.alias),
     ...(login.length ? { login } : {}), // only when there is a hand login to link to

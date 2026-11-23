@@ -51,16 +51,14 @@ describe("Inputs", () => {
     expect(callsTo(calls, "POST /api/accounts/pull")).toHaveLength(1);
   });
 
-  it("Refresh data says a browser-pulled account needs a login and links to the hand login", async () => {
+  it("Refresh data pulls what it can and tells, without alarm, which account needs a hand login", async () => {
     await inputs({
       "POST /api/accounts/pull": {
         accounts: [
           { alias: "capital-one", pulled: 3 },
           {
             alias: "venmo-dragos",
-            error: "Venmo is asking for a login",
-            needs_login: true,
-            state: "login_required",
+            login_needed: "the saved login has probably expired (last seen logged in 3 h ago); log in by hand to fetch it",
             login_url: "https://fetch.velicanu.com/login?account=venmo-dragos",
           },
         ],
@@ -68,12 +66,29 @@ describe("Inputs", () => {
       },
     });
     await userEvent.click(screen.getByRole("button", { name: "Refresh data" }));
-    expect(await screen.findByText(/venmo-dragos: Venmo is asking for a login/)).toBeInTheDocument();
+    expect(await screen.findByText(/capital-one: 3 transactions/)).toBeInTheDocument();
+    expect(screen.getByText(/venmo-dragos: the saved login has probably expired/)).toBeInTheDocument();
     const link = screen.getByRole("link", { name: "Log in to venmo-dragos by hand" });
     expect(link).toHaveAttribute("href", "https://fetch.velicanu.com/login?account=venmo-dragos");
     expect(link).toHaveAttribute("target", "_blank");
     expect(link).toHaveAttribute("rel", expect.stringContaining("noopener"));
-    expect(screen.getByRole("alert")).toBeInTheDocument(); // a login that lapsed is a problem, and it stays until the next action
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument(); // information, not a failure
+    expect(screen.getByRole("status")).toBeInTheDocument();
+  });
+
+  it("a login problem that comes with a real failure is still an alert, and still links", async () => {
+    await inputs({
+      "POST /api/accounts/pull": {
+        accounts: [
+          { alias: "chase-1", error: "ITEM_LOGIN_REQUIRED: login again" },
+          { alias: "venmo-dragos", login_needed: "log in by hand to fetch it", login_url: "https://fetch.velicanu.com/login?account=venmo-dragos" },
+        ],
+        pipeline: null,
+      },
+    });
+    await userEvent.click(screen.getByRole("button", { name: "Refresh data" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/chase-1: ITEM_LOGIN_REQUIRED/);
+    expect(screen.getByRole("link", { name: "Log in to venmo-dragos by hand" })).toBeInTheDocument();
   });
 
   it("Refresh data reports an account left alone because it was just fetched, without calling it a failure", async () => {
@@ -89,13 +104,20 @@ describe("Inputs", () => {
     expect(screen.queryByRole("link", { name: /by hand/ })).not.toBeInTheDocument();
   });
 
-  it("a login problem without a link is still shown, just without the link", async () => {
+  it("a login-needed result without a link is shown, just without the link", async () => {
     await inputs({
-      "POST /api/accounts/pull": { accounts: [{ alias: "venmo-dragos", error: "Venmo is asking for a login", needs_login: true, login_url: null }], pipeline: null },
+      "POST /api/accounts/pull": { accounts: [{ alias: "venmo-dragos", login_needed: "log in by hand to fetch it", login_url: null }], pipeline: null },
     });
     await userEvent.click(screen.getByRole("button", { name: "Refresh data" }));
-    expect(await screen.findByText(/venmo-dragos: Venmo is asking for a login/)).toBeInTheDocument();
+    expect(await screen.findByText(/venmo-dragos: log in by hand to fetch it/)).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /by hand/ })).not.toBeInTheDocument();
+  });
+
+  it("the plain Refresh data button sends no account and no after_login", async () => {
+    const calls = await inputs({ "POST /api/accounts/pull": { accounts: [], pipeline: null } });
+    await userEvent.click(screen.getByRole("button", { name: "Refresh data" }));
+    await screen.findByText(/No linked accounts to pull/);
+    expect(callsTo(calls, "POST /api/accounts/pull")[0].body).toBeUndefined();
   });
 
   it("shows why Plaid is unavailable in the banner", async () => {

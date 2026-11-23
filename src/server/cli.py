@@ -45,9 +45,12 @@ def pull(settings: Settings, client_factory=make_client, fetcher=None) -> int:
             continue
         for acct in result["accounts"]:
             who = f"{stamp} {user}/{acct['alias']}"
-            if acct.get("needs_login"):
-                failed += 1
-                print(f"{who}: NEEDS LOGIN, fix it at {acct.get('login_url')}")
+            if (
+                "login_needed" in acct
+            ):  # information, not a failure: the accounts whose login persists were pulled
+                print(
+                    f"{who}: login needed, {acct['login_needed']} ({acct.get('login_url')})"
+                )
             elif "error" in acct:
                 failed += 1
                 hint = (

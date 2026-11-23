@@ -93,7 +93,14 @@ def novnc(tmp_path):
     return root
 
 
-def make(tmp_path, novnc, vnc=None, trusted=frozenset({"testclient"}), browser=None):
+def make(
+    tmp_path,
+    novnc,
+    vnc=None,
+    trusted=frozenset({"testclient"}),
+    browser=None,
+    expense_url="https://expense.test",
+):
     audit = tmp_path / "audit.log"
     settings = web.Settings(
         trusted_proxies=trusted,
@@ -101,6 +108,7 @@ def make(tmp_path, novnc, vnc=None, trusted=frozenset({"testclient"}), browser=N
         public_origin=ORIGIN,
         audit_log=str(audit),
         novnc_dir=str(novnc),
+        expense_url=expense_url,
     )
     browser = browser or FakeBrowser()
     app = web.create_app(
@@ -421,3 +429,36 @@ def test_the_browser_client_sends_the_token_and_reports_refusals_without_it():
     with pytest.raises(web.BrowserdError) as e:
         web.Browserd("http://x", "SECRETTOKEN-0123456789abcdef", down).status()
     assert "URLError" in str(e.value) and "SECRETTOKEN" not in str(e.value)
+
+
+# --- Done sends the person to the expense app ---------------------------------------------------------------------
+
+
+def test_the_login_status_and_the_stop_reply_say_where_done_goes(ctx):
+    client, browser, _ = ctx
+    assert (
+        client.get("/api/login", headers=ME).json()["expense_url"]
+        == "https://expense.test"
+    )
+    post(client, "/api/login/venmo-dragos/start")
+    stopped = post(client, "/api/login/stop")
+    assert (
+        stopped.json()["expense_url"] == "https://expense.test"
+        and stopped.json()["result"] == "stopped"
+    )
+    assert VNC_PASSWORD not in stopped.text
+
+
+def test_without_an_expense_url_done_just_stops(tmp_path, novnc):
+    client, _, _ = make(tmp_path, novnc, expense_url="")
+    assert client.get("/api/login", headers=ME).json()["expense_url"] == ""
+
+
+def test_the_expense_url_comes_only_from_the_servers_own_setting(monkeypatch):
+    assert (
+        web.Settings.from_env(
+            {"EXPENSE_URL": "https://expense.velicanu.com/"}
+        ).expense_url
+        == "https://expense.velicanu.com"
+    )
+    assert web.Settings.from_env({}).expense_url == ""
