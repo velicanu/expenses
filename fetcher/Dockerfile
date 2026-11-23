@@ -15,6 +15,11 @@ RUN apt-get update \
 # uninstall it to upgrade: install over it.
 RUN pip install --no-cache-dir --ignore-installed typing_extensions playwright==1.55.0 fastapi uvicorn websockets
 
+# Real Google Chrome (not the bundled Chromium) for the hand login: a person drives it on the virtual desktop like Chrome on
+# a remote desktop, with none of the automation switches Playwright adds. Playwright installs the stable .deb (/opt/google).
+# It is whatever is current when the image is built.
+RUN python -m playwright install chrome
+
 WORKDIR /app
 COPY . /app/fetcher/
 ENV PYTHONPATH=/app PYTHONUNBUFFERED=1

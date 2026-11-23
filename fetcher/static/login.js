@@ -37,9 +37,9 @@ function finished(st) {
   clearInterval(ticking); remaining = 0; clock();
   if (rfb) { try { rfb.disconnect(); } catch (_) {} rfb = null; }
   show(false);
-  const msg = { logged_in: "Logged in. The session is saved.", timed_out: "Time ran out before it saw you logged in.", ended: "The browser closed before it saw you logged in.", stopped: "Stopped." }[st.result];
-  note(msg || "", st.result === "logged_in" ? "ok" : "");
-  $("start").textContent = st.result === "logged_in" ? "Log in again" : "Start the browser";
+  const msg = { finished: "Done. Chrome was closed so it keeps what it saved.", closed: "The browser was closed.", timed_out: "Time ran out, so the browser was closed." }[st.result];
+  note(msg || "", st.result === "finished" ? "ok" : "");
+  $("start").textContent = "Start the browser";
 }
 
 async function connect() {
