@@ -1,14 +1,20 @@
 """The browser side of the credentials page's hand-login (`python -m fetcher browserd`), in its own container.
 
 It holds the browser profiles (bank session cookies) and runs a login session on request: a small virtual display,
-a window manager, a VNC server on 127.0.0.1, and `python -m fetcher login ACCOUNT` (a real Chromium on the sign-in page
-in the account's persistent profile). It has no bao credentials and no web-facing port; the credentials page, which
+a window manager, a VNC server on 127.0.0.1, and a plain Google Chrome on the sign-in page in the account's profile.
+Plain means what it says: started like a person would start it, with no Playwright, no debugging pipe, none of the
+automation switches (`navigator.webdriver`, the "controlled by automated software" banner) that a bank's bot defense
+reads. The person drives it through the page exactly as they would a Chrome on a remote desktop; nothing here types or
+clicks. It has no bao credentials and no web-facing port; the credentials page, which
 has the opposite (bao but no browser), asks it to start and stop sessions over 127.0.0.1 with a shared token and
 bridges the VNC stream to the person's browser. So a hostile page that exploits the browser finds no vault login to read.
 
 One session at a time, over by itself after a deadline. VNC gets a fresh random password per session (the protocol
 keeps only 8 characters), because the container shares the host's network: any local process could otherwise connect.
-This module never types or clicks anything.
+
+Every way a session ends closes Chrome gracefully first (SIGTERM to the browser, then a wait), so it writes its cookies
+and the next start does not open on "Chromium didn't shut down correctly". Whether the login worked is not known here
+(that would take automation); the session's result says how it ended, and a separate check says if the session holds.
 """
 
 import hmac
@@ -17,7 +23,6 @@ import secrets
 import signal
 import socket
 import subprocess
-import sys
 import threading
 import time
 from pathlib import Path
@@ -71,8 +76,29 @@ def _vnc_ready() -> bool:
         return s.connect_ex(("127.0.0.1", VNC_PORT)) == 0
 
 
-def _login_argv(account: str, profiles: str, minutes: int) -> list[str]:
-    return [sys.executable, "-m", "fetcher", "login", account, str(minutes)]
+def _signal(proc, sig):
+    """Signal just this process (not its group): Chrome shuts its own children down when it is asked nicely."""
+    try:
+        os.kill(proc.pid, sig)
+    except (ProcessLookupError, PermissionError):
+        pass
+
+
+def _browser_argv(account: str, profiles: str) -> list[str]:
+    """Google Chrome the way a person starts it, on the institution's sign-in page, in the account's own profile.
+    --no-sandbox is needed because the container cannot create user namespaces (Chrome shows a bar saying so)."""
+    width, height = SCREEN.split("x")[:2]
+    return [
+        "google-chrome-stable",
+        f"--user-data-dir={Path(profiles) / account}",
+        "--no-first-run",
+        "--no-default-browser-check",
+        "--no-sandbox",
+        "--password-store=basic",
+        "--window-position=0,0",
+        f"--window-size={width},{height}",
+        institutions.get(account).start_url,
+    ]
 
 
 class StartError(Exception):
@@ -90,19 +116,21 @@ class Sessions:
         kill_group=_kill_group,
         x_ready=_x_ready,
         vnc_ready=_vnc_ready,
-        login_argv=_login_argv,
+        signal_proc=_signal,
+        browser_argv=_browser_argv,
         clock=time.time,
         workdir: str = "/tmp",
         ready_timeout: float = 10,
+        grace: float = 15,
     ):
         self.profiles, self.minutes = profiles, minutes
         self._spawn, self._kill_group = spawn, kill_group
         self._x_ready, self._vnc_ready = x_ready, vnc_ready
-        self._login_argv, self._clock = login_argv, clock
-        self._workdir, self._ready_timeout = workdir, ready_timeout
+        self._signal, self._browser_argv, self._clock = signal_proc, browser_argv, clock
+        self._workdir, self._ready_timeout, self._grace = workdir, ready_timeout, grace
         self._lock = threading.RLock()
         self._procs: list = []
-        self._login = None
+        self._browser = None
         self._account: str | None = None
         self._password: str | None = None
         self._deadline = 0.0
@@ -122,11 +150,7 @@ class Sessions:
             pwfile.write_text(password)
             pwfile.chmod(0o600)
             self._pwfile = pwfile
-            env = {
-                **os.environ,
-                "DISPLAY": DISPLAY,
-                "FETCHER_SCREEN": SCREEN.rsplit("x", 1)[0],
-            }
+            env = {**os.environ, "DISPLAY": DISPLAY}
             try:
                 self._procs.append(
                     self._spawn(
@@ -157,10 +181,10 @@ class Sessions:
                 )
                 if not _wait_for(self._vnc_ready, self._ready_timeout):
                     raise StartError("the VNC server did not start")
-                self._login = self._spawn(
-                    self._login_argv(account, self.profiles, self.minutes), env
+                self._browser = self._spawn(
+                    self._browser_argv(account, self.profiles), env
                 )
-                self._procs.append(self._login)
+                self._procs.append(self._browser)
             except StartError:
                 self._teardown()
                 raise
@@ -173,9 +197,11 @@ class Sessions:
             self._deadline = self._clock() + self.minutes * 60
             self._result = None
 
-    def stop(self, reason: str = "stopped") -> None:
+    def stop(self, reason: str = "finished") -> None:
+        """The person is done (or gave up): close Chrome gracefully so it keeps its cookies, then everything else."""
         with self._lock:
             if self._account is not None:
+                self._close_browser()
                 self._finish(reason)
 
     def status(self) -> dict:
@@ -193,13 +219,24 @@ class Sessions:
             }
 
     # -- internals --------------------------------------------------------------------------------------------
+    def _close_browser(self) -> None:
+        """Ask Chrome to quit and give it time to write its profile; the teardown after this is the backstop."""
+        browser = self._browser
+        if browser is None or browser.poll() is not None:
+            return
+        self._signal(browser, signal.SIGTERM)
+        end = time.monotonic() + self._grace
+        while browser.poll() is None and time.monotonic() < end:
+            time.sleep(0.05)
+
     def _reap(self) -> None:
-        """Notice that the login finished or the time is up."""
+        """Notice that the browser was closed or the time is up."""
         if self._account is None:
             return
-        if self._login is not None and self._login.poll() is not None:
-            self._finish("logged_in" if self._login.poll() == 0 else "ended")
+        if self._browser is not None and self._browser.poll() is not None:
+            self._finish("closed")
         elif self._clock() >= self._deadline:
+            self._close_browser()
             self._finish("timed_out")
 
     def _finish(self, result: str) -> None:
@@ -215,7 +252,7 @@ class Sessions:
                 time.sleep(0.05)
             if proc.poll() is None:
                 self._kill_group(proc, signal.SIGKILL)
-        self._procs, self._login = [], None
+        self._procs, self._browser = [], None
         if self._pwfile is not None:
             self._pwfile.unlink(missing_ok=True)
             self._pwfile = None

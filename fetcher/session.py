@@ -25,8 +25,11 @@ def launch(
             "viewport": {"width": w, "height": h},
             "args": ["--window-position=0,0", f"--window-size={w},{h}"],
         }
+    # channel="chrome": the same Google Chrome that did the hand login (see browserd.py), so the profile it wrote opens
+    # in the browser that wrote it
     return playwright.chromium.launch_persistent_context(
         str(profile),
+        channel="chrome",
         headless=headless,
         **({"viewport": {"width": 1280, "height": 900}} | extra),
         locale="en-US",

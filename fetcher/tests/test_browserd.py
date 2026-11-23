@@ -10,12 +10,18 @@ TOKEN = "t" * 32
 AUTH = {"Authorization": f"Bearer {TOKEN}"}
 
 
+_next_pid = iter(
+    range(2**22 + 1000, 2**23)
+)  # above any real pid: a stray os.kill could never hit a real process
+
+
 class FakeProc:
     def __init__(self, argv, env=None):
         self.argv, self.env = argv, env
-        self.pid = id(self) % 100000
+        self.pid = next(_next_pid)
         self.returncode = None
-        self.signals = []
+        self.signals = []  # group/tree kills
+        self.main_signals = []  # signals to just this process (the polite request)
 
     def poll(self):
         return self.returncode
@@ -30,6 +36,7 @@ class World:
     def __init__(self, tmp_path):
         self.procs, self.now, self.x_ok, self.vnc_ok = [], 1000.0, True, True
         self.tmp = tmp_path
+        self.browser_quits_when_asked = True  # Chrome does; a hung one would not
 
     def spawn(self, argv, env=None):
         p = FakeProc(argv, env)
@@ -38,7 +45,19 @@ class World:
 
     def kill_group(self, proc, sig):
         proc.signals.append(sig)
-        proc.returncode = -int(sig)
+        if (
+            proc.returncode is None
+        ):  # a process that already left cannot be killed again
+            proc.returncode = -int(sig)
+
+    def signal_proc(self, proc, sig):
+        proc.main_signals.append(sig)
+        if self.browser_quits_when_asked:
+            proc.returncode = 0
+
+    @property
+    def browser(self):
+        return self.procs[-1]
 
     def sessions(self, **kw):
         return browserd.Sessions(
@@ -46,6 +65,8 @@ class World:
             minutes=15,
             spawn=self.spawn,
             kill_group=self.kill_group,
+            signal_proc=self.signal_proc,
+            grace=0.3,
             x_ready=lambda: self.x_ok,
             vnc_ready=lambda: self.vnc_ok,
             clock=lambda: self.now,
@@ -55,10 +76,7 @@ class World:
         )
 
     def names(self):
-        return [
-            p.argv[0] if p.argv[0] != browserd.sys.executable else "login"
-            for p in self.procs
-        ]
+        return [p.argv[0] for p in self.procs]
 
 
 @pytest.fixture
@@ -66,13 +84,15 @@ def world(tmp_path):
     return World(tmp_path)
 
 
-def test_a_session_starts_the_display_the_vnc_server_and_the_login_in_order(world):
+def test_a_session_starts_the_display_the_vnc_server_and_a_plain_chrome_in_order(world):
     s = world.sessions()
     s.start("venmo-dragos")
-    assert world.names() == ["Xvfb", "fluxbox", "x11vnc", "login"]
-    login = world.procs[-1]
-    assert login.argv[1:] == ["-m", "fetcher", "login", "venmo-dragos", "15"]
-    assert login.env["DISPLAY"] == ":99" and login.env["FETCHER_SCREEN"] == "540x960"
+    assert world.names() == ["Xvfb", "fluxbox", "x11vnc", "google-chrome-stable"]
+    chrome = world.browser
+    assert chrome.env["DISPLAY"] == ":99"
+    assert "--user-data-dir=/profiles/venmo-dragos" in chrome.argv
+    assert chrome.argv[-1] == "https://account.venmo.com/"
+    assert "--window-size=540,960" in chrome.argv
     st = s.status()
     assert (
         st["state"] == "running"
@@ -80,6 +100,23 @@ def test_a_session_starts_the_display_the_vnc_server_and_the_login_in_order(worl
         and st["remaining"] == 900
     )
     assert len(st["vnc_password"]) == 8
+
+
+def test_the_browser_is_started_like_a_person_would_not_like_a_script(world):
+    """A bank's bot defense reads these: no Playwright, no debugging pipe or port, no automation switches."""
+    world.sessions().start("venmo-dragos")
+    argv = " ".join(world.browser.argv)
+    for automation in (
+        "playwright",
+        "--enable-automation",
+        "--remote-debugging",
+        "--headless",
+        "--disable-blink-features",
+        "--user-agent",
+        "-m fetcher",
+    ):
+        assert automation not in argv, automation
+    assert not any("python" in a for a in world.browser.argv)
 
 
 def test_the_vnc_password_is_in_a_private_file_and_never_on_a_command_line(world):
@@ -122,19 +159,19 @@ def test_an_account_without_a_sign_in_flow_starts_nothing(world):
     assert world.procs == [] and list(world.tmp.iterdir()) == []
 
 
-@pytest.mark.parametrize("rc,result", [(0, "logged_in"), (1, "ended")])
-def test_when_the_login_ends_everything_is_stopped_and_the_result_is_kept(
-    world, rc, result
+@pytest.mark.parametrize("rc", [0, 1])
+def test_when_the_browser_is_closed_everything_is_stopped_and_the_result_is_kept(
+    world, rc
 ):
     s = world.sessions()
     s.start("venmo-dragos")
-    world.procs[-1].finish(rc)
+    world.browser.finish(rc)  # the person closed Chrome
     st = s.status()
     assert st == {
         "state": "idle",
         "account": None,
         "remaining": 0,
-        "result": result,
+        "result": "closed",
         "vnc_password": None,
     }
     assert all(
@@ -151,18 +188,46 @@ def test_a_session_ends_by_itself_at_its_deadline(world):
     world.now += 2
     st = s.status()
     assert st["state"] == "idle" and st["result"] == "timed_out"
-    assert all(signal.SIGTERM in p.signals for p in world.procs)
+    assert world.browser.main_signals == [
+        signal.SIGTERM
+    ]  # asked to quit before anything was torn down
+    assert all(signal.SIGTERM in p.signals for p in world.procs[:3])
 
 
 def test_stop_ends_it_and_a_new_session_can_follow(world):
     s = world.sessions()
     s.start("venmo-dragos")
     s.stop()
-    assert s.status()["result"] == "stopped" and s.status()["state"] == "idle"
+    assert s.status()["result"] == "finished" and s.status()["state"] == "idle"
     s.start("venmo-viral")
     assert s.status()["account"] == "venmo-viral" and s.status()["result"] is None
     s.stop()
     s.stop()  # stopping nothing is fine
+
+
+def test_finishing_asks_chrome_to_quit_and_waits_so_it_can_write_its_cookies(world):
+    """Chrome gets a plain SIGTERM to itself first; the rest is only torn down after it has gone."""
+    s = world.sessions()
+    s.start("venmo-dragos")
+    chrome = world.browser
+    s.stop()
+    assert chrome.main_signals == [signal.SIGTERM]
+    assert chrome.returncode == 0  # it left by itself, not by being killed
+    assert not any(sig == signal.SIGKILL for sig in chrome.signals)
+
+
+def test_a_browser_that_ignores_the_request_is_killed_after_the_grace_period(world):
+    import time
+
+    world.browser_quits_when_asked = False
+    s = world.sessions()
+    s.start("venmo-dragos")
+    chrome = world.browser
+    started = time.monotonic()
+    s.stop()
+    assert time.monotonic() - started >= 0.3  # it was given the grace period
+    assert chrome.main_signals == [signal.SIGTERM] and signal.SIGTERM in chrome.signals
+    assert s.status()["state"] == "idle"
 
 
 @pytest.mark.parametrize("which", ["x_ok", "vnc_ok"])
@@ -229,5 +294,5 @@ def test_the_control_api_runs_a_session(world):
         c.post("/start", headers=AUTH, json={"account": "fidelity-dragos"}).status_code
         == 409
     )
-    assert c.post("/stop", headers=AUTH).json()["result"] == "stopped"
+    assert c.post("/stop", headers=AUTH).json()["result"] == "finished"
     assert c.get("/status", headers=AUTH).json()["vnc_password"] is None

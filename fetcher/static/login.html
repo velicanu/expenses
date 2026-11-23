@@ -43,7 +43,7 @@
 <div id="bar">
   <button type="button" id="keyboard">Keyboard</button>
   <button type="button" id="pastebtn">Paste</button>
-  <button type="button" id="stop">Stop</button>
+  <button type="button" id="stop" class="primary">Done</button>
 </div>
 <div id="paste">
   <textarea id="pastetext" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Paste text here, then tap Type it with the cursor in the right field"></textarea>
@@ -52,7 +52,8 @@
 <div id="note" role="status"></div>
 <div id="intro">
   <p id="what"></p>
-  <p>This opens a real browser on your server and shows it here. Solve any "confirm you're human" check, sign in, and approve any 2FA yourself. It closes by itself once it sees you're logged in, or after 15 minutes.</p>
+  <p>This opens Chrome on your server and shows it here, like a remote desktop. Sign in the way you normally would: any "confirm you're human" check, your password, 2FA.</p>
+  <p>When you are logged in, tap <b>Done</b> so Chrome closes properly and keeps its session. It also closes by itself after 15 minutes.</p>
   <button type="button" class="primary" id="start">Start the browser</button>
 </div>
 <div id="screen"></div>
