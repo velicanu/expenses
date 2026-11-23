@@ -355,6 +355,10 @@ def create_app(
         return {
             **{k: v for k, v in st.items() if k != "vnc_password"},
             "expense_url": settings.expense_url,
+            # the institutions Refresh data can fetch from: Done only goes to the expense app for these
+            "fetch_institutions": sorted(
+                n for n, i in institutions.INSTITUTIONS.items() if i.download
+            ),
         }
 
     @app.get("/api/login")

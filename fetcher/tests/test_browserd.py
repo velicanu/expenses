@@ -296,3 +296,17 @@ def test_the_control_api_runs_a_session(world):
     )
     assert c.post("/stop", headers=AUTH).json()["result"] == "finished"
     assert c.get("/status", headers=AUTH).json()["vnc_password"] is None
+
+
+def test_a_wealthfront_hand_login_opens_its_sign_in_page_in_a_plain_chrome(world):
+    s = world.sessions()
+    s.start("wealthfront-dragos")
+    chrome = world.browser
+    assert chrome.argv[-1] == "https://www.wealthfront.com/login"
+    assert (
+        "--user-data-dir=/profiles/wealthfront-dragos" in chrome.argv
+    )  # its own profile
+    assert not any(
+        flag in " ".join(chrome.argv)
+        for flag in ("playwright", "--enable-automation", "--remote-debugging")
+    )

@@ -42,7 +42,8 @@ function finished(st) {
   show(false);
   // Done (or closing Chrome yourself) means you have just logged in: go and fetch that account in the expense app, which
   // does it with your login there and shows the result. A timeout means you walked away: nothing to fetch.
-  if ((st.result === "finished" || st.result === "closed") && st.expense_url && account) {
+  const fetchable = (st.fetch_institutions || []).includes(account.split("-")[0]);
+  if ((st.result === "finished" || st.result === "closed") && st.expense_url && account && fetchable) {
     note("Chrome was closed so it keeps your login. Opening the expense app to fetch…", "ok");
     $("start").textContent = "Start the browser";
     setTimeout(() => location.assign(`${st.expense_url}/?refresh=${encodeURIComponent(account)}`), 800);
