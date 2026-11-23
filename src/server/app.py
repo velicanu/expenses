@@ -18,6 +18,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from . import figures, plaid_link, queries, sqlview
 from .auth import User, current_user
 from .bao import PlaidKeys, PlaidUnavailable
+from .direct_pull import FetcherClient
 from .palette import COLORS
 from .plaid_pull import make_client, pull_all
 from .settings import Settings
@@ -154,6 +155,13 @@ def create_app(
     app.state.plaid_client_factory = plaid_client_factory
     app.state.stores = Stores(settings.data_root)
     app.state.plaid = PlaidKeys(settings.bao)
+    app.state.fetcher = (
+        FetcherClient(
+            settings.fetcher.url, settings.fetcher.token, settings.fetcher.login_url
+        )
+        if settings.fetcher
+        else None
+    )
 
     @app.middleware("http")
     async def guard(request: Request, call_next):
@@ -408,6 +416,7 @@ def create_app(
             store,
             request.app.state.plaid,
             client_factory=request.app.state.plaid_client_factory,
+            fetcher=request.app.state.fetcher,
         )
 
     @app.post("/api/accounts/status")

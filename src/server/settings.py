@@ -28,6 +28,15 @@ class BaoSettings:
 
 
 @dataclass(frozen=True)
+class FetcherSettings:
+    """The browser container that downloads statements (velicanu/server's fetcher), and where its hand-login page is."""
+
+    url: str
+    token: str
+    login_url: str
+
+
+@dataclass(frozen=True)
 class Settings:
     data_root: Path
     users: dict
@@ -39,6 +48,7 @@ class Settings:
     plaid_redirect_uri: str | None = (
         None  # where a bank's OAuth login sends the browser back; registered at Plaid
     )
+    fetcher: FetcherSettings | None = None
 
     def __post_init__(self):
         for user in [*self.users.values(), *([self.dev_user] if self.dev_user else [])]:
@@ -74,4 +84,11 @@ class Settings:
             bao=bao,
             static_dir=Path(env["STATIC_DIR"]) if env.get("STATIC_DIR") else None,
             plaid_redirect_uri=env.get("PLAID_REDIRECT_URI") or None,
+            fetcher=FetcherSettings(
+                url=env.get("FETCHER_URL", "http://127.0.0.1:8097"),
+                token=env["FETCHER_TOKEN"],
+                login_url=env.get("FETCH_LOGIN_URL", "https://fetch.velicanu.com"),
+            )
+            if env.get("FETCHER_TOKEN")
+            else None,
         )

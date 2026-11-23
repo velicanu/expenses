@@ -312,6 +312,32 @@ class UserStore:
             for k, a in (self.config().get("linked_accounts") or {}).items()
         ]
 
+    def direct_accounts(self) -> list:
+        """Accounts fetched by a browser on a saved login (direct_pull.py): they hold no secret, only what to fetch."""
+        return [
+            {
+                "alias": a.get("alias", k),
+                "institution": a.get("institution"),
+                "last_success": a.get("last_success"),
+            }
+            for k, a in (self.config().get("direct_accounts") or {}).items()
+        ]
+
+    def add_direct_account(self, alias: str, institution: str):
+        def apply(cfg):
+            cfg.setdefault("direct_accounts", {}).setdefault(
+                alias, {"alias": alias, "institution": institution}
+            )
+
+        self.update_config(apply)
+
+    def mark_direct_success(self, alias: str, when: float):
+        def apply(cfg):
+            if alias in (cfg.get("direct_accounts") or {}):
+                cfg["direct_accounts"][alias]["last_success"] = when
+
+        self.update_config(apply)
+
     def account_token(self, alias: str) -> str | None:
         """The Plaid access token for an account. Only ever used inside this process, never returned."""
         for key, acct in (self.config().get("linked_accounts") or {}).items():

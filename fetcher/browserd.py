@@ -18,17 +18,20 @@ and the next start does not open on "Chromium didn't shut down correctly". Wheth
 """
 
 import hmac
+import json
 import os
+import re
 import secrets
 import signal
 import socket
 import subprocess
+import sys
 import threading
 import time
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from . import institutions
 
@@ -105,6 +108,55 @@ class StartError(Exception):
     pass
 
 
+MONTH = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
+MAX_MONTHS = 24
+FETCH_SECONDS = 420  # a first pull downloads a year of months, a few seconds apart
+
+
+def _run_fetch(
+    account: str, months: list[str], profiles: str, timeout=FETCH_SECONDS
+) -> dict:
+    """`python -m fetcher fetch ...` under its own virtual display; its one JSON line is the result. Whatever goes
+    wrong is reduced to a message with no page text."""
+    argv = [
+        "xvfb-run",
+        "-a",
+        sys.executable,
+        "-m",
+        "fetcher",
+        "fetch",
+        account,
+        *months,
+    ]
+    try:
+        proc = subprocess.Popen(
+            argv,
+            env={**os.environ, "FETCHER_PROFILES": profiles},
+            start_new_session=True,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+        )
+    except OSError as e:
+        return {
+            "state": "error",
+            "message": f"could not start the browser ({type(e).__name__})",
+            "files": [],
+        }
+    try:
+        out, _ = proc.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        _kill_group(proc, signal.SIGKILL)
+        proc.communicate()
+        return {"state": "error", "message": "the fetch took too long", "files": []}
+    lines = [line for line in out.splitlines() if line.startswith("{")]
+    try:
+        return json.loads(lines[-1])
+    except (IndexError, ValueError):
+        return {"state": "error", "message": "the fetch gave no result", "files": []}
+
+
 class Sessions:
     """The one hand-login session. Everything outside the OS (processes, clock, readiness) is injectable for tests."""
 
@@ -122,6 +174,7 @@ class Sessions:
         workdir: str = "/tmp",
         ready_timeout: float = 10,
         grace: float = 15,
+        fetch_runner=_run_fetch,
     ):
         self.profiles, self.minutes = profiles, minutes
         self._spawn, self._kill_group = spawn, kill_group
@@ -130,6 +183,8 @@ class Sessions:
         self._workdir, self._ready_timeout, self._grace = workdir, ready_timeout, grace
         self._lock = threading.RLock()
         self._procs: list = []
+        self._fetch_runner = fetch_runner
+        self._fetching = False
         self._browser = None
         self._account: str | None = None
         self._password: str | None = None
@@ -143,6 +198,8 @@ class Sessions:
             raise StartError(f"there is no sign-in flow for {account!r} yet")
         with self._lock:
             self._reap()
+            if self._fetching:
+                raise StartError("a fetch is running; try again in a minute")
             if self._account is not None:
                 raise StartError("a login session is already running")
             password = "".join(secrets.choice(_ALPHABET) for _ in range(8))
@@ -196,6 +253,30 @@ class Sessions:
             self._account, self._password = account, password
             self._deadline = self._clock() + self.minutes * 60
             self._result = None
+
+    def fetch(self, account: str, months: list[str]) -> dict:
+        """Download statements on the account's saved login (the Refresh data button). One at a time, and never while a
+        hand login is open: both use the account's browser profile."""
+        if institutions.find(account) is None:
+            raise StartError(f"there is no sign-in flow for {account!r} yet")
+        if (
+            not months
+            or len(months) > MAX_MONTHS
+            or not all(MONTH.match(m) for m in months)
+        ):
+            raise StartError("months must be YYYY-MM, at most 24")
+        with self._lock:
+            self._reap()
+            if self._account is not None:
+                raise StartError("a login session is open; finish it first")
+            if self._fetching:
+                raise StartError("a fetch is already running")
+            self._fetching = True
+        try:
+            return self._fetch_runner(account, months, self.profiles)
+        finally:
+            with self._lock:
+                self._fetching = False
 
     def stop(self, reason: str = "finished") -> None:
         """The person is done (or gave up): close Chrome gracefully so it keeps its cookies, then everything else."""
@@ -262,6 +343,11 @@ class StartIn(BaseModel):
     account: str
 
 
+class FetchIn(BaseModel):
+    account: str
+    months: list[str] = Field(max_length=MAX_MONTHS)
+
+
 def create_app(token: str, sessions: Sessions) -> FastAPI:
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 
@@ -281,6 +367,13 @@ def create_app(token: str, sessions: Sessions) -> FastAPI:
         except StartError as e:
             raise HTTPException(409, str(e)) from None
         return sessions.status()
+
+    @app.post("/fetch", dependencies=[Depends(authorized)])
+    def fetch(body: FetchIn):
+        try:
+            return sessions.fetch(body.account, body.months)
+        except StartError as e:
+            raise HTTPException(409, str(e)) from None
 
     @app.post("/stop", dependencies=[Depends(authorized)])
     def stop():

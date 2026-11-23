@@ -51,6 +51,53 @@ describe("Inputs", () => {
     expect(callsTo(calls, "POST /api/accounts/pull")).toHaveLength(1);
   });
 
+  it("Refresh data says a browser-pulled account needs a login and links to the hand login", async () => {
+    await inputs({
+      "POST /api/accounts/pull": {
+        accounts: [
+          { alias: "capital-one", pulled: 3 },
+          {
+            alias: "venmo-dragos",
+            error: "Venmo is asking for a login",
+            needs_login: true,
+            state: "login_required",
+            login_url: "https://fetch.velicanu.com/login?account=venmo-dragos",
+          },
+        ],
+        pipeline: null,
+      },
+    });
+    await userEvent.click(screen.getByRole("button", { name: "Refresh data" }));
+    expect(await screen.findByText(/venmo-dragos: Venmo is asking for a login/)).toBeInTheDocument();
+    const link = screen.getByRole("link", { name: "Log in to venmo-dragos by hand" });
+    expect(link).toHaveAttribute("href", "https://fetch.velicanu.com/login?account=venmo-dragos");
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", expect.stringContaining("noopener"));
+    expect(screen.getByRole("alert")).toBeInTheDocument(); // a login that lapsed is a problem, and it stays until the next action
+  });
+
+  it("Refresh data reports an account left alone because it was just fetched, without calling it a failure", async () => {
+    await inputs({
+      "POST /api/accounts/pull": {
+        accounts: [{ alias: "venmo-dragos", skipped: "fetched moments ago; it can be fetched again in about 8 min" }],
+        pipeline: null,
+      },
+    });
+    await userEvent.click(screen.getByRole("button", { name: "Refresh data" }));
+    expect(await screen.findByText(/venmo-dragos: fetched moments ago; it can be fetched again in about 8 min/)).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /by hand/ })).not.toBeInTheDocument();
+  });
+
+  it("a login problem without a link is still shown, just without the link", async () => {
+    await inputs({
+      "POST /api/accounts/pull": { accounts: [{ alias: "venmo-dragos", error: "Venmo is asking for a login", needs_login: true, login_url: null }], pipeline: null },
+    });
+    await userEvent.click(screen.getByRole("button", { name: "Refresh data" }));
+    expect(await screen.findByText(/venmo-dragos: Venmo is asking for a login/)).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /by hand/ })).not.toBeInTheDocument();
+  });
+
   it("shows why Plaid is unavailable in the banner", async () => {
     await inputs({ "POST /api/accounts/pull": () => jsonResponse({ detail: "Plaid is unavailable: cannot read the Plaid keys" }, 503) });
     await userEvent.click(screen.getByRole("button", { name: "Refresh data" }));
