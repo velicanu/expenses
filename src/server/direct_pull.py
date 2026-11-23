@@ -235,15 +235,24 @@ def refresh_account(store, account: dict, client, today: date, now: float) -> di
     except FetcherError as e:
         return {"alias": alias, "error": str(e)}
     state = result.get("state")
+    if (
+        state == "error"
+    ):  # the fetch itself broke: say so, do not call it a login problem
+        return {"alias": alias, "error": result.get("message") or "the fetch failed"}
     if state != "logged_in":
+        reason = {
+            "login_required": "Venmo is asking for a login",
+            "challenge": "Venmo challenged the automated browser (a bot check, not a login)",
+        }.get(state, "could not tell whether the session is logged in")
+        detail = result.get(
+            "detail"
+        )  # e.g. "HTTP 403 at id.venmo.com/signin": status and page, never page text
         return {
             "alias": alias,
             "needs_login": True,
             "state": state,
             "login_url": client.login_link(alias),
-            "error": "Venmo is asking for a login"
-            if state in ("login_required", "challenge")
-            else "could not tell whether the session is logged in",
+            "error": f"{reason} ({detail})" if detail else reason,
         }
     pulled, header = 0, None
     try:

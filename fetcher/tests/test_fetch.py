@@ -315,3 +315,146 @@ def test_main_prints_one_json_line_and_never_a_traceback(capsys, monkeypatch):
     monkeypatch.setattr(fetch_mod, "fetch", page_changed)
     fetch_mod.main("venmo-dragos", ["2026-11"])
     assert "month field" in json.loads(capsys.readouterr().out)["message"]
+
+
+# --- fetch(): the login check, with a fake Playwright ----------------------------------------------------------------
+
+
+class _Resp:
+    def __init__(self, status):
+        self.status = status
+
+
+class _FakeChromePage:
+    def __init__(self, url, status, text="", password_field=False, title="Venmo"):
+        self.url, self._status, self._text, self._pw, self._title = (
+            url,
+            status,
+            text,
+            password_field,
+            title,
+        )
+
+    def goto(self, url, **kw):
+        return _Resp(self._status)
+
+    def wait_for_timeout(self, ms):
+        pass
+
+    def title(self):
+        return self._title
+
+    def inner_text(self, selector):
+        return self._text
+
+    def query_selector(self, selector):
+        return object() if self._pw else None
+
+
+class _FakeContext:
+    def __init__(self, page):
+        self.pages, self.closed = [page], False
+
+    def close(self):
+        self.closed = True
+
+
+def _with_fake_playwright(monkeypatch, page):
+    import sys
+    import types
+
+    ctx = _FakeContext(page)
+
+    class Chromium:
+        def launch_persistent_context(self, *a, **kw):
+            return ctx
+
+    class PW:
+        chromium = Chromium()
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    module = types.ModuleType("playwright.sync_api")
+    module.sync_playwright = lambda: PW()
+    monkeypatch.setitem(sys.modules, "playwright", types.ModuleType("playwright"))
+    monkeypatch.setitem(sys.modules, "playwright.sync_api", module)
+    return ctx
+
+
+def test_a_bot_challenge_is_reported_with_its_status_and_page_but_no_query_or_text(
+    monkeypatch, tmp_path
+):
+    page = _FakeChromePage(
+        "https://id.venmo.com/signin?country.x=US&secret=abc",
+        403,
+        text="Confirm you're human",
+        title="venmo.com",
+    )
+    ctx = _with_fake_playwright(monkeypatch, page)
+    out = fetch_mod.fetch("venmo-dragos", ["2026-11"], profiles=str(tmp_path))
+    assert out == {
+        "state": "challenge",
+        "files": [],
+        "detail": "HTTP 403 at id.venmo.com/signin",
+    }
+    assert "secret" not in json.dumps(out) and "human" not in json.dumps(out)
+    assert ctx.closed  # Chrome is closed properly in every case
+
+
+def test_a_login_page_is_login_required_and_a_logged_in_page_downloads(
+    monkeypatch, tmp_path
+):
+    login = _FakeChromePage(
+        "https://id.venmo.com/signin", 200, text="Log in", password_field=True
+    )
+    ctx = _with_fake_playwright(monkeypatch, login)
+    out = fetch_mod.fetch("venmo-dragos", ["2026-11"], profiles=str(tmp_path))
+    assert (
+        out["state"] == "login_required"
+        and out["detail"] == "HTTP 200 at id.venmo.com/signin"
+        and ctx.closed
+    )
+
+    good = _FakeChromePage(
+        "https://account.venmo.com/statement?month=11",
+        200,
+        text="Account Statement",
+        title="Venmo | Account Statement",
+    )
+    ctx = _with_fake_playwright(monkeypatch, good)
+    monkeypatch.setattr(
+        fetch_mod.venmo,
+        "fetch_statements",
+        lambda page, months: [{"month": m, "csv": "c"} for m in months],
+    )
+    assert fetch_mod.fetch(
+        "venmo-dragos", ["2026-10", "2026-11"], profiles=str(tmp_path)
+    ) == {
+        "state": "logged_in",
+        "files": [{"month": "2026-10", "csv": "c"}, {"month": "2026-11", "csv": "c"}],
+    }
+    assert ctx.closed
+
+
+def test_chrome_is_closed_even_when_a_download_fails(monkeypatch, tmp_path):
+    good = _FakeChromePage(
+        "https://account.venmo.com/statement",
+        200,
+        text="Account Statement",
+        title="Venmo | Account Statement",
+    )
+    ctx = _with_fake_playwright(monkeypatch, good)
+
+    def boom(page, months):
+        raise venmo.VenmoPageError(
+            "the month field is not on the page (Venmo changed it?)"
+        )
+
+    monkeypatch.setattr(fetch_mod.venmo, "fetch_statements", boom)
+    with pytest.raises(venmo.VenmoPageError):
+        fetch_mod.fetch("venmo-dragos", ["2026-11"], profiles=str(tmp_path))
+    assert ctx.closed

@@ -633,3 +633,72 @@ def test_the_pull_command_prints_a_line_for_each_kind_of_result(tmp_path, capsys
     store.mark_direct_success("venmo-dragos", __import__("time").time())
     assert cli.pull(settings, fetcher=Fake(error=AssertionError("no visit"))) == 0
     assert "venmo-dragos: skipped, fetched moments ago" in capsys.readouterr().out
+
+
+# --- what a failed visit says -------------------------------------------------------------------------------------
+
+
+def test_a_crashed_fetch_is_an_error_not_a_login_problem(store):
+    store.add_direct_account("venmo-dragos", "venmo")
+    r = dp.refresh_account(
+        store,
+        account(),
+        Fake(
+            {
+                "state": "error",
+                "message": "the month field is not on the page",
+                "files": [],
+            }
+        ),
+        TODAY,
+        NOW,
+    )
+    assert r == {
+        "alias": "venmo-dragos",
+        "error": "the month field is not on the page",
+    }  # no needs_login, no login link
+    assert (
+        dp.refresh_account(
+            store, account(), Fake({"state": "error", "files": []}), TODAY, NOW
+        )["error"]
+        == "the fetch failed"
+    )
+    assert store.direct_accounts()[0]["last_success"] is None
+
+
+def test_a_bot_challenge_is_named_as_one_with_where_it_happened(store):
+    r = dp.refresh_account(
+        store,
+        account(),
+        Fake(
+            {
+                "state": "challenge",
+                "files": [],
+                "detail": "HTTP 403 at id.venmo.com/signin",
+            }
+        ),
+        TODAY,
+        NOW,
+    )
+    assert r["needs_login"] is True and r["state"] == "challenge"
+    assert (
+        r["error"]
+        == "Venmo challenged the automated browser (a bot check, not a login) (HTTP 403 at id.venmo.com/signin)"
+    )
+    plain = dp.refresh_account(
+        store,
+        account(),
+        Fake(
+            {
+                "state": "login_required",
+                "files": [],
+                "detail": "HTTP 200 at id.venmo.com/signin",
+            }
+        ),
+        TODAY,
+        NOW,
+    )
+    assert (
+        plain["error"]
+        == "Venmo is asking for a login (HTTP 200 at id.venmo.com/signin)"
+    )

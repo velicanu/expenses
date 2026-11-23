@@ -2,7 +2,7 @@
 download the statements for the months asked. Prints one JSON line:
 
     {"state": "logged_in", "files": [{"month": "2026-11", "csv": "..."}]}
-    {"state": "login_required" | "challenge" | "unknown", "files": []}      the login needs a person
+    {"state": "login_required" | "challenge" | "unknown", "files": [], "detail": "HTTP 403 at id.venmo.com/signin"}
     {"state": "error", "message": "...", "files": []}                       something broke; the message has no page text
 
 The browser service (browserd.py) runs this and hands the JSON to the expense app, which decides what enters the data.
@@ -10,6 +10,7 @@ The browser service (browserd.py) runs this and hands the JSON to the expense ap
 
 import json
 import sys
+from urllib.parse import urlparse
 
 from . import institutions, venmo
 from .session import facts_from, launch
@@ -36,9 +37,16 @@ def fetch(account: str, months: list[str], profiles: str = "/profiles") -> dict:
                 inst.home_url, wait_until="domcontentloaded", timeout=60000
             )
             page.wait_for_timeout(5000)
-            state = STATES[inst.classify(facts_from(page, response))]
+            facts = facts_from(page, response)
+            state = STATES[inst.classify(facts)]
             if state != "logged_in":
-                return {"state": state, "files": []}
+                # where the page ended up and its status: enough to tell a login page from a bot challenge, no page text
+                where = urlparse(facts.url)
+                return {
+                    "state": state,
+                    "files": [],
+                    "detail": f"HTTP {facts.status} at {where.netloc}{where.path}",
+                }
             return {"state": "logged_in", "files": venmo.fetch_statements(page, months)}
         finally:
             ctx.close()  # closes Chrome properly, so it keeps what it saved
