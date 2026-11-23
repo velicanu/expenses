@@ -13,6 +13,8 @@ from datetime import date, datetime, timedelta
 from cardstore import dump_csv, merge_tx
 from fsutil import make_dirs
 
+from .bao import PlaidUnavailable
+from .direct_pull import refresh_direct
 from .plaid_link import RECONNECT_CODES
 
 log = logging.getLogger("expenses.plaid")
@@ -75,48 +77,64 @@ def _error_code(exc) -> str | None:
         return None
 
 
-def pull_all(store, keys, client_factory=make_client, today=date.today) -> dict:
-    """keys: bao.PlaidKeys. Raises PlaidUnavailable if the keys cannot be had, PipelineBusy if a pull is running."""
+def pull_all(
+    store, keys, client_factory=make_client, today=date.today, fetcher=None, now=None
+) -> dict:
+    """Refresh data: every linked Plaid account, then every direct (browser) account, then one pipeline run if anything
+    new came in. keys: bao.PlaidKeys; fetcher: direct_pull.FetcherClient or None. Raises PlaidUnavailable if the keys
+    cannot be had and there is nothing else to pull, PipelineBusy if a pull is running."""
     with store.exclusive("pull"):
-        return _pull_all(store, keys, client_factory, today)
+        return _pull_all(store, keys, client_factory, today, fetcher, now)
 
 
-def _pull_all(store, keys, client_factory, today) -> dict:
-    accounts = (store.config().get("linked_accounts") or {}).items()
-    if not accounts:
+def _pull_all(store, keys, client_factory, today, fetcher, now) -> dict:
+    linked = (store.config().get("linked_accounts") or {}).items()
+    direct = store.direct_accounts()
+    if not linked and not direct:
         return {"accounts": [], "pipeline": None}
-    client = client_factory(keys.get())
-    make_dirs([store.cards_dir, store.raw_dir])
     results, new_starts = [], {}
-    for key, card in accounts:
-        alias = card.get("alias", key)
+    if linked:
         try:
-            transactions = fetch_transactions(
-                client, card["token"], card["start_date"], today().isoformat()
+            client = client_factory(keys.get())
+        except PlaidUnavailable as e:
+            if not direct:
+                raise
+            # the browser pull does not need Plaid (or bao): say what failed and carry on with the rest
+            client = None
+            results.extend(
+                {"alias": card.get("alias", key), "error": str(e)}
+                for key, card in linked
             )
-        except Exception as e:
-            log.warning("pull failed for %s: %s", alias, type(e).__name__)
-            code = _error_code(e)
-            results.append(
-                {
-                    "alias": alias,
-                    "error": _plaid_error(e),
-                    "code": code,
-                    "needs_reconnect": code in RECONNECT_CODES,
-                }
-            )
-            continue
-        # the card file is replaced whole, like before; merge_tx then adds only unseen transaction ids
-        with open(store.cards_dir / f"{alias}.json", "w") as outfile:
-            for tx in transactions:
-                record = tx.to_dict()
-                record["institution"] = card.get("institution")
-                outfile.write(json.dumps(record, default=_json_default) + "\n")
-        db_file = merge_tx(str(store.cards_dir), alias)
-        if db_file:
-            dump_csv(str(store.dir), db_file, alias)
-        new_starts[key] = (today() - timedelta(days=30)).isoformat()
-        results.append({"alias": alias, "pulled": len(transactions)})
+        make_dirs([store.cards_dir, store.raw_dir])
+        for key, card in linked if client else ():
+            alias = card.get("alias", key)
+            try:
+                transactions = fetch_transactions(
+                    client, card["token"], card["start_date"], today().isoformat()
+                )
+            except Exception as e:
+                log.warning("pull failed for %s: %s", alias, type(e).__name__)
+                code = _error_code(e)
+                results.append(
+                    {
+                        "alias": alias,
+                        "error": _plaid_error(e),
+                        "code": code,
+                        "needs_reconnect": code in RECONNECT_CODES,
+                    }
+                )
+                continue
+            # the card file is replaced whole, like before; merge_tx then adds only unseen transaction ids
+            with open(store.cards_dir / f"{alias}.json", "w") as outfile:
+                for tx in transactions:
+                    record = tx.to_dict()
+                    record["institution"] = card.get("institution")
+                    outfile.write(json.dumps(record, default=_json_default) + "\n")
+            db_file = merge_tx(str(store.cards_dir), alias)
+            if db_file:
+                dump_csv(str(store.dir), db_file, alias)
+            new_starts[key] = (today() - timedelta(days=30)).isoformat()
+            results.append({"alias": alias, "pulled": len(transactions)})
 
     def remember(cfg):
         for key, start in new_starts.items():
@@ -124,5 +142,11 @@ def _pull_all(store, keys, client_factory, today) -> dict:
 
     if new_starts:
         store.update_config(remember)
-    pipeline = store.run_pipeline() if new_starts else None
+    new_rows = bool(new_starts)
+    if direct:
+        make_dirs([store.raw_dir])
+        direct_results = refresh_direct(store, fetcher, today(), now)
+        results.extend(direct_results)
+        new_rows = new_rows or any(r.get("pulled") for r in direct_results)
+    pipeline = store.run_pipeline() if new_rows else None
     return {"accounts": results, "pipeline": pipeline}

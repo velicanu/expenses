@@ -146,6 +146,7 @@ label.check input { width: 1rem; height: 1rem; accent-color: var(--primary); }
 .link-form p { margin: 0; }
 .link-form .field { margin-bottom: 0; }
 .alert button.inline, td button.inline { margin-left: 0.75rem; min-height: 2rem; padding: 0.1rem 0.6rem; }
+.alert a.inline { margin-left: 0.75rem; }
 .oauth-return { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1rem; padding: 2rem; text-align: center; }
 .oauth-return p { margin: 0; }
 .json { background: var(--secondary); border-radius: 0.5rem; padding: 1rem; overflow: auto; max-height: 24rem; font-size: 14px; }

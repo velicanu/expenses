@@ -22,7 +22,7 @@ export function InputsPanel({ plaidConfigured, oauthReady }: { plaidConfigured: 
   const [message, setMessage] = useState<Outcome[]>([]);
   useEffect(() => {
     // plain confirmations fade, as in the old app; an error, or a Reconnect button, stays until the next action
-    if (message.length === 0 || message.some((m) => m.kind === "error" || m.reconnect?.length)) return;
+    if (message.length === 0 || message.some((m) => m.kind === "error" || m.reconnect?.length || m.login?.length)) return;
     const t = setTimeout(() => setMessage([]), NOTICE_MS);
     return () => clearTimeout(t);
   }, [message]);
@@ -266,6 +266,11 @@ export function InputsPanel({ plaidConfigured, oauthReady }: { plaidConfigured: 
             >
               Reconnect
             </button>
+          ))}
+          {(m.login ?? []).map((target) => (
+            <a key={target.alias} className="inline" href={target.url} target="_blank" rel="noopener noreferrer">
+              Log in to {target.alias} by hand
+            </a>
           ))}
         </p>
       ))}

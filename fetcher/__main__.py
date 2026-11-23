@@ -6,6 +6,7 @@
   login INSTITUTION [MIN]   the one-time login by hand (run through remote-login.sh, a virtual display + noVNC)
   browserd                  the browser side of the page's hand-login (own container; BROWSERD_TOKEN)
   serve                     the credentials page (web.py): LISTEN_HOST, PORT, TRUSTED_PROXIES, ALLOWED_EMAILS, PUBLIC_ORIGIN
+  fetch ACCOUNT MONTH...    on the saved login, download the statements for those months (run by browserd; prints JSON)
   vault-check INSTITUTION   what bao holds for an institution (never any value)
   set-credentials INSTITUTION
                             prompt (hidden) for username, password, optional TOTP seed and a short-lived
@@ -37,6 +38,10 @@ def main(argv=None) -> int:
         from . import login
 
         return login.login(args[0], profiles, int(args[1]) if len(args) > 1 else 30)
+    if cmd == "fetch" and len(args) >= 2:
+        from . import fetch
+
+        return fetch.main(args[0], args[1:])
     if cmd == "browserd" and not args:
         from . import browserd
 

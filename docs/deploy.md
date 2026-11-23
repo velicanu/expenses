@@ -58,9 +58,16 @@ and renames it into place.
   mode with the stored token (same token, only the bank login is asked again), then pulls.
 - **Tokens** live in `data/<user>/config.json` (as the old app kept them), are used only inside the server and are never
   returned by the API.
-- **Nightly pull**: the server repo's cron runs `docker exec expenses python -m server.cli pull` at 04:47 and appends one
-  line per account to `~/expenses/pull.log` on tess (exit status 1 if any account failed, e.g. a login to reconnect).
-  Only one pull or rebuild runs at a time, across the web app and the cron (a file lock in the container's /tmp).
+- **Refresh data (on demand, no schedule)**: the button pulls every linked Plaid account and every *direct* account, then
+  rebuilds. `docker exec expenses python -m server.cli pull` does the same by hand (one line per account; exit status 1 if
+  any failed). Only one pull or rebuild runs at a time (a file lock in the container's /tmp).
+- **Direct accounts** (e.g. `venmo-dragos`) are fetched by a real Chrome on a login you did by hand on
+  fetch.velicanu.com (velicanu/server `docs/expense-direct-pulls.md`): the app asks the browser service on 127.0.0.1:8097
+  (`FETCHER_URL`, `FETCHER_TOKEN`) for the monthly statements, and decides what enters the data itself
+  (`src/server/direct_pull.py`): already-known transaction IDs and pending ones are skipped, and new ones are only ever
+  **appended** to `raw/<account>-direct.csv`, so edit keys stay valid. Register one with
+  `docker exec expenses python -m server.cli add-direct USER venmo-dragos`. If the saved login has lapsed, Refresh data says
+  so and links to the hand login; a second Refresh within 10 minutes of a successful fetch does not visit the bank again.
 
 ## First deploy over existing data: re-key `changes.db` once
 
