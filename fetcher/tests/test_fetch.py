@@ -384,6 +384,13 @@ class _FakeContext:
         self.closed = True
 
 
+def _with_downloader(monkeypatch, fn):
+    import dataclasses
+
+    swapped = dataclasses.replace(inst.INSTITUTIONS["venmo"], download=fn)
+    monkeypatch.setitem(inst.INSTITUTIONS, "venmo", swapped)
+
+
 def _with_fake_playwright(monkeypatch, page):
     import sys
     import types
@@ -451,9 +458,8 @@ def test_a_login_page_is_login_required_and_a_logged_in_page_downloads(
         title="Venmo | Account Statement",
     )
     ctx = _with_fake_playwright(monkeypatch, good)
-    monkeypatch.setattr(
-        fetch_mod.venmo,
-        "fetch_statements",
+    _with_downloader(
+        monkeypatch,
         lambda page, months: [{"month": m, "csv": "c"} for m in months],
     )
     assert fetch_mod.fetch(
@@ -479,7 +485,7 @@ def test_chrome_is_closed_even_when_a_download_fails(monkeypatch, tmp_path):
             "the month field is not on the page (Venmo changed it?)"
         )
 
-    monkeypatch.setattr(fetch_mod.venmo, "fetch_statements", boom)
+    _with_downloader(monkeypatch, boom)
     with pytest.raises(venmo.VenmoPageError):
         fetch_mod.fetch("venmo-dragos", ["2026-11"], profiles=str(tmp_path))
     assert ctx.closed
@@ -521,3 +527,37 @@ def test_an_unexpected_playwright_error_is_not_mistaken_for_a_missing_control():
     boom.first = boom
     with pytest.raises(RuntimeError, match="browser crashed"):
         venmo._wait_visible(boom, "the thing")
+
+
+def test_an_institution_without_a_downloader_checks_the_login_but_fetches_nothing(
+    monkeypatch, tmp_path
+):
+    """Wealthfront's hand login works; downloading is not built yet, so a fetch says so instead of doing something wrong."""
+    dash = _FakeChromePage(
+        "https://www.wealthfront.com/dashboard",
+        200,
+        text="Your accounts",
+        title="Wealthfront",
+    )
+    ctx = _with_fake_playwright(monkeypatch, dash)
+    out = fetch_mod.fetch("wealthfront-dragos", ["2026-11"], profiles=str(tmp_path))
+    assert out == {
+        "state": "error",
+        "message": "downloading from wealthfront is not built yet",
+        "files": [],
+    }
+    assert ctx.closed
+    login = _FakeChromePage(
+        "https://www.wealthfront.com/login",
+        200,
+        text="Log in",
+        title="Log in | Wealthfront",
+        password_field=True,
+    )
+    ctx = _with_fake_playwright(monkeypatch, login)
+    out = fetch_mod.fetch("wealthfront-dragos", ["2026-11"], profiles=str(tmp_path))
+    assert (
+        out["state"] == "login_required"
+        and out["detail"] == "HTTP 200 at www.wealthfront.com/login"
+        and ctx.closed
+    )

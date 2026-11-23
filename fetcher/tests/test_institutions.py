@@ -104,3 +104,95 @@ def test_the_registry_knows_venmo_and_refuses_others_clearly():
     with pytest.raises(SystemExit) as e:
         inst.get("nowhere")
     assert "venmo" in str(e.value)
+
+
+# --- Wealthfront (provisional: only its sign-in page has been looked at) ----------------------------------------------
+
+
+def test_wealthfronts_sign_in_page_means_a_login_is_needed():
+    """The probe saw a normal 200 page with an email/password form and "Continue with passkey"."""
+    cw = inst.classify_wealthfront
+    assert (
+        cw(
+            facts(
+                "https://www.wealthfront.com/login",
+                title="Log in | Wealthfront",
+                password=True,
+            )
+        )
+        == LOGIN_REQUIRED
+    )
+    assert (
+        cw(facts("https://www.wealthfront.com/login", title="Wealthfront"))
+        == LOGIN_REQUIRED
+    )  # passkey-only form: no password field
+    assert (
+        cw(facts("https://www.wealthfront.com/", title="Sign in to Wealthfront"))
+        == LOGIN_REQUIRED
+    )
+    assert (
+        cw(facts("https://www.wealthfront.com/x", title="Wealthfront", password=True))
+        == LOGIN_REQUIRED
+    )
+
+
+def test_a_wealthfront_page_that_is_not_the_sign_in_page_counts_as_logged_in():
+    cw = inst.classify_wealthfront
+    assert (
+        cw(facts("https://www.wealthfront.com/dashboard", title="Wealthfront"))
+        == LOGGED_IN
+    )
+    assert (
+        cw(
+            facts(
+                "https://www.wealthfront.com/cash/activity",
+                title="Cash Account | Wealthfront",
+            )
+        )
+        == LOGGED_IN
+    )
+    assert (
+        cw(facts("https://app.wealthfront.com/home", title="Wealthfront")) == LOGGED_IN
+    )
+
+
+def test_wealthfront_challenges_and_foreign_pages_are_never_logged_in():
+    cw = inst.classify_wealthfront
+    assert (
+        cw(
+            facts(
+                "https://www.wealthfront.com/login", status=403, title="Access denied"
+            )
+        )
+        == CHALLENGE
+    )
+    assert (
+        cw(
+            facts(
+                "https://www.wealthfront.com/dashboard",
+                text="Please verify you are human",
+            )
+        )
+        == CHALLENGE
+    )
+    assert cw(facts("https://accounts.example.com/sso", title="Wealthfront")) == UNKNOWN
+    assert (
+        cw(facts("https://wealthfront.com.evil.example/dashboard", title="Wealthfront"))
+        == UNKNOWN
+    )  # a lookalike host
+    # a host that merely ENDS with the name, without the dot, is not Wealthfront either
+    assert (
+        cw(facts("https://evilwealthfront.com/dashboard", title="Wealthfront"))
+        == UNKNOWN
+    )
+    assert (
+        cw(facts("https://notwealthfront.com/dashboard", title="Wealthfront"))
+        == UNKNOWN
+    )
+
+
+def test_only_venmo_has_a_downloader_so_far():
+    assert inst.get("venmo").download is not None
+    w = inst.get("wealthfront-dragos")  # an account key finds its institution
+    assert w.name == "wealthfront" and w.download is None
+    assert w.start_url == "https://www.wealthfront.com/login"

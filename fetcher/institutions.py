@@ -9,6 +9,8 @@ from dataclasses import dataclass
 from typing import Callable
 from urllib.parse import urlparse
 
+from . import venmo
+
 LOGGED_IN = "logged_in"
 LOGIN_REQUIRED = "login_required"
 CHALLENGE = "challenge"
@@ -33,6 +35,9 @@ class Institution:
     start_url: str  # where a login begins
     home_url: str  # a page that only a logged-in session can open
     classify: Callable[[PageFacts], str]
+    # (page, months) -> [{"month", "csv"}]: how to download this institution's statements. None until one is built: the
+    # hand login still works (it is a person in Chrome), but nothing is fetched and Done does not send you to Refresh.
+    download: Callable | None = None
 
 
 def human_check(facts: PageFacts) -> bool:
@@ -61,12 +66,42 @@ def classify_venmo(facts: PageFacts) -> str:
     return UNKNOWN
 
 
+def classify_wealthfront(facts: PageFacts) -> str:
+    """Wealthfront: a normal 200 sign-in page (email and password, "Continue with passkey"). PROVISIONAL: the logged-in
+    side has not been looked at yet, so anything on wealthfront.com that is not the sign-in page counts as logged in, and
+    the first real visit has to confirm that."""
+    if human_check(facts) or facts.status == 403:
+        return CHALLENGE
+    parts = urlparse(facts.url)
+    if not (
+        parts.netloc == "wealthfront.com" or parts.netloc.endswith(".wealthfront.com")
+    ):
+        return UNKNOWN
+    title = facts.title.lower()
+    if (
+        facts.has_password_field
+        or "login" in parts.path.lower()
+        or "log in" in title
+        or "sign in" in title
+    ):
+        return LOGIN_REQUIRED
+    return LOGGED_IN
+
+
 INSTITUTIONS = {
     "venmo": Institution(
         name="venmo",
         start_url="https://account.venmo.com/",
         home_url="https://account.venmo.com/statement",
         classify=classify_venmo,
+        download=venmo.fetch_statements,
+    ),
+    "wealthfront": Institution(
+        name="wealthfront",
+        start_url="https://www.wealthfront.com/login",
+        # a logged-in browser is sent on to its dashboard, a logged-out one gets the sign-in form (provisional, see above)
+        home_url="https://www.wealthfront.com/login",
+        classify=classify_wealthfront,
     ),
 }
 

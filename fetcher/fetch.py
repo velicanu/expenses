@@ -39,6 +39,12 @@ def fetch(account: str, months: list[str], profiles: str = "/profiles") -> dict:
             page.wait_for_timeout(5000)
             facts = facts_from(page, response)
             state = STATES[inst.classify(facts)]
+            if state == "logged_in" and inst.download is None:
+                return {
+                    "state": "error",
+                    "message": f"downloading from {inst.name} is not built yet",
+                    "files": [],
+                }
             if state != "logged_in":
                 # where the page ended up and its status: enough to tell a login page from a bot challenge, no page text
                 where = urlparse(facts.url)
@@ -47,7 +53,7 @@ def fetch(account: str, months: list[str], profiles: str = "/profiles") -> dict:
                     "files": [],
                     "detail": f"HTTP {facts.status} at {where.netloc}{where.path}",
                 }
-            return {"state": "logged_in", "files": venmo.fetch_statements(page, months)}
+            return {"state": "logged_in", "files": inst.download(page, months)}
         finally:
             ctx.close()  # closes Chrome properly, so it keeps what it saved
 
