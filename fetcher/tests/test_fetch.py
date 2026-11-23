@@ -386,7 +386,7 @@ def _with_fake_playwright(monkeypatch, page):
 
 
 def test_a_bot_challenge_is_reported_with_its_status_and_page_but_no_query_or_text(
-    monkeypatch,
+    monkeypatch, tmp_path
 ):
     page = _FakeChromePage(
         "https://id.venmo.com/signin?country.x=US&secret=abc",
@@ -395,7 +395,7 @@ def test_a_bot_challenge_is_reported_with_its_status_and_page_but_no_query_or_te
         title="venmo.com",
     )
     ctx = _with_fake_playwright(monkeypatch, page)
-    out = fetch_mod.fetch("venmo-dragos", ["2026-11"])
+    out = fetch_mod.fetch("venmo-dragos", ["2026-11"], profiles=str(tmp_path))
     assert out == {
         "state": "challenge",
         "files": [],
@@ -405,12 +405,14 @@ def test_a_bot_challenge_is_reported_with_its_status_and_page_but_no_query_or_te
     assert ctx.closed  # Chrome is closed properly in every case
 
 
-def test_a_login_page_is_login_required_and_a_logged_in_page_downloads(monkeypatch):
+def test_a_login_page_is_login_required_and_a_logged_in_page_downloads(
+    monkeypatch, tmp_path
+):
     login = _FakeChromePage(
         "https://id.venmo.com/signin", 200, text="Log in", password_field=True
     )
     ctx = _with_fake_playwright(monkeypatch, login)
-    out = fetch_mod.fetch("venmo-dragos", ["2026-11"])
+    out = fetch_mod.fetch("venmo-dragos", ["2026-11"], profiles=str(tmp_path))
     assert (
         out["state"] == "login_required"
         and out["detail"] == "HTTP 200 at id.venmo.com/signin"
@@ -429,14 +431,16 @@ def test_a_login_page_is_login_required_and_a_logged_in_page_downloads(monkeypat
         "fetch_statements",
         lambda page, months: [{"month": m, "csv": "c"} for m in months],
     )
-    assert fetch_mod.fetch("venmo-dragos", ["2026-10", "2026-11"]) == {
+    assert fetch_mod.fetch(
+        "venmo-dragos", ["2026-10", "2026-11"], profiles=str(tmp_path)
+    ) == {
         "state": "logged_in",
         "files": [{"month": "2026-10", "csv": "c"}, {"month": "2026-11", "csv": "c"}],
     }
     assert ctx.closed
 
 
-def test_chrome_is_closed_even_when_a_download_fails(monkeypatch):
+def test_chrome_is_closed_even_when_a_download_fails(monkeypatch, tmp_path):
     good = _FakeChromePage(
         "https://account.venmo.com/statement",
         200,
@@ -452,5 +456,5 @@ def test_chrome_is_closed_even_when_a_download_fails(monkeypatch):
 
     monkeypatch.setattr(fetch_mod.venmo, "fetch_statements", boom)
     with pytest.raises(venmo.VenmoPageError):
-        fetch_mod.fetch("venmo-dragos", ["2026-11"])
+        fetch_mod.fetch("venmo-dragos", ["2026-11"], profiles=str(tmp_path))
     assert ctx.closed
