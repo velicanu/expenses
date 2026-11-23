@@ -160,12 +160,32 @@ def test_the_real_runner_parses_the_childs_last_json_line_and_enforces_a_timeout
 # --- venmo.py with a fake page -------------------------------------------------------------------------------------
 
 
+class TimeoutError(
+    Exception
+):  # named like Playwright's, which is what the code recognises
+    pass
+
+
 class FakeLocator:
     def __init__(self, page, kind):
         self.page, self.kind = page, kind
 
+    @property
+    def first(self):
+        return self
+
     def count(self):
-        return 0 if self.page.missing == self.kind else 1
+        if self.page.missing == self.kind:
+            return 0
+        if self.page.late == self.kind and not self.page.arrived:
+            return 0  # still re-rendering: not there yet at this instant
+        return 1
+
+    def wait_for(self, state=None, timeout=None):
+        if self.page.missing == self.kind:
+            raise TimeoutError("timed out")
+        if self.page.late == self.kind:
+            self.page.arrived = True  # waiting is what lets it appear
 
     def click(self):
         if self.kind == "button":
@@ -179,7 +199,8 @@ class FakeLocator:
 
 
 class FakePage:
-    def __init__(self, missing=None, ignore_typing=False):
+    def __init__(self, missing=None, ignore_typing=False, late=None):
+        self.late, self.arrived = late, False
         self.events, self.value, self.typed, self.missing, self.ignore = (
             [],
             "November 2026",
@@ -259,9 +280,13 @@ def test_each_month_is_typed_selected_and_downloaded_in_order_with_a_pause(tmp_p
 def test_a_page_that_changed_fails_loudly_instead_of_downloading_the_wrong_month(
     tmp_path,
 ):
-    with pytest.raises(venmo.VenmoPageError, match="month field"):
+    with pytest.raises(
+        venmo.VenmoPageError, match=r"month field did not appear.*found 0"
+    ):
         venmo.fetch_statements(FakePage(missing="field"), ["2026-01"])
-    with pytest.raises(venmo.VenmoPageError, match="Download CSV"):
+    with pytest.raises(
+        venmo.VenmoPageError, match=r"Download CSV button did not appear.*found 0"
+    ):
         venmo.fetch_statements(FakePage(missing="button"), ["2026-01"])
     stuck = FakePage(ignore_typing=True)
     with pytest.raises(venmo.VenmoPageError, match="could not select January 2026"):
@@ -458,3 +483,41 @@ def test_chrome_is_closed_even_when_a_download_fails(monkeypatch, tmp_path):
     with pytest.raises(venmo.VenmoPageError):
         fetch_mod.fetch("venmo-dragos", ["2026-11"], profiles=str(tmp_path))
     assert ctx.closed
+
+
+def test_a_button_that_appears_late_is_waited_for_not_given_up_on(tmp_path):
+    """The first production run counted the buttons right after typing the month, while Venmo was re-rendering, found
+    none and failed with "not on the page". The button is there a moment later; the code must wait for it."""
+    page = FakePage(late="button")
+    csv_file = tmp_path / "s.csv"
+    csv_file.write_text("x\n")
+    page.csv_path = str(csv_file)
+    assert (
+        page.get_by_role("button", name="Download CSV").count() == 0
+    )  # absent at first, as in production
+    files = venmo.fetch_statements(page, ["2025-12"], sleep=lambda s: None)
+    assert [f["month"] for f in files] == ["2025-12"] and (
+        "download",
+        "December 2025",
+    ) in page.events
+    late_field = FakePage(late="field")
+    late_field.csv_path = str(csv_file)
+    assert (
+        venmo.fetch_statements(late_field, ["2025-12"], sleep=lambda s: None)[0][
+            "month"
+        ]
+        == "2025-12"
+    )
+
+
+def test_an_unexpected_playwright_error_is_not_mistaken_for_a_missing_control():
+    class Boom:
+        first = None
+
+        def wait_for(self, **kw):
+            raise RuntimeError("browser crashed")
+
+    boom = Boom()
+    boom.first = boom
+    with pytest.raises(RuntimeError, match="browser crashed"):
+        venmo._wait_visible(boom, "the thing")

@@ -26,11 +26,27 @@ def month_label(month: str) -> str:
     return f"{calendar.month_name[int(number)]} {int(year)}"
 
 
+def _wait_visible(locator, what: str, timeout_ms=20000):
+    """Wait for a control the way a person would: the page re-renders while a month loads, so it may be briefly absent.
+    (The first production run counted the buttons the instant after typing the month, found none, and gave up.)"""
+    try:
+        locator.first.wait_for(state="visible", timeout=timeout_ms)
+    except Exception as e:
+        if (
+            type(e).__name__ != "TimeoutError"
+        ):  # Playwright's TimeoutError; anything else is a different problem
+            raise
+        raise VenmoPageError(
+            f"{what} did not appear within {timeout_ms // 1000} s (found {locator.count()} on the page)"
+        ) from None
+    return locator.first
+
+
 def select_month(page, month: str, settle=2.5) -> None:
     label = month_label(month)
-    field = page.locator("input[placeholder='MMMM YYYY']")
-    if field.count() != 1:
-        raise VenmoPageError("the month field is not on the page (Venmo changed it?)")
+    field = _wait_visible(
+        page.locator("input[placeholder='MMMM YYYY']"), "the month field"
+    )
     field.click()
     field.fill(label)
     page.keyboard.press("Enter")
@@ -42,9 +58,9 @@ def select_month(page, month: str, settle=2.5) -> None:
 def download_month(page, month: str) -> str:
     """The text of the statement CSV for one month."""
     select_month(page, month)
-    button = page.get_by_role("button", name="Download CSV")
-    if button.count() != 1:
-        raise VenmoPageError("the Download CSV button is not on the page")
+    button = _wait_visible(
+        page.get_by_role("button", name="Download CSV"), "the Download CSV button"
+    )
     with page.expect_download(timeout=60000) as download:
         button.click()
     path = download.value.path()
