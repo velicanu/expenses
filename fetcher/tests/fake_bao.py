@@ -20,6 +20,7 @@ class FakeBao:
         self.totp = {"venmo"}
         self.requests = []
         self.login_status = 200
+        self.registry = None  # the account list: absent until the page first runs
 
     def __call__(self, req, timeout=None):
         path = req.full_url.removeprefix(ADDR)
@@ -34,6 +35,15 @@ class FakeBao:
             return self._reply(403, {"errors": ["permission denied"]})
         kind, _, rest = path.removeprefix("/v1/").partition("/")
         if kind == "kv":
+            if rest == "data/fetcher-meta/accounts":
+                if body is not None:
+                    if token != WRITER:
+                        return self._reply(403, {})
+                    self.registry = body["data"]
+                    return self._reply(200, {"data": {"version": 1}})
+                if self.registry is None:
+                    return self._reply(404, {})
+                return self._reply(200, {"data": {"data": self.registry}})
             name = rest.removeprefix("data/fetcher/")
             if rest.startswith("metadata/"):
                 name = rest.removeprefix("metadata/fetcher/")

@@ -149,6 +149,31 @@ class Vault:
                 f"cannot get a TOTP code for {name!r} (HTTP {e.status})"
             ) from None
 
+    def registry(self) -> list | None:
+        """The list of accounts (kv/fetcher-meta/accounts): not secret, so the page and the nightly job both read it."""
+        try:
+            return self._call(
+                f"/v1/{KV}/data/fetcher-meta/accounts", token=self._auth()
+            )["data"]["data"].get("accounts")
+        except _Http as e:
+            if e.status == 404:
+                return None
+            raise VaultError(
+                f"cannot read the account list (HTTP {e.status})"
+            ) from None
+
+    def save_registry(self, accounts: list) -> None:
+        try:
+            self._call(
+                f"/v1/{KV}/data/fetcher-meta/accounts",
+                {"data": {"accounts": accounts}},
+                token=self._auth(),
+            )
+        except _Http as e:
+            raise VaultError(
+                f"cannot save the account list (HTTP {e.status})"
+            ) from None
+
     def status(self, name: str) -> dict:
         """What is stored, as booleans and a date, never a value. Works with the write-only role: it reads the kv entry's
         metadata (versions and times), not its data, and a TOTP key's settings, which hold no seed."""

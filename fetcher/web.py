@@ -21,8 +21,8 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field
 
+from . import accounts as acct
 from . import vault as vault_mod
-from .accounts import ACCOUNTS
 
 STATIC = Path(__file__).parent / "static"
 
@@ -97,12 +97,26 @@ def create_app(settings: Settings, bao: "vault_mod.Vault") -> FastAPI:
             raise HTTPException(403, "this account may not use this page")
         return email
 
-    def same_origin_json(request: Request) -> None:
-        """CSRF: a write must be JSON (which a cross-site form cannot send) from this site's own origin."""
-        if not request.headers.get("content-type", "").startswith("application/json"):
-            raise HTTPException(415, "expected JSON")
+    def same_origin(request: Request) -> None:
+        """CSRF: a write must come from this site's own origin (browsers always send Origin on a write)."""
         if request.headers.get("origin") != settings.public_origin:
             raise HTTPException(403, "wrong origin")
+
+    def same_origin_json(request: Request) -> None:
+        """...and a body must be JSON, which a cross-site form cannot send."""
+        if not request.headers.get("content-type", "").startswith("application/json"):
+            raise HTTPException(415, "expected JSON")
+        same_origin(request)
+
+    registry_lock = threading.Lock()
+
+    def accounts_list() -> list[dict]:
+        """The account list from bao, saved there on first use from the defaults (the existing data files' accounts)."""
+        stored = bao.registry()
+        if stored is None:
+            stored = acct.defaults()
+            bao.save_registry(stored)
+        return acct.clean(stored)
 
     @app.exception_handler(RequestValidationError)
     async def invalid(request: Request, exc: RequestValidationError):
@@ -127,8 +141,19 @@ def create_app(settings: Settings, bao: "vault_mod.Vault") -> FastAPI:
         name: str, request: Request, email: str = Depends(current_email)
     ) -> str:
         """Runs before the body is parsed: who, which account, and where the request came from."""
-        if name not in ACCOUNTS:
-            raise HTTPException(404, "unknown account")
+        same_origin_json(request)
+        try:
+            if name not in {a["key"] for a in accounts_list()}:
+                raise HTTPException(404, "unknown account")
+        except vault_mod.VaultError:
+            raise HTTPException(502, "cannot read the account list") from None
+        return email
+
+    def origin_guard(request: Request, email: str = Depends(current_email)) -> str:
+        same_origin(request)
+        return email
+
+    def json_guard(request: Request, email: str = Depends(current_email)) -> str:
         same_origin_json(request)
         return email
 
@@ -147,12 +172,62 @@ def create_app(settings: Settings, bao: "vault_mod.Vault") -> FastAPI:
     @app.get("/api/accounts")
     def accounts(email: str = Depends(current_email)):
         out = []
-        for name, label in ACCOUNTS.items():
+        try:
+            listed = accounts_list()
+        except vault_mod.VaultError as e:
+            return JSONResponse({"error": str(e)}, status_code=502)
+        for a in listed:
             try:
-                out.append({"name": name, "label": label, **bao.status(name)})
+                out.append({**a, **bao.status(a["key"])})
             except vault_mod.VaultError as e:
-                out.append({"name": name, "label": label, "error": str(e)})
-        return {"email": email, "accounts": out}
+                out.append({**a, "error": str(e)})
+        return {
+            "email": email,
+            "institutions": [
+                {"id": k, "label": v} for k, v in acct.INSTITUTIONS.items()
+            ],
+            "accounts": out,
+        }
+
+    class AccountIn(BaseModel):
+        institution: str = Field(min_length=1, max_length=32)
+        owner: str = Field(default="", max_length=32)
+
+    @app.post("/api/accounts")
+    def add_account(body: AccountIn, email: str = Depends(json_guard)):
+        try:
+            new = acct.entry(body.institution, body.owner)
+        except acct.AccountError as e:
+            return JSONResponse({"error": str(e)}, status_code=422)
+        with registry_lock:
+            try:
+                current = accounts_list()
+                if new["key"] in {a["key"] for a in current}:
+                    return JSONResponse(
+                        {"error": f"{new['label']} is already listed"}, status_code=409
+                    )
+                bao.save_registry(current + [new])
+            except vault_mod.VaultError as e:
+                audit(email, "add-account", new["key"], False)
+                return JSONResponse({"error": str(e)}, status_code=502)
+        audit(email, "add-account", new["key"], True)
+        return {"ok": True, "account": new}
+
+    @app.delete("/api/accounts/{name}")
+    def remove_account(name: str, email: str = Depends(origin_guard)):
+        """Takes the account off the list. Stored credentials stay in bao (this role cannot delete them) and are
+        used again if the account is re-added."""
+        with registry_lock:
+            try:
+                current = accounts_list()
+                if name not in {a["key"] for a in current}:
+                    raise HTTPException(404, "unknown account")
+                bao.save_registry([a for a in current if a["key"] != name])
+            except vault_mod.VaultError as e:
+                audit(email, "remove-account", name, False)
+                return JSONResponse({"error": str(e)}, status_code=502)
+        audit(email, "remove-account", name, True)
+        return {"ok": True}
 
     @app.post("/api/accounts/{name}/credentials")
     def save(
