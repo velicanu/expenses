@@ -218,3 +218,120 @@ def test_against_a_real_openbao():
     assert reader.registry() == [{"institution": "venmo", "owner": "viral"}]
     with pytest.raises(v.VaultError):
         reader.save_registry([])
+
+
+# --- the login token is renewed before it expires -----------------------------------------------------------------
+
+
+class _Json:
+    def __init__(self, payload):
+        self._b = json.dumps(payload).encode()
+
+    def read(self):
+        return self._b
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+
+class RotatingBao:
+    """Each login issues a new token; a token stops working when its lease is over (what the real bao does)."""
+
+    def __init__(self, lease=900, clock=None):
+        self.lease, self.clock, self.logins, self.expires, self.refuse_login = (
+            lease,
+            clock,
+            0,
+            {},
+            False,
+        )
+
+    def __call__(self, req, timeout=None):
+        path = req.full_url.removeprefix(ADDR)
+        if path == "/v1/auth/approle/login":
+            if self.refuse_login:
+                raise urllib.error.HTTPError("u", 403, "denied", {}, None)
+            self.logins += 1
+            token = f"t{self.logins}"
+            self.expires[token] = self.clock() + (self.lease or 900)
+            return _Json(
+                {
+                    "auth": {
+                        "client_token": token,
+                        **({"lease_duration": self.lease} if self.lease else {}),
+                    }
+                }
+            )
+        token = req.get_header("X-vault-token")
+        if token not in self.expires or self.clock() >= self.expires[token]:
+            raise urllib.error.HTTPError("u", 403, "permission denied", {}, None)
+        return _Json({"data": {"data": {"username": "u", "password": "p"}}})
+
+
+class Clock:
+    def __init__(self):
+        self.t = 1000.0
+
+    def __call__(self):
+        return self.t
+
+
+def make_rotating(lease=900):
+    clock = Clock()
+    bao = RotatingBao(lease, clock)
+    return v.Vault(ADDR, "r", "s", bao, clock=clock), bao, clock
+
+
+def test_one_login_serves_many_calls_within_the_lease():
+    vault, bao, clock = make_rotating()
+    for _ in range(5):
+        assert vault.password("venmo") == "p"
+        clock.t += 100  # 500 s in all: inside three quarters of 900 s
+    assert bao.logins == 1
+
+
+def test_a_long_running_service_logs_in_again_before_its_token_expires():
+    """The bug: the page cached its first token forever, so 15 minutes after a restart every bao call was refused (403)."""
+    vault, bao, clock = make_rotating(lease=900)
+    assert vault.password("venmo") == "p" and bao.logins == 1
+    clock.t += (
+        700  # past three quarters of the lease, before it ends: renewed ahead of time
+    )
+    assert vault.password("venmo") == "p" and bao.logins == 2
+    clock.t += 2 * 3600  # hours later, as in the page left open overnight
+    assert vault.password("venmo") == "p" and bao.logins == 3
+
+
+def test_a_login_reply_without_a_lease_is_renewed_soon_not_never():
+    vault, bao, clock = make_rotating(lease=0)
+    vault.password("venmo")
+    clock.t += 200
+    vault.password("venmo")
+    assert bao.logins == 1
+    clock.t += 100  # 300 s: past 0.75 * the 300 s default
+    vault.password("venmo")
+    assert bao.logins == 2
+
+
+def test_a_ready_made_token_is_used_as_given_and_never_renewed():
+    clock = Clock()
+    bao = RotatingBao(clock=clock)
+    bao.expires["cli-token"] = clock.t + 10**9
+    vault = v.Vault(ADDR, "", "", bao, token="cli-token", clock=clock)
+    clock.t += 10**6
+    assert vault.password("venmo") == "p"
+    assert bao.logins == 0
+
+
+def test_a_refused_renewal_is_a_clear_error_and_the_next_call_tries_again():
+    vault, bao, clock = make_rotating()
+    vault.password("venmo")
+    clock.t += 800
+    bao.refuse_login = True
+    with pytest.raises(v.VaultError, match="refused the fetcher's login"):
+        vault.password("venmo")
+    bao.refuse_login = False
+    assert vault.password("venmo") == "p"
