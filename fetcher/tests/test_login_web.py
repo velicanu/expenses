@@ -467,11 +467,12 @@ def test_the_expense_url_comes_only_from_the_servers_own_setting(monkeypatch):
 def test_the_status_lists_the_institutions_done_can_fetch_from(ctx):
     client, _, _ = ctx
     assert client.get("/api/login", headers=ME).json()["fetch_institutions"] == [
-        "venmo"
-    ]  # not wealthfront: no downloader yet
+        "venmo",
+        "wealthfront",
+    ]  # the ones with a downloader
 
 
-def test_wealthfront_can_start_a_hand_login_but_is_not_fetchable(ctx):
+def test_wealthfront_can_start_a_hand_login(ctx):
     client, browser, _ = ctx
     by = {
         a["key"]: a for a in client.get("/api/accounts", headers=ME).json()["accounts"]

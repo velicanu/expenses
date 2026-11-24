@@ -29,7 +29,9 @@ import re
 import time
 import urllib.error
 import urllib.request
+from collections import Counter
 from datetime import date
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 MIN_INTERVAL = 600  # seconds between successful fetches of one account
@@ -131,6 +133,78 @@ def _add_months(d: date, n: int) -> date:
     return date(index // 12, index % 12 + 1, 1)
 
 
+# --- Wealthfront: the same idea, a different identity -----------------------------------------------------------------
+# Wealthfront's export has no transaction ID, and it later relabels old rows (the Type column, reworded descriptions), so a
+# row is identified by (date, amount) and counted: two equal rows on one day are two transactions. Only the surplus over what
+# the account's raw files already hold is added, and never anything dated before the earliest row already there (the
+# export goes back to the account's opening; the raw files start where the person chose to).
+
+WF_HEADER = ["Transaction date", "Description", "Type", "Amount"]
+
+
+def _wf_date(text: str) -> date:
+    m, d, y = text.strip().split("/")
+    return date(int(y), int(m), int(d))
+
+
+def _wf_key(row: list[str]) -> tuple[date, Decimal]:
+    return _wf_date(row[0]), Decimal(row[3].strip())
+
+
+def parse_wealthfront(text: str):
+    """(header, rows) of a Wealthfront activity export, newest first as downloaded."""
+    rows = list(csv.reader(io.StringIO(text, newline="")))
+    if not rows or rows[0] != WF_HEADER:
+        raise DirectPullError("the download is not Wealthfront's activity export")
+    body = [r for r in rows[1:] if r]
+    try:
+        for r in body:
+            if len(r) != len(WF_HEADER):
+                raise ValueError
+            _wf_key(r)
+    except (ValueError, InvalidOperation):
+        raise DirectPullError(
+            "Wealthfront changed the layout of its activity export"
+        ) from None
+    return rows[0], body
+
+
+def known_wealthfront(raw_dir: Path, account: str) -> Counter:
+    """(date, amount) -> how many rows the account's raw files hold."""
+    seen = Counter()
+    for path in _raw_files(raw_dir, account):
+        try:
+            rows = list(csv.reader(open(path, newline="")))
+        except (OSError, csv.Error):
+            continue
+        if not rows or rows[0] != WF_HEADER:
+            continue
+        for r in rows[1:]:
+            try:
+                seen[_wf_key(r)] += 1
+            except (ValueError, InvalidOperation, IndexError):
+                continue
+    return seen
+
+
+def append_new_wealthfront(
+    raw_dir: Path, account: str, header: list[str], rows: list[list[str]]
+) -> int:
+    have = known_wealthfront(raw_dir, account)
+    earliest = min((k[0] for k in have), default=None)
+    candidates = [r for r in rows if earliest is None or _wf_date(r[0]) >= earliest]
+    candidates.reverse()  # oldest first; the sort below is stable, so a day keeps its order
+    candidates.sort(key=lambda r: _wf_date(r[0]))
+    fresh = []
+    for r in candidates:
+        k = _wf_key(r)
+        if have[k] > 0:
+            have[k] -= 1
+        else:
+            fresh.append(r)
+    return _append_rows(raw_dir, account, header, fresh)
+
+
 # --- adding what is new ------------------------------------------------------------------------------------------
 
 
@@ -151,9 +225,16 @@ def append_new(
             continue
         seen.add(tid)
         fresh.append(r)
+    fresh.sort(key=lambda r: r[date_col])  # stable: ties keep the statement's order
+    return _append_rows(raw_dir, account, header, fresh)
+
+
+def _append_rows(
+    raw_dir: Path, account: str, header: list[str], fresh: list[list[str]]
+) -> int:
+    """Add rows to the end of <account>-direct.csv (created with the header); what is there stays byte for byte."""
     if not fresh:
         return 0
-    fresh.sort(key=lambda r: r[date_col])  # stable: ties keep the statement's order
     target = raw_dir / f"{account}-direct.csv"
     out = io.StringIO()
     writer = csv.writer(out, lineterminator="\n")
@@ -328,12 +409,20 @@ def refresh_account(
         }
     pulled, header = 0, None
     try:
-        parsed = [
-            parse_statement(f["csv"], account.get("institution", "venmo"))
-            for f in sorted(result.get("files", []), key=lambda f: f["month"])
-        ]
-        for header, transactions in parsed:
-            pulled += append_new(store.raw_dir, alias, header, transactions)
+        files = sorted(result.get("files", []), key=lambda f: f["month"])
+        if account.get("institution") == "wealthfront":
+            parsed = [parse_wealthfront(f["csv"]) for f in files]
+            for header, transactions in parsed:
+                pulled += append_new_wealthfront(
+                    store.raw_dir, alias, header, transactions
+                )
+        else:
+            parsed = [
+                parse_statement(f["csv"], account.get("institution", "venmo"))
+                for f in files
+            ]
+            for header, transactions in parsed:
+                pulled += append_new(store.raw_dir, alias, header, transactions)
     except DirectPullError as e:
         return {"alias": alias, "error": str(e)}
     store.mark_direct_success(alias, now)

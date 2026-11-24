@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from typing import Callable
 from urllib.parse import urlparse
 
-from . import venmo
+from . import venmo, wealthfront
 
 LOGGED_IN = "logged_in"
 LOGIN_REQUIRED = "login_required"
@@ -105,6 +105,7 @@ INSTITUTIONS = {
         # /login, which the classifier reads as "login needed". Not yet confirmed by an automated visit.
         home_url="https://www.wealthfront.com/dashboard",
         classify=classify_wealthfront,
+        download=wealthfront.fetch_statements,
         # worked out on 2026-11-24 by hand: the sign-in page focuses the email field and Chrome offers the saved login;
         # Down + Return accepts it (fills both fields), Return submits. Wealthfront then sometimes asks for an authenticator
         # code (it did on the second attempt): the "totp" step types the current one from the owner's KeePass file and

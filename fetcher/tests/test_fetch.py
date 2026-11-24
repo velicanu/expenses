@@ -537,10 +537,10 @@ def test_an_unexpected_playwright_error_is_not_mistaken_for_a_missing_control():
         venmo._wait_visible(boom, "the thing")
 
 
-def test_an_institution_without_a_downloader_checks_the_login_but_fetches_nothing(
-    monkeypatch, tmp_path
-):
-    """Wealthfront's hand login works; downloading is not built yet, so a fetch says so instead of doing something wrong."""
+def test_wealthfront_fetch_returns_the_one_all_time_file(monkeypatch, tmp_path):
+    """Wealthfront's export is one all-time file; the months asked for do not apply."""
+    from fetcher import wealthfront
+
     dash = _FakeChromePage(
         "https://www.wealthfront.com/dashboard",
         200,
@@ -548,13 +548,11 @@ def test_an_institution_without_a_downloader_checks_the_login_but_fetches_nothin
         title="Wealthfront",
     )
     ctx = _with_fake_playwright(monkeypatch, dash)
+    monkeypatch.setattr(wealthfront, "download_all", lambda page: "the,csv\n")
     out = fetch_mod.fetch("wealthfront-dragos", ["2026-11"], profiles=str(tmp_path))
-    assert out == {
-        "state": "error",
-        "message": "downloading from wealthfront is not built yet",
-        "files": [],
-        "auto_login": "not attempted",
-    }
+    assert out["state"] == "logged_in" and out["files"] == [
+        {"month": "all", "csv": "the,csv\n"}
+    ]
     assert ctx.closed
     login = _FakeChromePage(
         "https://www.wealthfront.com/login",
