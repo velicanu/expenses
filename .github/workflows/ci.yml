@@ -56,6 +56,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install pytest fastapi httpx uvicorn
+      - run: pip install pytest fastapi httpx uvicorn pykeepass pyotp
       - name: Fetcher tests (no browser or network needed)
         run: python -m pytest -q fetcher/tests

@@ -142,13 +142,19 @@ FETCH_SECONDS = 420  # a first pull downloads a year of months, a few seconds ap
 
 
 def _run_fetch(
-    account: str, months: list[str], profiles: str, timeout=FETCH_SECONDS
+    account: str,
+    months: list[str],
+    profiles: str,
+    autologin: bool = False,
+    timeout=FETCH_SECONDS,
 ) -> dict:
     """`python -m fetcher fetch ...` under its own virtual display; its one JSON line is the result. Whatever goes
     wrong is reduced to a message with no page text."""
     argv = [
         "xvfb-run",
         "-a",
+        "-s",
+        "-screen 0 1280x960x24",  # room for the 540x960 window an automatic login opens
         sys.executable,
         "-m",
         "fetcher",
@@ -159,7 +165,11 @@ def _run_fetch(
     try:
         proc = subprocess.Popen(
             argv,
-            env={**os.environ, "FETCHER_PROFILES": profiles},
+            env={
+                **os.environ,
+                "FETCHER_PROFILES": profiles,
+                "FETCHER_AUTOLOGIN": "1" if autologin else "0",
+            },
             start_new_session=True,
             stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
@@ -285,7 +295,7 @@ class Sessions:
             self._deadline = self._clock() + self.minutes * 60
             self._result = None
 
-    def fetch(self, account: str, months: list[str]) -> dict:
+    def fetch(self, account: str, months: list[str], autologin: bool = False) -> dict:
         """Download statements on the account's saved login (the Refresh data button). One at a time, and never while a
         hand login is open: both use the account's browser profile."""
         if institutions.find(account) is None:
@@ -304,7 +314,7 @@ class Sessions:
                 raise StartError("a fetch is already running")
             self._fetching = True
         try:
-            return self._fetch_runner(account, months, self.profiles)
+            return self._fetch_runner(account, months, self.profiles, autologin)
         finally:
             with self._lock:
                 self._fetching = False
@@ -377,6 +387,7 @@ class StartIn(BaseModel):
 class FetchIn(BaseModel):
     account: str
     months: list[str] = Field(max_length=MAX_MONTHS)
+    autologin: bool = False  # the app allows one automatic login attempt if the saved login has lapsed
 
 
 def create_app(token: str, sessions: Sessions) -> FastAPI:
@@ -402,7 +413,7 @@ def create_app(token: str, sessions: Sessions) -> FastAPI:
     @app.post("/fetch", dependencies=[Depends(authorized)])
     def fetch(body: FetchIn):
         try:
-            return sessions.fetch(body.account, body.months)
+            return sessions.fetch(body.account, body.months, body.autologin)
         except StartError as e:
             raise HTTPException(409, str(e)) from None
 

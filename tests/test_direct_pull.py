@@ -267,7 +267,7 @@ def test_a_pull_keeps_every_existing_key_and_edit_and_adds_the_new_rows(store):
         def login_link(self, account):
             return f"{self.login_url}/login?account={account}"
 
-        def fetch(self, account, months):
+        def fetch(self, account, months, autologin=False):
             self.asked.append((account, months))
             return {
                 "state": "logged_in",
@@ -348,7 +348,7 @@ class Fake:
     def login_link(self, account):
         return f"{self.login_url}/login?account={account}"
 
-    def fetch(self, account, months):
+    def fetch(self, account, months, autologin=False):
         self.asked.append((account, months))
         if self.error:
             raise self.error
@@ -890,3 +890,196 @@ def test_a_bot_check_is_named_as_one_with_where_it_happened(store):
         plain["login_needed"]
         == "Venmo is asking for a login (HTTP 200 at id.venmo.com/signin); log in by hand to fetch it"
     )
+
+
+# --- automatic login: who may try, how often, and what each outcome says ----------------------------------------------
+
+
+class Recorder(Fake):
+    """A Fake that remembers whether each fetch was allowed to log in by itself."""
+
+    def __init__(self, *results):
+        super().__init__(None)
+        self.queue, self.allowed = list(results), []
+
+    def fetch(self, account, months, autologin=False):
+        self.allowed.append(autologin)
+        self.asked.append((account, months))
+        return self.queue.pop(0) if len(self.queue) > 1 else self.queue[0]
+
+
+def auto_account(**kw):
+    return {
+        "alias": "wealthfront-dragos",
+        "institution": "wealthfront",
+        "autologin": True,
+        **kw,
+    }
+
+
+def wf_store(store, **kw):
+    store.add_direct_account("wealthfront-dragos", "wealthfront", autologin=True)
+    return store
+
+
+def test_only_an_account_set_up_for_it_is_ever_allowed_to_log_in_by_itself(store):
+    wf_store(store)
+    plain = Recorder(LOGGED_IN)
+    dp.refresh_account(
+        store, account(last_ok=NOW - 30), plain, TODAY, NOW
+    )  # Venmo: no autologin flag
+    assert plain.allowed == [False]
+    auto = Recorder(LOGGED_IN)
+    dp.refresh_account(store, auto_account(last_ok=NOW - 30), auto, TODAY, NOW)
+    assert auto.allowed == [True]
+
+
+def test_an_account_that_can_log_in_is_visited_even_when_its_saved_login_looks_stale(
+    store,
+):
+    wf_store(store)
+    rec = Recorder({"state": "logged_in", "files": [], "auto_login": "ok"})
+    out = dp.refresh_account(
+        store, auto_account(last_ok=None), rec, TODAY, NOW
+    )  # no login on record at all
+    assert rec.allowed == [True]  # the login lapses within minutes; trying is the point
+    assert out == {
+        "alias": "wealthfront-dragos",
+        "pulled": 0,
+        "months": 0,
+        "auto_login": "ok",
+    }
+    assert (
+        store.direct_accounts()[0]["last_ok"] == NOW
+        and store.direct_accounts()[0]["autologin_failed"] is None
+    )
+
+
+def test_a_fresh_login_by_a_person_never_asks_for_an_automatic_one(store):
+    wf_store(store)
+    rec = Recorder(LOGGED_IN)
+    dp.refresh_account(store, auto_account(), rec, TODAY, NOW, fresh=True)
+    assert rec.allowed == [False]
+
+
+def test_a_failed_automatic_login_is_named_recorded_and_not_retried_for_a_while(store):
+    wf_store(store)
+    failed = {
+        "state": "login_required",
+        "files": [],
+        "detail": "HTTP 200 at www.wealthfront.com/login",
+        "auto_login": "failed",
+    }
+    rec = Recorder(failed)
+    out = dp.refresh_account(store, auto_account(), rec, TODAY, NOW)
+    assert "error" not in out and out["auto_login"] == "failed"
+    assert out["login_needed"] == (
+        "the automatic login did not get in (Wealthfront is asking for a login, HTTP 200 at www.wealthfront.com/login); "
+        "log in by hand to fetch it"
+    )
+    assert out["login_url"] == "https://fetch.test/login?account=wealthfront-dragos"
+    state = store.direct_accounts()[0]
+    assert (
+        state["autologin_failed"] == NOW
+        and state["last_ok"] is None
+        and state["last_success"] is None
+    )
+    # a moment later: no visit at all, and it says why
+    soon = dp.refresh_account(store, state, no_visit(), TODAY, NOW + 120)
+    assert soon["login_needed"].startswith(
+        "the automatic login failed 2 min ago and is not retried yet; "
+    )
+    # past the pause it may try again
+    again = Recorder(LOGGED_IN | {"auto_login": "ok"})
+    ok = dp.refresh_account(
+        store, store.direct_accounts()[0], again, TODAY, NOW + dp.AUTOLOGIN_RETRY + 1
+    )
+    assert again.allowed == [True] and ok["auto_login"] == "ok"
+    assert (
+        store.direct_accounts()[0]["autologin_failed"] is None
+    )  # a success clears the failure
+
+
+def test_inside_the_pause_a_login_a_person_just_did_is_still_fetched_without_another_attempt(
+    store,
+):
+    wf_store(store)
+    store.mark_direct_autologin("wealthfront-dragos", NOW - 60)
+    store.mark_direct_session(
+        "wealthfront-dragos", NOW - 30
+    )  # they logged in by hand a moment ago
+    rec = Recorder(LOGGED_IN)
+    out = dp.refresh_account(store, store.direct_accounts()[0], rec, TODAY, NOW)
+    assert rec.allowed == [False] and out["pulled"] == 0
+
+
+def test_a_site_without_login_steps_is_not_marked_as_failed(store):
+    wf_store(store)
+    rec = Recorder(
+        {"state": "login_required", "files": [], "auto_login": "unsupported"}
+    )
+    out = dp.refresh_account(store, auto_account(), rec, TODAY, NOW)
+    assert "login_needed" in out and "auto_login" not in out
+    assert (
+        store.direct_accounts()[0]["autologin_failed"] is None
+    )  # nothing was attempted, so nothing is held back
+
+
+def test_a_crash_during_an_automatic_login_attempt_is_an_error_not_a_login_problem(
+    store,
+):
+    wf_store(store)
+    rec = Recorder(
+        {
+            "state": "error",
+            "message": "the fetch took too long",
+            "files": [],
+            "auto_login": "failed",
+        }
+    )
+    out = dp.refresh_account(store, auto_account(), rec, TODAY, NOW)
+    assert out == {"alias": "wealthfront-dragos", "error": "the fetch took too long"}
+
+
+def test_the_client_asks_for_an_automatic_login_only_when_allowed():
+    sent = []
+
+    def opener(req, timeout=None):
+        sent.append(json.loads(req.data))
+        return Resp({"state": "logged_in", "files": []})
+
+    c = dp.FetcherClient("http://127.0.0.1:8097", "t" * 32, "", opener)
+    c.fetch("a", ["2026-11"])
+    c.fetch("a", ["2026-11"], autologin=True)
+    assert sent == [
+        {"account": "a", "months": ["2026-11"]},
+        {"account": "a", "months": ["2026-11"], "autologin": True},
+    ]
+
+
+def test_add_direct_can_turn_automatic_login_on(tmp_path, monkeypatch):
+    from server import cli
+
+    root = tmp_path / "data"
+    settings = Settings(
+        data_root=root, users={"me@example.com": "me"}, trusted_proxies=frozenset()
+    )
+    assert cli.add_direct(settings, "me", "venmo-dragos") == 0
+    assert cli.add_direct(settings, "me", "wealthfront-dragos", autologin=True) == 0
+    by = {a["alias"]: a for a in UserStore(root / "me").direct_accounts()}
+    assert (
+        by["venmo-dragos"]["autologin"] is False
+        and by["wealthfront-dragos"]["autologin"] is True
+    )
+    # and the command line accepts the flag (main reads its settings from the environment)
+    users = tmp_path / "users.json"
+    users.write_text(json.dumps({"me@example.com": "me"}))
+    monkeypatch.setenv("USERS_FILE", str(users))
+    monkeypatch.setenv("DATA_ROOT", str(root))
+    UserStore(root / "me").update_config(
+        lambda c: c["direct_accounts"].pop("wealthfront-dragos")
+    )
+    assert cli.main(["add-direct", "me", "wealthfront-dragos", "--autologin"]) == 0
+    assert {
+        a["alias"]: a["autologin"] for a in UserStore(root / "me").direct_accounts()
+    }["wealthfront-dragos"] is True

@@ -36,6 +36,9 @@ MIN_INTERVAL = 600  # seconds between successful fetches of one account
 SESSION_TRUST = (
     25 * 60
 )  # a login seen working this recently is believed to still work (Venmo's lasted 30-40 minutes)
+AUTOLOGIN_RETRY = (
+    30 * 60
+)  # after a failed automatic login, none for this long (a site that refuses is not hammered)
 MAX_MONTHS = 24  # the most one pull will ask for
 FIRST_PULL_MONTHS = 12  # when an account has no data at all yet
 
@@ -196,10 +199,15 @@ class FetcherClient:
         """Where the person fixes a login that has lapsed (the credentials page's hand-login)."""
         return f"{self.login_url}/login?account={account}" if self.login_url else None
 
-    def fetch(self, account: str, months: list[str]) -> dict:
+    def fetch(self, account: str, months: list[str], autologin: bool = False) -> dict:
+        body = {"account": account, "months": months}
+        if autologin:
+            body["autologin"] = (
+                True  # one automatic login attempt is allowed if the saved login has lapsed
+            )
         req = urllib.request.Request(
             self._url + "/fetch",
-            data=json.dumps({"account": account, "months": months}).encode(),
+            data=json.dumps(body).encode(),
             method="POST",
             headers={
                 "Authorization": f"Bearer {self._token}",
@@ -230,6 +238,10 @@ def _ago(seconds: float) -> str:
     return f"{minutes} min" if minutes < 90 else f"{minutes // 60} h"
 
 
+def _name(account: dict) -> str:
+    return (account.get("institution") or "the site").capitalize()
+
+
 def refresh_account(
     store, account: dict, client, today: date, now: float, fresh: bool = False
 ) -> dict:
@@ -243,7 +255,12 @@ def refresh_account(
             "alias": alias,
             "skipped": f"fetched moments ago; it can be fetched again in about {wait} min",
         }
-    if not fresh:
+    # An account set up for automatic login (a site where that works: no captcha) may log itself in once if its saved
+    # login has lapsed, but not again for AUTOLOGIN_RETRY after a failed attempt: a site that refuses is not hammered.
+    failed_at = account.get("autologin_failed")
+    retry_blocked = bool(failed_at and now - failed_at < AUTOLOGIN_RETRY)
+    may_autologin = bool(account.get("autologin")) and not retry_blocked and not fresh
+    if not fresh and not may_autologin:
         seen = account.get("last_ok")
         if not seen or now - seen > SESSION_TRUST:
             how = (
@@ -251,18 +268,28 @@ def refresh_account(
                 if seen
                 else "not logged in since it was last checked"
             )
+            why = (
+                f"the automatic login failed {_ago(now - failed_at)} ago and is not retried yet; "
+                if retry_blocked and account.get("autologin")
+                else ""
+            )
             return {
                 "alias": alias,
-                "login_needed": f"the saved login has probably expired ({how}); log in by hand to fetch it",
+                "login_needed": f"{why}the saved login has probably expired ({how}); log in by hand to fetch it",
                 "login_url": client.login_link(alias),
             }
     ids, latest = known(store.raw_dir, alias)
     months = months_to_fetch(latest, today)
     try:
-        result = client.fetch(alias, months)
+        result = client.fetch(alias, months, autologin=may_autologin)
     except FetcherError as e:
         return {"alias": alias, "error": str(e)}
     state = result.get("state")
+    auto = result.get("auto_login")
+    if auto == "failed":
+        store.mark_direct_autologin(alias, now)  # no automatic retry for a while
+    elif auto == "ok":
+        store.mark_direct_autologin(alias, None)
     if (
         state == "error"
     ):  # the fetch itself broke: say so, do not call it a login problem
@@ -271,20 +298,33 @@ def refresh_account(
         store.mark_direct_session(
             alias, None
         )  # known logged out: no more visits until a person logs in
+        name = _name(account)
         reason = {
-            "login_required": "Venmo is asking for a login",
-            "challenge": "Venmo showed its bot check",
+            "login_required": f"{name} is asking for a login",
+            "challenge": f"{name} showed its bot check",
         }.get(state, "could not tell whether the session is logged in")
         detail = result.get(
             "detail"
         )  # e.g. "HTTP 403 at id.venmo.com/signin": status and page, never page text
+        tried = (
+            f"the automatic login did not get in ({reason}"
+            + (f", {detail}" if detail else "")
+            + ")"
+            if auto == "failed"
+            else None
+        )
         return {
             "alias": alias,
-            "login_needed": f"{reason} ({detail}); log in by hand to fetch it"
-            if detail
-            else f"{reason}; log in by hand to fetch it",
+            "login_needed": f"{tried}; log in by hand to fetch it"
+            if tried
+            else (
+                f"{reason} ({detail}); log in by hand to fetch it"
+                if detail
+                else f"{reason}; log in by hand to fetch it"
+            ),
             "state": state,
             "login_url": client.login_link(alias),
+            **({"auto_login": "failed"} if auto == "failed" else {}),
         }
     pulled, header = 0, None
     try:
@@ -297,7 +337,12 @@ def refresh_account(
     except DirectPullError as e:
         return {"alias": alias, "error": str(e)}
     store.mark_direct_success(alias, now)
-    return {"alias": alias, "pulled": pulled, "months": len(parsed)}
+    out = {"alias": alias, "pulled": pulled, "months": len(parsed)}
+    if auto == "ok":
+        out["auto_login"] = (
+            "ok"  # the saved login had lapsed and the automatic login got back in
+        )
+    return out
 
 
 def refresh_direct(

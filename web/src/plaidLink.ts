@@ -139,7 +139,7 @@ export function pullLine(r: PullResult): string {
           ? `${a.alias}: ${a.skipped}`
           : loginNeeded(a)
             ? `${a.alias}: ${a.login_needed}`
-            : `${a.alias}: ${a.pulled} transactions`,
+            : `${a.alias}: ${a.pulled} transactions${a.auto_login === "ok" ? " (logged in automatically)" : ""}`,
     )
     .join("; ");
 }

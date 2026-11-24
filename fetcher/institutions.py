@@ -38,6 +38,8 @@ class Institution:
     # (page, months) -> [{"month", "csv"}]: how to download this institution's statements. None until one is built: the
     # hand login still works (it is a person in Chrome), but nothing is fetched and Done does not send you to Refresh.
     download: Callable | None = None
+    # fixed keystrokes that log in with Chrome's own saved login (see autologin.py), or None where that was not worked out
+    autologin: tuple | None = None
 
 
 def human_check(facts: PageFacts) -> bool:
@@ -103,6 +105,17 @@ INSTITUTIONS = {
         # /login, which the classifier reads as "login needed". Not yet confirmed by an automated visit.
         home_url="https://www.wealthfront.com/dashboard",
         classify=classify_wealthfront,
+        # worked out on 2026-11-24 by hand: the sign-in page focuses the email field and Chrome offers the saved login;
+        # Down + Return accepts it (fills both fields), Return submits. It got in on the first attempt.
+        autologin=(
+            ("wait", 10),
+            ("key", "Down"),
+            ("wait", 1),
+            ("key", "Return"),
+            ("wait", 2),
+            ("key", "Return"),
+            ("wait", 14),
+        ),
     ),
 }
 
