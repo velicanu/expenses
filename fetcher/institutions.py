@@ -106,13 +106,20 @@ INSTITUTIONS = {
         home_url="https://www.wealthfront.com/dashboard",
         classify=classify_wealthfront,
         # worked out on 2026-11-24 by hand: the sign-in page focuses the email field and Chrome offers the saved login;
-        # Down + Return accepts it (fills both fields), Return submits. It got in on the first attempt.
+        # Down + Return accepts it (fills both fields), Return submits. Wealthfront then sometimes asks for an authenticator
+        # code (it did on the second attempt): the "totp" step types the current one from the owner's KeePass file and
+        # Return submits it. If no code is asked for, those keys land on the logged-in page and do nothing.
+        # PROVISIONAL until run for real: the code page's focus and timing have not been seen.
         autologin=(
             ("wait", 10),
             ("key", "Down"),
             ("wait", 1),
             ("key", "Return"),
             ("wait", 2),
+            ("key", "Return"),
+            ("wait", 8),
+            ("totp", "wealthfront"),
+            ("wait", 1),
             ("key", "Return"),
             ("wait", 14),
         ),

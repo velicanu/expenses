@@ -16,12 +16,27 @@ WEALTHFRONT = inst.get("wealthfront-dragos").autologin
 
 def test_wealthfronts_steps_are_valid_and_mean_what_was_worked_out_by_hand():
     assert al.valid_steps(WEALTHFRONT)
-    keys = [arg for kind, arg in WEALTHFRONT if kind == "key"]
-    assert keys == ["Down", "Return", "Return"]  # accept the saved login, then submit
     assert WEALTHFRONT[0] == (
         "wait",
         10,
     )  # the page loads and offers the saved login first
+    kinds = [(k, a) for k, a in WEALTHFRONT if k != "wait"]
+    assert kinds == [
+        ("key", "Down"),  # accept the saved login...
+        ("key", "Return"),  # ...(fills email and password)
+        ("key", "Return"),  # submit the form
+        (
+            "totp",
+            "wealthfront",
+        ),  # if a code is asked for: the current one from the KeePass entry
+        ("key", "Return"),  # submit the code
+    ]
+    submit = WEALTHFRONT.index(
+        ("key", "Return"), WEALTHFRONT.index(("key", "Return")) + 1
+    )
+    assert ("wait", 8) in WEALTHFRONT[
+        submit:
+    ]  # the code page gets time to load before anything is typed
 
 
 @pytest.mark.parametrize(
@@ -90,6 +105,8 @@ def run(rig, tmp_path, steps=WEALTHFRONT):
         send_key=rig.key,
         sleep=rig.sleep,
         close=rig.close,
+        send_text=lambda text: rig.log.append(("type", len(text))),
+        get_code=lambda name: "123456",
     )
 
 
@@ -98,7 +115,7 @@ def test_one_attempt_starts_a_plain_chrome_sends_the_steps_in_order_and_closes_c
 ):
     rig = Rig()
     run(rig, tmp_path)
-    assert [e for e in rig.log if e[0] in ("spawn", "key", "wait")] == [
+    assert [e for e in rig.log if e[0] in ("spawn", "key", "wait", "type")] == [
         ("spawn", "fluxbox"),
         ("spawn", "google-chrome-stable"),
         ("wait", 10),
@@ -106,6 +123,10 @@ def test_one_attempt_starts_a_plain_chrome_sends_the_steps_in_order_and_closes_c
         ("wait", 1),
         ("key", "Return"),
         ("wait", 2),
+        ("key", "Return"),
+        ("wait", 8),
+        ("type", 6),  # the code: typed after the code page had time to load
+        ("wait", 1),
         ("key", "Return"),
         ("wait", 14),
     ]
