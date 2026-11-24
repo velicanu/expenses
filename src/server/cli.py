@@ -3,7 +3,7 @@
 pull:        Refresh data for every user with linked Plaid or browser-pulled accounts (what the Refresh data button does).
              One line per account on stdout; exits 1 if any account failed. There is no schedule: data is pulled when
              someone clicks Refresh data (or runs this by hand).
-add-direct:  python -m server.cli add-direct USER ACCOUNT   make ACCOUNT (e.g. venmo-dragos, an account on the fetcher's
+add-direct:  python -m server.cli add-direct USER ACCOUNT [--autologin]   make ACCOUNT (e.g. venmo-dragos, an account on the fetcher's
              credentials page that has a sign-in flow) part of USER's Refresh data.
 """
 
@@ -68,7 +68,9 @@ def pull(settings: Settings, client_factory=make_client, fetcher=None) -> int:
     return 1 if failed else 0
 
 
-def add_direct(settings: Settings, user: str = "", account: str = "") -> int:
+def add_direct(
+    settings: Settings, user: str = "", account: str = "", autologin: bool = False
+) -> int:
     from .direct_pull import schema
 
     if user not in set(settings.users.values()) or not account:
@@ -83,7 +85,9 @@ def add_direct(settings: Settings, user: str = "", account: str = "") -> int:
     except Exception:
         print(f"no direct pull for {institution!r} yet", file=sys.stderr)
         return 2
-    Stores(settings.data_root).get(user).add_direct_account(account, institution)
+    Stores(settings.data_root).get(user).add_direct_account(
+        account, institution, autologin=autologin
+    )
     print(f"{user}: {account} will be fetched by Refresh data")
     return 0
 
@@ -101,11 +105,12 @@ def main(argv=None) -> int:
     )
     ap.add_argument("command", choices=["pull", "add-direct"])
     ap.add_argument("args", nargs="*")
+    ap.add_argument("--autologin", action="store_true")
     ns = ap.parse_args(argv)
     quiet()
     settings = Settings.from_env()
     if ns.command == "add-direct":
-        return add_direct(settings, *ns.args)
+        return add_direct(settings, *ns.args, autologin=ns.autologin)
     return pull(settings, client_factory=make_client)
 
 

@@ -76,6 +76,35 @@ describe("Inputs", () => {
     expect(screen.getByRole("status")).toBeInTheDocument();
   });
 
+  it("Refresh data says when an account's saved login had lapsed and it logged itself in", async () => {
+    await inputs({
+      "POST /api/accounts/pull": { accounts: [{ alias: "wealthfront-dragos", pulled: 5, months: 2, auto_login: "ok" }], pipeline: null },
+    });
+    await userEvent.click(screen.getByRole("button", { name: "Refresh data" }));
+    expect(await screen.findByText(/wealthfront-dragos: 5 transactions \(logged in automatically\)/)).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("an automatic login that did not get in is information with the hand-login link, not an alert", async () => {
+    await inputs({
+      "POST /api/accounts/pull": {
+        accounts: [
+          {
+            alias: "wealthfront-dragos",
+            login_needed: "the automatic login did not get in (Wealthfront is asking for a login, HTTP 200 at www.wealthfront.com/login); log in by hand to fetch it",
+            login_url: "https://fetch.velicanu.com/login?account=wealthfront-dragos",
+            auto_login: "failed",
+          },
+        ],
+        pipeline: null,
+      },
+    });
+    await userEvent.click(screen.getByRole("button", { name: "Refresh data" }));
+    expect(await screen.findByText(/the automatic login did not get in/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Log in to wealthfront-dragos by hand" })).toHaveAttribute("href", "https://fetch.velicanu.com/login?account=wealthfront-dragos");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
   it("a login problem that comes with a real failure is still an alert, and still links", async () => {
     await inputs({
       "POST /api/accounts/pull": {

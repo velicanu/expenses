@@ -77,6 +77,23 @@ describe("arriving from the hand-login page's Done (/?refresh=<account>)", () =>
     await waitFor(() => expect(screen.queryByText(/venmo-dragos: 3 transactions/)).toBeNull());
   });
 
+  it("says what is going on if the fetch is slow, without claiming a year of data", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      mockApi(appRoutes({ "POST /api/accounts/pull": () => new Promise<Response>(() => {}) })); // never answers
+      arrive();
+      renderWithClient(<App />);
+      expect(screen.getByText("Fetching venmo-dragos…")).toBeInTheDocument();
+      expect(screen.queryByText(/Still working/)).toBeNull(); // not at first
+      await vi.advanceTimersByTimeAsync(16000);
+      const hint = await screen.findByText(/Still working/);
+      expect(hint).toHaveTextContent("checks the login, then downloads the recent statements");
+      expect(hint.textContent).not.toMatch(/year/i);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("the ordinary page, without ?refresh, fetches nothing on load", async () => {
     const calls = mockApi(appRoutes({}));
     renderWithClient(<App />);

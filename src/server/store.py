@@ -324,15 +324,33 @@ class UserStore:
                 "last_ok": a.get(
                     "last_ok"
                 ),  # the last time its saved login was seen working
+                "autologin": bool(
+                    a.get("autologin")
+                ),  # may log itself in (a site with no check in the way)
+                "autologin_failed": a.get(
+                    "autologin_failed"
+                ),  # when the last automatic login did not get in
             }
             for k, a in (self.config().get("direct_accounts") or {}).items()
         ]
 
-    def add_direct_account(self, alias: str, institution: str):
+    def add_direct_account(self, alias: str, institution: str, autologin: bool = False):
         def apply(cfg):
-            cfg.setdefault("direct_accounts", {}).setdefault(
+            entry = cfg.setdefault("direct_accounts", {}).setdefault(
                 alias, {"alias": alias, "institution": institution}
             )
+            if autologin:
+                entry["autologin"] = True
+
+        self.update_config(apply)
+
+    def mark_direct_autologin(self, alias: str, failed_at: float | None):
+        """When an automatic login last failed (None once one worked): none is retried for a while after a failure."""
+
+        def apply(cfg):
+            entry = (cfg.get("direct_accounts") or {}).get(alias)
+            if entry is not None:
+                entry["autologin_failed"] = failed_at
 
         self.update_config(apply)
 

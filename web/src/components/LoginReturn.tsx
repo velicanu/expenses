@@ -25,7 +25,11 @@ export function LoginReturn({ alias, onDone }: { alias: string; onDone: (outcome
   return (
     <main className="oauth-return" aria-live="polite">
       <p className="spinner">Fetching {alias}…</p>
-      {slow && <p className="muted">A first fetch downloads about a year of statements and can take a couple of minutes.</p>}
+      {slow && (
+        <p className="muted">
+          Still working: it checks the login, then downloads the recent statements. That is usually under a minute; an account's very first fetch can take a couple of minutes.
+        </p>
+      )}
     </main>
   );
 }

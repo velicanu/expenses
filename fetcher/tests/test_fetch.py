@@ -10,7 +10,7 @@ from test_browserd import AUTH, TOKEN, World
 
 
 def runner_returning(result, calls=None):
-    def run(account, months, profiles):
+    def run(account, months, profiles, autologin=False):
         if calls is not None:
             calls.append((account, list(months), profiles))
         return result
@@ -63,7 +63,7 @@ def test_a_fetch_and_a_hand_login_never_overlap(world):
     gate, entered = threading.Event(), threading.Event()
     result = {"state": "logged_in", "files": []}
 
-    def slow(account, months, profiles):
+    def slow(account, months, profiles, autologin=False):
         entered.set()
         gate.wait(5)
         return result
@@ -84,7 +84,7 @@ def test_a_fetch_and_a_hand_login_never_overlap(world):
 
 
 def test_a_crashing_fetch_releases_the_lock(world):
-    def boom(account, months, profiles):
+    def boom(account, months, profiles, autologin=False):
         raise RuntimeError("boom")
 
     s = sessions(world, boom)
@@ -312,7 +312,7 @@ def test_main_prints_one_json_line_and_never_a_traceback(capsys, monkeypatch):
     monkeypatch.setattr(
         fetch_mod,
         "fetch",
-        lambda account, months: {"state": "login_required", "files": []},
+        lambda account, months, **kw: {"state": "login_required", "files": []},
     )
     assert fetch_mod.main("venmo-dragos", ["2026-11"]) == 0
     assert json.loads(capsys.readouterr().out) == {
@@ -320,7 +320,7 @@ def test_main_prints_one_json_line_and_never_a_traceback(capsys, monkeypatch):
         "files": [],
     }
 
-    def broken(account, months):
+    def broken(account, months, **kw):
         raise RuntimeError("secret page text 123")
 
     monkeypatch.setattr(fetch_mod, "fetch", broken)
@@ -332,7 +332,7 @@ def test_main_prints_one_json_line_and_never_a_traceback(capsys, monkeypatch):
         "files": [],
     } and "secret" not in json.dumps(out)
 
-    def page_changed(account, months):
+    def page_changed(account, months, **kw):
         raise venmo.VenmoPageError(
             "the month field is not on the page (Venmo changed it?)"
         )
@@ -391,15 +391,21 @@ def _with_downloader(monkeypatch, fn):
     monkeypatch.setitem(inst.INSTITUTIONS, "venmo", swapped)
 
 
-def _with_fake_playwright(monkeypatch, page):
+def _with_fake_playwright(monkeypatch, page, *later_pages):
+    """The first launch gets `page`, each following launch the next of `later_pages` (then the last again). Returns the
+    first context; `.all` on it lists every context handed out, in order."""
     import sys
     import types
 
-    ctx = _FakeContext(page)
+    contexts = [_FakeContext(p) for p in (page, *later_pages)]
+    ctx = contexts[0]
+    ctx.all = contexts
+    launches = []
 
     class Chromium:
         def launch_persistent_context(self, *a, **kw):
-            return ctx
+            launches.append(1)
+            return contexts[min(len(launches), len(contexts)) - 1]
 
     class PW:
         chromium = Chromium()
@@ -432,6 +438,7 @@ def test_a_bot_challenge_is_reported_with_its_status_and_page_but_no_query_or_te
         "state": "challenge",
         "files": [],
         "detail": "HTTP 403 at id.venmo.com/signin",
+        "auto_login": "not attempted",
     }
     assert "secret" not in json.dumps(out) and "human" not in json.dumps(out)
     assert ctx.closed  # Chrome is closed properly in every case
@@ -467,6 +474,7 @@ def test_a_login_page_is_login_required_and_a_logged_in_page_downloads(
     ) == {
         "state": "logged_in",
         "files": [{"month": "2026-10", "csv": "c"}, {"month": "2026-11", "csv": "c"}],
+        "auto_login": "not attempted",
     }
     assert ctx.closed
 
@@ -545,6 +553,7 @@ def test_an_institution_without_a_downloader_checks_the_login_but_fetches_nothin
         "state": "error",
         "message": "downloading from wealthfront is not built yet",
         "files": [],
+        "auto_login": "not attempted",
     }
     assert ctx.closed
     login = _FakeChromePage(
@@ -560,4 +569,52 @@ def test_an_institution_without_a_downloader_checks_the_login_but_fetches_nothin
         out["state"] == "login_required"
         and out["detail"] == "HTTP 200 at www.wealthfront.com/login"
         and ctx.closed
+    )
+
+
+# --- the permission to retry a lapsed login travels from the app to the child process ---------------------------------
+
+
+def test_the_autologin_permission_reaches_the_runner_and_defaults_to_no(world):
+    seen = []
+
+    def run(account, months, profiles, autologin=False):
+        seen.append(autologin)
+        return {"state": "logged_in", "files": []}
+
+    s = sessions(world, run)
+    s.fetch("venmo-dragos", ["2026-11"])
+    s.fetch("venmo-dragos", ["2026-11"], autologin=True)
+    assert seen == [False, True]
+    c = TestClient(browserd.create_app(TOKEN, s))
+    c.post(
+        "/fetch", json={"account": "venmo-dragos", "months": ["2026-11"]}, headers=AUTH
+    )
+    c.post(
+        "/fetch",
+        json={"account": "venmo-dragos", "months": ["2026-11"], "autologin": True},
+        headers=AUTH,
+    )
+    assert seen[2:] == [False, True]
+
+
+def test_the_real_runner_hands_the_permission_to_the_child_and_gives_it_a_big_enough_display(
+    tmp_path, monkeypatch
+):
+    import stat
+
+    fake = tmp_path / "xvfb-run"
+    fake.write_text(
+        '#!/bin/sh\necho "{\\"state\\": \\"logged_in\\", \\"files\\": [], \\"autologin_env\\": \\"$FETCHER_AUTOLOGIN\\", \\"args\\": \\"$*\\"}"\n'
+    )
+    fake.chmod(fake.stat().st_mode | stat.S_IEXEC)
+    monkeypatch.setenv("PATH", f"{tmp_path}:/usr/bin:/bin")
+    off = browserd._run_fetch("venmo-dragos", ["2026-11"], "/profiles", timeout=10)
+    on = browserd._run_fetch(
+        "venmo-dragos", ["2026-11"], "/profiles", autologin=True, timeout=10
+    )
+    assert (off["autologin_env"], on["autologin_env"]) == ("0", "1")
+    assert (
+        "-screen 0 1280x960x24" in on["args"]
+        and "-m fetcher fetch venmo-dragos 2026-11" in on["args"]
     )
