@@ -12,34 +12,20 @@ transactions oldest first, an ending-balance row.
 import calendar
 import time
 
+from .pageutil import PageError
+from .pageutil import wait_visible as _wait_visible
+
 STATEMENT_URL = "https://account.venmo.com/statement"
 PAUSE = 4.0  # seconds between downloads: a person does not click this fast, and it is kinder to the site
 
 
-class VenmoPageError(Exception):
-    pass
+VenmoPageError = PageError
 
 
 def month_label(month: str) -> str:
     """'2025-12' -> 'December 2025'"""
     year, number = month.split("-")
     return f"{calendar.month_name[int(number)]} {int(year)}"
-
-
-def _wait_visible(locator, what: str, timeout_ms=20000):
-    """Wait for a control the way a person would: the page re-renders while a month loads, so it may be briefly absent.
-    (The first production run counted the buttons the instant after typing the month, found none, and gave up.)"""
-    try:
-        locator.first.wait_for(state="visible", timeout=timeout_ms)
-    except Exception as e:
-        if (
-            type(e).__name__ != "TimeoutError"
-        ):  # Playwright's TimeoutError; anything else is a different problem
-            raise
-        raise VenmoPageError(
-            f"{what} did not appear within {timeout_ms // 1000} s (found {locator.count()} on the page)"
-        ) from None
-    return locator.first
 
 
 def select_month(page, month: str, settle=2.5) -> None:

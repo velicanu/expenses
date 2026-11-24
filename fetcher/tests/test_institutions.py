@@ -191,10 +191,10 @@ def test_wealthfront_challenges_and_foreign_pages_are_never_logged_in():
     )
 
 
-def test_only_venmo_has_a_downloader_so_far():
+def test_venmo_and_wealthfront_have_downloaders():
     assert inst.get("venmo").download is not None
     w = inst.get("wealthfront-dragos")  # an account key finds its institution
-    assert w.name == "wealthfront" and w.download is None
+    assert w.name == "wealthfront" and w.download is not None
     assert w.start_url == "https://www.wealthfront.com/login"
     assert (
         w.home_url == "https://www.wealthfront.com/dashboard"
