@@ -99,8 +99,9 @@ INSTITUTIONS = {
     "wealthfront": Institution(
         name="wealthfront",
         start_url="https://www.wealthfront.com/login",
-        # a logged-in browser is sent on to its dashboard, a logged-out one gets the sign-in form (provisional, see above)
-        home_url="https://www.wealthfront.com/login",
+        # where a logged-in browser lands (reported by the owner, 2026-11-23); a logged-out one is expected to be sent on to
+        # /login, which the classifier reads as "login needed". Not yet confirmed by an automated visit.
+        home_url="https://www.wealthfront.com/dashboard",
         classify=classify_wealthfront,
     ),
 }

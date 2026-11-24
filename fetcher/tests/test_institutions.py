@@ -196,3 +196,29 @@ def test_only_venmo_has_a_downloader_so_far():
     w = inst.get("wealthfront-dragos")  # an account key finds its institution
     assert w.name == "wealthfront" and w.download is None
     assert w.start_url == "https://www.wealthfront.com/login"
+    assert (
+        w.home_url == "https://www.wealthfront.com/dashboard"
+    )  # where a logged-in browser lands
+
+
+def test_a_logged_out_visit_to_the_dashboard_is_login_needed_and_a_logged_in_one_is_not():
+    """home_url is /dashboard: logged out, Wealthfront is expected to send the browser on to its sign-in form."""
+    cw = inst.classify_wealthfront
+    assert (
+        cw(
+            facts(
+                "https://www.wealthfront.com/login",
+                title="Login - Wealthfront",
+                password=True,
+            )
+        )
+        == LOGIN_REQUIRED
+    )  # what visit 1 saw
+    assert (
+        cw(
+            facts(
+                "https://www.wealthfront.com/dashboard", title="Dashboard - Wealthfront"
+            )
+        )
+        == LOGGED_IN
+    )
