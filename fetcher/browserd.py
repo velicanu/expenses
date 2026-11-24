@@ -79,6 +79,34 @@ def _vnc_ready() -> bool:
         return s.connect_ex(("127.0.0.1", VNC_PORT)) == 0
 
 
+def _keep_session_cookies(profile: Path) -> bool:
+    """Set Chrome's "Continue where you left off" in the profile, before it starts.
+
+    Why: by default Chrome drops a site's session cookies (the usual kind of bank login) when it closes, and does not even
+    write a cookie to disk if it is closed within about 30 seconds of getting it. Measured on tess (3 runs each): default
+    profile, closed after 6 s: nothing survives; after 40 s: only persistent cookies; with this setting: both survive, even
+    closed after 6 s. So a login done by hand would be gone before the next visit. Returns whether the setting is in place;
+    a profile this cannot be applied to (corrupt file, no write access) is left exactly as it was."""
+    path = profile / "Default" / "Preferences"
+    try:
+        prefs = json.loads(path.read_text()) if path.exists() else {}
+        if not isinstance(prefs, dict):
+            return False
+        session = prefs.setdefault("session", {})
+        if not isinstance(session, dict):
+            return False
+        if session.get("restore_on_startup") == 1:
+            return True
+        session["restore_on_startup"] = 1
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_name("Preferences.tmp")
+        tmp.write_text(json.dumps(prefs))
+        os.replace(tmp, path)
+        return True
+    except (OSError, ValueError):
+        return False
+
+
 def _signal(proc, sig):
     """Signal just this process (not its group): Chrome shuts its own children down when it is asked nicely."""
     try:
@@ -175,6 +203,7 @@ class Sessions:
         ready_timeout: float = 10,
         grace: float = 15,
         fetch_runner=_run_fetch,
+        prepare_profile=_keep_session_cookies,
     ):
         self.profiles, self.minutes = profiles, minutes
         self._spawn, self._kill_group = spawn, kill_group
@@ -184,6 +213,7 @@ class Sessions:
         self._lock = threading.RLock()
         self._procs: list = []
         self._fetch_runner = fetch_runner
+        self._prepare_profile = prepare_profile
         self._fetching = False
         self._browser = None
         self._account: str | None = None
@@ -208,6 +238,7 @@ class Sessions:
             pwfile.chmod(0o600)
             self._pwfile = pwfile
             env = {**os.environ, "DISPLAY": DISPLAY}
+            self._prepare_profile(Path(self.profiles) / account)
             try:
                 self._procs.append(
                     self._spawn(

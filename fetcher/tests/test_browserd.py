@@ -1,3 +1,4 @@
+import json
 import os
 import signal
 import stat
@@ -37,6 +38,7 @@ class World:
         self.procs, self.now, self.x_ok, self.vnc_ok = [], 1000.0, True, True
         self.tmp = tmp_path
         self.browser_quits_when_asked = True  # Chrome does; a hung one would not
+        self.prepared = []  # (profile, how many processes had been started by then)
 
     def spawn(self, argv, env=None):
         p = FakeProc(argv, env)
@@ -66,6 +68,10 @@ class World:
             spawn=self.spawn,
             kill_group=self.kill_group,
             signal_proc=self.signal_proc,
+            prepare_profile=lambda profile: self.prepared.append(
+                (str(profile), len(self.procs))
+            )
+            or True,
             grace=0.3,
             x_ready=lambda: self.x_ok,
             vnc_ready=lambda: self.vnc_ok,
@@ -310,3 +316,67 @@ def test_a_wealthfront_hand_login_opens_its_sign_in_page_in_a_plain_chrome(world
         flag in " ".join(chrome.argv)
         for flag in ("playwright", "--enable-automation", "--remote-debugging")
     )
+
+
+# --- the profile is set up so a login survives Chrome closing -----------------------------------------------------------
+
+
+def test_the_profile_is_prepared_before_chrome_starts(world):
+    world.sessions().start("venmo-dragos")
+    assert world.prepared == [
+        ("/profiles/venmo-dragos", 0)
+    ]  # for this account's own profile, with nothing started yet
+
+
+def test_continue_where_you_left_off_is_set_in_a_new_profile(tmp_path):
+    profile = tmp_path / "wealthfront-dragos"
+    assert browserd._keep_session_cookies(profile) is True
+    prefs = json.loads((profile / "Default" / "Preferences").read_text())
+    assert prefs == {"session": {"restore_on_startup": 1}}
+
+
+def test_it_keeps_every_other_preference_and_does_not_rewrite_what_is_already_right(
+    tmp_path,
+):
+    profile = tmp_path / "p"
+    (profile / "Default").mkdir(parents=True)
+    path = profile / "Default" / "Preferences"
+    path.write_text(
+        json.dumps(
+            {
+                "profile": {"exit_type": "SessionEnded", "name": "x"},
+                "session": {"other": 5},
+                "homepage": "h",
+            }
+        )
+    )
+    assert browserd._keep_session_cookies(profile) is True
+    prefs = json.loads(path.read_text())
+    assert prefs["session"] == {"other": 5, "restore_on_startup": 1}
+    assert (
+        prefs["profile"] == {"exit_type": "SessionEnded", "name": "x"}
+        and prefs["homepage"] == "h"
+    )
+    before = (path.stat().st_ino, path.stat().st_mtime_ns)
+    assert browserd._keep_session_cookies(profile) is True
+    after = (path.stat().st_ino, path.stat().st_mtime_ns)
+    assert (
+        after == before
+    )  # already right: not rewritten (a rewrite is a new file, so a new inode)
+    assert not list((profile / "Default").glob("Preferences.tmp"))  # no stray temp file
+
+
+def test_a_preferences_file_it_cannot_understand_is_left_exactly_as_it_was(tmp_path):
+    profile = tmp_path / "p"
+    (profile / "Default").mkdir(parents=True)
+    path = profile / "Default" / "Preferences"
+    for content in ("{not json", "[1, 2]", json.dumps({"session": "oops"})):
+        path.write_text(content)
+        assert browserd._keep_session_cookies(profile) is False
+        assert path.read_text() == content
+
+
+def test_a_profile_it_cannot_write_is_not_an_error(tmp_path):
+    blocked = tmp_path / "file"
+    blocked.write_text("a file where a directory should be")
+    assert browserd._keep_session_cookies(blocked / "profile") is False
